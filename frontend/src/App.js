@@ -1,30 +1,21 @@
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
-
-
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Profile from "./pages/Profile";
-import ProductList from "./pages/ProductList";
-import ProductDetail from "./pages/ProductDetail";
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import ProductList from './pages/Products/ProductList';
+import ProductDetail from './pages/Products/ProductDetail';
+import './index.css';
+import './App.css';
 
 function App() {
   return (
-    <BrowserRouter>
-      <nav>
-        <Link to="/">Trang chủ</Link> |{" "}
-        <Link to="/login">Đăng nhập</Link> |{" "}
-        <Link to="/register">Đăng ký</Link> |{" "}
-        <Link to="/profile">Cá nhân</Link>
-      </nav>
-
-      <Routes>
-        <Route path="/" element={<ProductList />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/products/:id" element={<ProductDetail />} />
-      </Routes>
-    </BrowserRouter>
+    <Router>
+      <div className="App">
+        <Routes>
+          <Route path="/" element={<Navigate to="/products" />} />
+          <Route path="/products" element={<ProductList />} />
+          <Route path="/products/:id" element={<ProductDetail />} />
+        </Routes>
+      </div>
+    </Router>
   );
 }
 
