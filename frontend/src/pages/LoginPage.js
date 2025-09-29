@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import authService from '../services/authService';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const LoginPage = () => {
   // State quản lý form đăng nhập
@@ -15,18 +15,23 @@ const LoginPage = () => {
   const [message, setMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Hook điều hướng
+  // Hook điều hướng và auth
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user, login } = useAuth();
+
+  // Redirect path từ ProtectedRoute hoặc mặc định về Homepage
+  const from = location.state?.from?.pathname || '/';
 
   /**
    * Kiểm tra nếu user đã đăng nhập thì chuyển hướng
    */
   useEffect(() => {
-    if (authService.isLoggedIn()) {
-      console.log('👤 User đã đăng nhập, chuyển hướng về profile');
-      navigate('/profile');
+    if (user) {
+      console.log('👤 User đã đăng nhập, chuyển hướng về:', from);
+      navigate(from, { replace: true });
     }
-  }, [navigate]);
+  }, [user, navigate, from]);
 
   /**
    * Xử lý thay đổi giá trị input
@@ -106,10 +111,10 @@ const LoginPage = () => {
 
       console.log('🔐 Đăng nhập với dữ liệu:', { TenDangNhap: loginData.TenDangNhap });
 
-      // Gọi API đăng nhập
-      const result = await authService.login(loginData);
+      // Gọi login từ AuthContext
+      await login(loginData);
 
-      console.log('✅ Đăng nhập thành công:', result);
+      console.log('✅ Đăng nhập thành công');
 
       // Hiển thị thông báo thành công
       setMessage('Đăng nhập thành công! Đang chuyển hướng...');
@@ -120,11 +125,7 @@ const LoginPage = () => {
         MatKhau: ''
       });
 
-      // Chuyển hướng về trang profile sau 1.5 giây
-      setTimeout(() => {
-        navigate('/profile');
-        console.log('🔄 Chuyển hướng về trang profile');
-      }, 1500);
+      // Chuyển hướng sẽ được xử lý bởi useEffect khi user state thay đổi
 
     } catch (error) {
       console.error('❌ Lỗi đăng nhập:', error);
@@ -146,7 +147,7 @@ const LoginPage = () => {
   return (
     <div style={styles.container}>
       <div style={styles.formWrapper}>
-        <h2 style={styles.title}>Đăng nhập</h2>
+        <h2 style={styles.title}>🔐 Đăng nhập</h2>
         
         {/* Hiển thị thông báo */}
         {message && (
@@ -224,7 +225,7 @@ const LoginPage = () => {
             }}
             disabled={loading}
           >
-            {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+            {loading ? '⏳ Đang đăng nhập...' : '🚀 Đăng nhập'}
           </button>
         </form>
 
@@ -247,13 +248,22 @@ const LoginPage = () => {
           <p><strong>Admin:</strong> admin / admin123</p>
           <p><strong>User:</strong> user1 / user123</p>
         </div>
+
+        {/* Debug info (chỉ hiển thị trong development) */}
+        {process.env.NODE_ENV === 'development' && (
+          <div style={styles.debugInfo}>
+            <p><strong>Current user:</strong> {user ? user.tenDangNhap : 'None'}</p>
+            <p><strong>Redirect to:</strong> {from}</p>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-// CSS Styles
+// CSS Styles (giữ nguyên như cũ, chỉ thêm debugInfo)
 const styles = {
+  // ... các styles khác giữ nguyên
   container: {
     minHeight: '100vh',
     display: 'flex',
@@ -361,6 +371,14 @@ const styles = {
   testTitle: {
     margin: '0 0 10px 0',
     fontWeight: 'bold',
+    color: '#495057'
+  },
+  debugInfo: {
+    marginTop: '15px',
+    padding: '10px',
+    backgroundColor: '#e9ecef',
+    borderRadius: '4px',
+    fontSize: '12px',
     color: '#495057'
   }
 };

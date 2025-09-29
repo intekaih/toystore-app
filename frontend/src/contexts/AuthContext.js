@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import authService from '../services/authService';
 
 const AuthContext = createContext();
 
@@ -16,31 +17,33 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // Kiểm tra token trong localStorage khi app khởi động
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    
-    if (token && userData) {
-      try {
-        setUser(JSON.parse(userData));
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+    try {
+      if (authService.isLoggedIn()) {
+        const userData = authService.getUser();
+        setUser(userData);
+        console.log('👤 User đã đăng nhập:', userData);
       }
+    } catch (error) {
+      console.error('Error loading auth state:', error);
+      authService.logout(); // Clear invalid data
     }
     
     setLoading(false);
   }, []);
 
-  const login = (userData, token) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    setUser(userData);
+  const login = async (loginData) => {
+    try {
+      const result = await authService.login(loginData);
+      setUser(result.user);
+      return result;
+    } catch (error) {
+      console.error('Login error in context:', error);
+      throw error;
+    }
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    authService.logout();
     setUser(null);
   };
 
@@ -49,6 +52,8 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     loading,
+    isLoggedIn: () => authService.isLoggedIn(),
+    isAdmin: () => authService.isAdmin(),
   };
 
   return (

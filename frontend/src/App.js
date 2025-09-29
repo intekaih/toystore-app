@@ -2,15 +2,17 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext.js';
 import Navbar from './components/Navbar.js';
+import Homepage from './pages/Homepage.js';
 import ProductList from './pages/Products/ProductList.js';
 import ProductDetail from './pages/Products/ProductDetail.js';
-import Login from './pages/Auth/Login.js';
-import Register from './pages/Auth/Register.js';
-import Profile from './pages/User/Profile.js';
-import EditProfile from './pages/User/EditProfile.js';
+import Login from './pages/LoginPage.js';
+import Register from './pages/RegisterPage.js';
+import Profile from './pages/ProfilePage.js';
+import EditProfilePage from './pages/EditProfilePage.js';
 import ProtectedRoute from './components/ProtectedRoute.js';
 import './index.css';
 import './App.css';
+import './pages/Homepage.css';
 
 function App() {
   return (
@@ -23,7 +25,7 @@ function App() {
               <div className="page-wrapper">
                 <Routes>
                   {/* Public routes */}
-                  <Route path="/" element={<Navigate to="/products" replace />} />
+                  <Route path="/" element={<Homepage />} />
                   <Route path="/products" element={<ProductList />} />
                   <Route path="/products/:id" element={<ProductDetail />} />
                   <Route path="/login" element={<Login />} />
@@ -42,7 +44,7 @@ function App() {
                     path="/profile/edit" 
                     element={
                       <ProtectedRoute>
-                        <EditProfile />
+                        <EditProfilePage />
                       </ProtectedRoute>
                     } 
                   />
@@ -70,7 +72,7 @@ const NotFound = () => {
           <p style={{ color: '#9ca3af', marginBottom: '2rem' }}>
             Trang bạn đang tìm kiếm không tồn tại hoặc đã được chuyển đi.
           </p>
-          <a href="/products" className="btn btn-primary">
+          <a href="/" className="btn btn-primary">
             🏠 Về trang chủ
           </a>
         </div>

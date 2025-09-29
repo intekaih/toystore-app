@@ -1,287 +1,211 @@
-// API service xử lý authentication
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
 
 class AuthService {
-  /**
-   * Đăng ký tài khoản mới
-   * @param {Object} userData - Dữ liệu đăng ký
-   * @param {string} userData.TenDangNhap - Tên đăng nhập
-   * @param {string} userData.MatKhau - Mật khẩu
-   * @param {string} userData.HoTen - Họ tên đầy đủ
-   * @param {string} userData.Email - Địa chỉ email
-   * @param {string} userData.DienThoai - Số điện thoại (tùy chọn)
-   * @returns {Promise} Response từ API
-   */
-  async register(userData) {
-    try {
-      // Debug: In ra URL đang gọi
-      const url = `${API_BASE_URL}/auth/register`;
-      console.log('🌐 API URL:', url);
-      console.log('🌐 API_BASE_URL:', API_BASE_URL);
-      
-      console.log('📤 Gửi yêu cầu đăng ký:', userData);
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(userData)
-      });
-
-      // Debug: Kiểm tra response
-      console.log('📥 Response status:', response.status);
-      console.log('📥 Response headers:', response.headers.get('content-type'));
-
-      // Kiểm tra content-type trước khi parse JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        // Nếu không phải JSON, đọc as text để debug
-        const textResponse = await response.text();
-        console.error('❌ Response không phải JSON:', textResponse);
-        throw new Error('Server trả về response không phải JSON. Kiểm tra URL API.');
-      }
-
-      const data = await response.json();
-
-      // Log response để debug
-      console.log('📥 Response từ server:', {
-        status: response.status,
-        success: data.success,
-        message: data.message
-      });
-
-      // Kiểm tra response status
-      if (!response.ok) {
-        throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      return {
-        success: true,
-        data: data.data,
-        message: data.message
-      };
-
-    } catch (error) {
-      console.error('❌ Lỗi đăng ký:', error);
-
-      // Xử lý các loại lỗi khác nhau
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        throw new Error('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.');
-      }
-
-      // Ném lại lỗi để component xử lý
-      throw error;
-    }
+  constructor() {
+    this.TOKEN_KEY = 'token';
+    this.USER_KEY = 'user';
+    
+    // Tạo axios instance
+    this.api = axios.create({
+      baseURL: API_BASE_URL,
+      timeout: 10000,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
   }
 
   /**
-   * Đăng nhập tài khoản
-   * @param {Object} loginData - Dữ liệu đăng nhập
-   * @param {string} loginData.TenDangNhap - Tên đăng nhập hoặc Email
-   * @param {string} loginData.MatKhau - Mật khẩu
-   * @returns {Promise} Response từ API
+   * Đăng nhập
    */
   async login(loginData) {
     try {
-      const url = `${API_BASE_URL}/auth/login`;
-      console.log('🔐 Gửi yêu cầu đăng nhập đến:', url);
-      console.log('🔐 Dữ liệu đăng nhập:', { TenDangNhap: loginData.TenDangNhap });
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(loginData)
-      });
-
-      // Debug response
-      console.log('📥 Login response status:', response.status);
-      const contentType = response.headers.get('content-type');
+      console.log('🔐 Đang gửi request đăng nhập...');
       
-      if (!contentType || !contentType.includes('application/json')) {
-        const textResponse = await response.text();
-        console.error('❌ Login response không phải JSON:', textResponse);
-        throw new Error('Server trả về response không phải JSON. Kiểm tra URL API.');
+      const response = await this.api.post('/auth/login', loginData);
+      
+      if (response.data && response.data.success) {
+        const { token, user } = response.data.data;
+        
+        // Lưu vào localStorage
+        this.setAuth(token, user);
+        
+        console.log('✅ Đăng nhập thành công:', user);
+        return { token, user };
+      } else {
+        throw new Error(response.data.message || 'Đăng nhập thất bại');
       }
-
-      const data = await response.json();
-      console.log('📥 Login response data:', data);
-
-      if (!response.ok) {
-        throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      // Lưu token vào localStorage nếu đăng nhập thành công
-      if (data.success && data.data && data.data.token) {
-        this.saveToken(data.data.token);
-        this.saveUserInfo(data.data.user);
-        console.log('💾 Đã lưu token và thông tin user');
-      }
-
-      return {
-        success: true,
-        data: data.data,
-        message: data.message
-      };
-
     } catch (error) {
       console.error('❌ Lỗi đăng nhập:', error);
-
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        throw new Error('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.');
+      
+      if (error.response) {
+        const { status, data } = error.response;
+        
+        switch (status) {
+          case 400:
+            throw new Error(data.message || 'Thông tin đăng nhập không hợp lệ');
+          case 401:
+            throw new Error('Tên đăng nhập hoặc mật khẩu không đúng');
+          case 403:
+            throw new Error('Tài khoản đã bị khóa');
+          case 404:
+            throw new Error('Tài khoản không tồn tại');
+          case 500:
+            throw new Error('Lỗi máy chủ, vui lòng thử lại sau');
+          default:
+            throw new Error(data.message || `Lỗi ${status}`);
+        }
+      } else if (error.request) {
+        throw new Error('Không thể kết nối đến máy chủ');
+      } else {
+        throw new Error(error.message || 'Có lỗi xảy ra');
       }
-
-      throw error;
     }
   }
 
   /**
-   * Lưu JWT token vào localStorage
-   * @param {string} token - JWT token
+   * Đăng ký
    */
-  saveToken(token) {
+  async register(registerData) {
     try {
-      localStorage.setItem('token', token);
-      console.log('💾 Token đã được lưu vào localStorage');
+      console.log('📝 Đang gửi request đăng ký...');
+      
+      const response = await this.api.post('/auth/register', registerData);
+      
+      if (response.data && response.data.success) {
+        console.log('✅ Đăng ký thành công');
+        return response.data;
+      } else {
+        throw new Error(response.data.message || 'Đăng ký thất bại');
+      }
     } catch (error) {
-      console.error('❌ Lỗi lưu token:', error);
+      console.error('❌ Lỗi đăng ký:', error);
+      
+      if (error.response) {
+        const { status, data } = error.response;
+        
+        switch (status) {
+          case 400:
+            throw new Error(data.message || 'Thông tin đăng ký không hợp lệ');
+          case 409:
+            throw new Error('Tên đăng nhập hoặc email đã tồn tại');
+          case 500:
+            throw new Error('Lỗi máy chủ, vui lòng thử lại sau');
+          default:
+            throw new Error(data.message || `Lỗi ${status}`);
+        }
+      } else if (error.request) {
+        throw new Error('Không thể kết nối đến máy chủ');
+      } else {
+        throw new Error(error.message || 'Có lỗi xảy ra');
+      }
     }
   }
 
   /**
-   * Lưu thông tin user vào localStorage
-   * @param {Object} user - Thông tin user
+   * Kiểm tra xem user đã đăng nhập chưa
    */
-  saveUserInfo(user) {
-    try {
-      localStorage.setItem('userInfo', JSON.stringify(user));
-      console.log('💾 Thông tin user đã được lưu:', user);
-    } catch (error) {
-      console.error('❌ Lỗi lưu thông tin user:', error);
-    }
+  isLoggedIn() {
+    const token = this.getToken();
+    const user = this.getUser();
+    return !!(token && user && !this.isTokenExpired());
   }
 
   /**
-   * Lấy JWT token từ localStorage
-   * @returns {string|null} JWT token hoặc null nếu không có
+   * Lấy token từ localStorage
    */
   getToken() {
     try {
-      const token = localStorage.getItem('token');
-      return token;
+      return localStorage.getItem(this.TOKEN_KEY);
     } catch (error) {
-      console.error('❌ Lỗi lấy token:', error);
+      console.error('Error getting token:', error);
       return null;
     }
   }
 
   /**
    * Lấy thông tin user từ localStorage
-   * @returns {Object|null} User info hoặc null nếu không có
    */
-  getUserInfo() {
+  getUser() {
     try {
-      const userInfo = localStorage.getItem('userInfo');
-      return userInfo ? JSON.parse(userInfo) : null;
+      const userStr = localStorage.getItem(this.USER_KEY);
+      return userStr ? JSON.parse(userStr) : null;
     } catch (error) {
-      console.error('❌ Lỗi lấy thông tin user:', error);
+      console.error('Error getting user:', error);
       return null;
     }
   }
 
   /**
-   * Kiểm tra user đã đăng nhập chưa
-   * @returns {boolean} True nếu đã đăng nhập
+   * Lưu thông tin user (dùng cho việc update profile)
    */
-  isLoggedIn() {
-    const token = this.getToken();
-    const userInfo = this.getUserInfo();
-    
-    // Kiểm tra có token và thông tin user
-    if (!token || !userInfo) {
-      return false;
-    }
-
-    // Kiểm tra token có hết hạn không (optional)
+  saveUserInfo(user) {
     try {
-      // Decode JWT payload (không verify signature)
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const currentTime = Math.floor(Date.now() / 1000);
-      
-      // Nếu token hết hạn
-      if (payload.exp && payload.exp < currentTime) {
-        console.log('⏰ Token đã hết hạn');
-        this.logout(); // Tự động logout
-        return false;
-      }
-      
-      return true;
+      localStorage.setItem(this.USER_KEY, JSON.stringify(user));
     } catch (error) {
-      console.error('❌ Lỗi kiểm tra token:', error);
-      return false;
+      console.error('Error saving user info:', error);
     }
   }
 
   /**
-   * Đăng xuất - xóa token và thông tin user
+   * Lấy thông tin user (alias cho getUser)
+   */
+  getUserInfo() {
+    return this.getUser();
+  }
+
+  /**
+   * Lưu token và user info vào localStorage
+   */
+  setAuth(token, user) {
+    try {
+      localStorage.setItem(this.TOKEN_KEY, token);
+      localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+    } catch (error) {
+      console.error('Error setting auth:', error);
+    }
+  }
+
+  /**
+   * Xóa thông tin đăng nhập
    */
   logout() {
     try {
-      localStorage.removeItem('token');
-      localStorage.removeItem('userInfo');
-      console.log('🔓 Đã đăng xuất và xóa token, thông tin user');
+      localStorage.removeItem(this.TOKEN_KEY);
+      localStorage.removeItem(this.USER_KEY);
     } catch (error) {
-      console.error('❌ Lỗi đăng xuất:', error);
+      console.error('Error during logout:', error);
     }
   }
 
   /**
-   * Lấy thông tin profile từ API (cần token)
-   * @returns {Promise} Response từ API
+   * Kiểm tra role của user
    */
-  async getProfile() {
+  isAdmin() {
+    const user = this.getUser();
+    return user && user.vaiTro === 'admin';
+  }
+
+  /**
+   * Kiểm tra token có hết hạn không
+   */
+  isTokenExpired() {
+    const token = this.getToken();
+    if (!token) return true;
+
     try {
-      const token = this.getToken();
+      // Decode JWT payload (chỉ để kiểm tra exp, không verify signature)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const currentTime = Date.now() / 1000;
       
-      if (!token) {
-        throw new Error('Không tìm thấy token đăng nhập');
-      }
-
-      const response = await fetch(`${API_BASE_URL}/users/profile`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Nếu token hết hạn hoặc không hợp lệ
-        if (response.status === 401) {
-          this.logout(); // Tự động logout
-        }
-        throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      return {
-        success: true,
-        data: data.data,
-        message: data.message
-      };
-
+      return payload.exp && payload.exp < currentTime;
     } catch (error) {
-      console.error('❌ Lỗi lấy profile:', error);
-      throw error;
+      console.error('Error checking token expiration:', error);
+      return true;
     }
   }
 }
 
-// Export singleton instance
 export default new AuthService();
