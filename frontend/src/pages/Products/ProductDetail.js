@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getProductById } from '../../api/productApi';
+import { getProductById } from '../../api/productApi.js';
 
 const ProductDetail = () => {
   const [product, setProduct] = useState(null);
@@ -23,13 +23,13 @@ const ProductDetail = () => {
     }
   };
 
-  if (loading) return <div>Loading...</div>;
-  if (!product) return <div>Product not found</div>;
+  if (loading) return <div className="loading">Đang tải...</div>;
+  if (!product) return <div>Không tìm thấy sản phẩm</div>;
 
   return (
     <div className="product-detail">
       <Link to="/products" className="back-button">
-        ← Back to Products
+        ← Quay lại danh sách sản phẩm
       </Link>
       
       <div className="product-detail-content">
@@ -43,7 +43,7 @@ const ProductDetail = () => {
 
         <div className="product-info">
           <h1>{product.ten}</h1>
-          <p className="price">{product.giaBan.toLocaleString('vi-VN')} ₫</p>
+          <p className="price">{product.giaBan?.toLocaleString('vi-VN')} ₫</p>
           <p className="stock">Số lượng trong kho: {product.ton}</p>
           <div className="product-description">
             <h3>Mô tả sản phẩm:</h3>

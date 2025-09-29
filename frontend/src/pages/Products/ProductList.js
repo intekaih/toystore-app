@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProducts } from '../../api/productApi';
-import Pagination from '../../components/Pagination';
+import { getProducts } from '../../api/productApi.js';
+import Pagination from '../../components/Pagination.js';
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
