@@ -2,11 +2,11 @@
 💡 Gồm cả Frontend (ReactJS hoặc HTML/CSS/JS) và Backend (Node.js hoặc ASP.NET MVC) tùy stack bạn chọn. Dưới đây là bản trung lập, có thể dùng cho cả hai.
 STT	Chức năng	Mô tả chi tiết	Trạng thái
 A. CHỨC NĂNG NGƯỜI DÙNG (KHÁCH HÀNG)			
-A1	Đăng ký tài khoản	Gửi form đăng ký, lưu vào bảng TaiKhoan với role = 'user'	⬜
-A2	Đăng nhập / Đăng xuất	Xác thực tài khoản, tạo JWT/token/session	⬜
-A3	Cập nhật thông tin cá nhân	Cho phép sửa email, số điện thoại, họ tên,...	⬜
-A4	Xem danh sách sản phẩm	Hiển thị từ bảng SanPham, phân trang, tìm kiếm	⬜
-A5	Xem chi tiết sản phẩm	Tên, mô tả, ảnh, tồn kho, giá,...	⬜
+A1	Đăng ký tài khoản	Gửi form đăng ký, lưu vào bảng TaiKhoan với role = 'user'	✅
+A2	Đăng nhập / Đăng xuất	Xác thực tài khoản, tạo JWT/token/session	✅
+A3	Cập nhật thông tin cá nhân	Cho phép sửa email, số điện thoại, họ tên,...	✅
+A4	Xem danh sách sản phẩm	Hiển thị từ bảng SanPham, phân trang, tìm kiếm	✅
+A5	Xem chi tiết sản phẩm	Tên, mô tả, ảnh, tồn kho, giá,...	✅
 A6	Thêm sản phẩm vào giỏ hàng	Tạo GioHang, GioHangChiTiet	⬜
 A7	Xem & cập nhật giỏ hàng	Tăng giảm số lượng, xóa sản phẩm	⬜
 A8	Đặt hàng (Tạo hóa đơn)	Tạo HoaDon, ChiTietHoaDon, xóa giỏ hàng	⬜

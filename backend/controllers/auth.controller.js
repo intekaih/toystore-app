@@ -11,7 +11,7 @@ exports.register = async (req, res) => {
 
     const { TenDangNhap, MatKhau, HoTen, Email, DienThoai } = req.body;
 
-    // Validate input - HoTen bây giờ là bắt buộc
+    // Validate input - Chỉ TenDangNhap, MatKhau, HoTen là bắt buộc
     if (!TenDangNhap || !MatKhau || !HoTen) {
       return res.status(400).json({
         success: false,
@@ -27,23 +27,24 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Validate email format nếu có
-    if (Email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(Email)) {
+    // Validate email format nếu có (chỉ validate khi Email không rỗng)
+    if (Email && Email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(Email.trim())) {
       return res.status(400).json({
         success: false,
         message: "Định dạng email không hợp lệ"
       });
     }
 
-    // Kiểm tra trùng tên đăng nhập hoặc email trong một query
+    // Kiểm tra trùng tên đăng nhập
     const whereCondition = {
       [Op.or]: [
         { TenDangNhap: TenDangNhap }
       ]
     };
 
-    if (Email) {
-      whereCondition[Op.or].push({ Email: Email });
+    // Chỉ kiểm tra trùng email nếu email được cung cấp và không rỗng
+    if (Email && Email.trim()) {
+      whereCondition[Op.or].push({ Email: Email.trim().toLowerCase() });
     }
 
     const existingUser = await TaiKhoan.findOne({
@@ -57,7 +58,7 @@ exports.register = async (req, res) => {
           message: "Tên đăng nhập đã tồn tại"
         });
       }
-      if (existingUser.Email === Email) {
+      if (Email && Email.trim() && existingUser.Email === Email.trim().toLowerCase()) {
         return res.status(409).json({
           success: false,
           message: "Email đã tồn tại"
@@ -69,13 +70,13 @@ exports.register = async (req, res) => {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(MatKhau, saltRounds);
 
-    // Tạo tài khoản mới
+    // Tạo tài khoản mới - Email và DienThoai có thể null
     const newUser = await TaiKhoan.create({
       TenDangNhap: TenDangNhap.trim(),
       MatKhau: hashedPassword,
-      HoTen: HoTen ? HoTen.trim() : null,
-      Email: Email ? Email.trim().toLowerCase() : null,
-      DienThoai: DienThoai ? DienThoai.trim() : null,
+      HoTen: HoTen.trim(),
+      Email: (Email && Email.trim()) ? Email.trim().toLowerCase() : null,
+      DienThoai: (DienThoai && DienThoai.trim()) ? DienThoai.trim() : null,
       VaiTro: 'user',
       Enable: true
       // Không gửi NgayTao - để SQL Server tự động gán
@@ -228,6 +229,100 @@ exports.login = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Lỗi đăng nhập:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
+    });
+  }
+};
+
+// Hàm đăng nhập admin
+exports.adminLogin = async (req, res) => {
+  try {
+    console.log('🔐 Đăng nhập Admin - Dữ liệu nhận được:', req.body);
+
+    const { username, password } = req.body;
+
+    // Kiểm tra dữ liệu đầu vào
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu'
+      });
+    }
+
+    // Tìm người dùng theo tên đăng nhập, kiểm tra Enable = true và VaiTro = 'admin'
+    const user = await TaiKhoan.findOne({
+      where: {
+        TenDangNhap: username,
+        Enable: true,
+        VaiTro: 'admin' // Chỉ cho phép admin
+      }
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Sai thông tin hoặc không có quyền'
+      });
+    }
+
+    console.log('👤 Tìm thấy admin:', {
+      ID: user.ID,
+      TenDangNhap: user.TenDangNhap,
+      VaiTro: user.VaiTro
+    });
+
+    // So sánh mật khẩu với bcrypt
+    const isPasswordValid = await bcrypt.compare(password, user.MatKhau);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Sai thông tin hoặc không có quyền'
+      });
+    }
+
+    // Kiểm tra JWT_SECRET có tồn tại
+    if (!process.env.JWT_SECRET) {
+      console.error('❌ JWT_SECRET không được cấu hình trong .env');
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi cấu hình server'
+      });
+    }
+
+    // Tạo JWT token với payload { id, role }
+    const token = jwt.sign(
+      {
+        id: user.ID,
+        role: user.VaiTro
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    console.log('✅ Đăng nhập admin thành công:', user.TenDangNhap);
+
+    // Trả về thông tin đăng nhập thành công
+    res.status(200).json({
+      success: true,
+      message: 'Đăng nhập admin thành công',
+      data: {
+        token: token,
+        admin: {
+          id: user.ID,
+          username: user.TenDangNhap,
+          role: user.VaiTro,
+          hoTen: user.HoTen,
+          email: user.Email
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi đăng nhập admin:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server nội bộ',
