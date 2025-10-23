@@ -1,0 +1,89 @@
+/* Card Base */
+.card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+/* Variants */
+.default {
+  border: 1px solid #e5e7eb;
+}
+
+.elevated {
+  border: none;
+}
+
+.outlined {
+  border: 2px solid #667eea;
+}
+
+/* Shadow */
+.shadow {
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.12);
+}
+
+/* Hoverable */
+.hoverable:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(102, 126, 234, 0.18);
+}
+
+/* Clickable */
+.clickable {
+  cursor: pointer;
+}
+
+/* Padding Variants */
+.padding-none .body {
+  padding: 0;
+}
+
+.padding-small .header,
+.padding-small .body,
+.padding-small .footer {
+  padding: 1rem;
+}
+
+.padding-normal .header,
+.padding-normal .body,
+.padding-normal .footer {
+  padding: 1.5rem;
+}
+
+.padding-large .header,
+.padding-large .body,
+.padding-large .footer {
+  padding: 2rem;
+}
+
+/* Header */
+.header {
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.subtitle {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.9375rem;
+  color: #6b7280;
+}
+
+/* Body */
+.body {
+  color: #374151;
+}
+
+/* Footer */
+.footer {
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}

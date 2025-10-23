@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import userService from '../services/userService';
-import authService from '../services/authService';
-import LogoutButton from '../components/LogoutButton';
+import * as userApi from '../../api/user.api';
+import { isAuthenticated, getUser } from '../../utils/storage';
+import { validateEmail, validatePhone, validateName } from '../../utils/validation';
+import LogoutButton from '../../components/layout/LogoutButton';
 
 const EditProfilePage = () => {
   // State quản lý dữ liệu form
@@ -35,7 +36,7 @@ const EditProfilePage = () => {
     const loadProfile = async () => {
       try {
         // Kiểm tra đăng nhập
-        if (!authService.isLoggedIn()) {
+        if (!isAuthenticated()) {
           console.log('❌ User chưa đăng nhập, chuyển hướng về login');
           navigate('/login');
           return;
@@ -44,28 +45,41 @@ const EditProfilePage = () => {
         setLoading(true);
         console.log('📤 Đang tải thông tin profile...');
 
-        // Gọi API lấy thông tin profile
-        const response = await userService.getProfile();
-        const userData = response.data.user;
+        // Lấy thông tin user từ localStorage trước
+        const localUser = getUser();
+        if (localUser) {
+          const initialData = {
+            HoTen: localUser.hoTen || '',
+            Email: localUser.email || '',
+            DienThoai: localUser.dienThoai || ''
+          };
+          setFormData(initialData);
+          setOriginalData(initialData);
+          setUserInfo(localUser);
+        }
 
-        console.log('✅ Đã tải thông tin profile:', userData);
+        // Gọi API lấy thông tin profile mới nhất
+        try {
+          const userData = await userApi.getProfile();
+          console.log('✅ Đã tải thông tin profile:', userData);
 
-        // Cập nhật state với dữ liệu từ API
-        const profileData = {
-          HoTen: userData.hoTen || '',
-          Email: userData.email || '',
-          DienThoai: userData.dienThoai || ''
-        };
+          const profileData = {
+            HoTen: userData.hoTen || '',
+            Email: userData.email || '',
+            DienThoai: userData.dienThoai || ''
+          };
 
-        setFormData(profileData);
-        setOriginalData(profileData); // Lưu dữ liệu gốc để so sánh
-        setUserInfo(userData);
+          setFormData(profileData);
+          setOriginalData(profileData);
+          setUserInfo(userData);
+        } catch (apiError) {
+          console.warn('⚠️ Không load được từ API, dùng dữ liệu local');
+        }
 
       } catch (error) {
         console.error('❌ Lỗi tải profile:', error);
         setMessage(error.message || 'Có lỗi xảy ra khi tải thông tin profile');
         
-        // Nếu lỗi 401, chuyển về login
         if (error.message.includes('đăng nhập')) {
           setTimeout(() => navigate('/login'), 2000);
         }
@@ -111,22 +125,23 @@ const EditProfilePage = () => {
     const newErrors = {};
 
     // Validate họ tên
-    if (!formData.HoTen.trim()) {
-      newErrors.HoTen = 'Họ tên không được để trống';
-    } else if (!userService.validateName(formData.HoTen)) {
-      newErrors.HoTen = 'Họ tên chỉ được chứa chữ cái và khoảng trắng, tối thiểu 2 ký tự';
+    const nameValidation = validateName(formData.HoTen);
+    if (!nameValidation.isValid) {
+      newErrors.HoTen = nameValidation.message;
     }
 
     // Validate email
-    if (!formData.Email.trim()) {
-      newErrors.Email = 'Email không được để trống';
-    } else if (!userService.validateEmail(formData.Email)) {
-      newErrors.Email = 'Định dạng email không hợp lệ';
+    const emailValidation = validateEmail(formData.Email);
+    if (!emailValidation.isValid) {
+      newErrors.Email = emailValidation.message;
     }
 
-    // Validate số điện thoại (tùy chọn)
-    if (formData.DienThoai.trim() && !userService.validatePhoneNumber(formData.DienThoai)) {
-      newErrors.DienThoai = 'Số điện thoại phải có định dạng Việt Nam hợp lệ (VD: 0901234567)';
+    // Validate số điện thoại (optional)
+    if (formData.DienThoai.trim()) {
+      const phoneValidation = validatePhone(formData.DienThoai);
+      if (!phoneValidation.isValid) {
+        newErrors.DienThoai = phoneValidation.message;
+      }
     }
 
     setErrors(newErrors);
@@ -187,22 +202,20 @@ const EditProfilePage = () => {
 
       console.log('📝 Cập nhật profile với dữ liệu:', updateData);
 
-      // Gọi API cập nhật
-      const response = await userService.updateProfile(updateData);
+      // Gọi API cập nhật từ user.api.js
+      const updatedUser = await userApi.updateProfile(updateData);
 
-      console.log('✅ Cập nhật thành công:', response.data);
+      console.log('✅ Cập nhật thành công:', updatedUser);
 
-      // Cập nhật state với dữ liệu mới
-      const newUserData = response.data.user;
       const newProfileData = {
-        HoTen: newUserData.hoTen || '',
-        Email: newUserData.email || '',
-        DienThoai: newUserData.dienThoai || ''
+        HoTen: updatedUser.hoTen || '',
+        Email: updatedUser.email || '',
+        DienThoai: updatedUser.dienThoai || ''
       };
 
       setFormData(newProfileData);
-      setOriginalData(newProfileData); // Cập nhật dữ liệu gốc
-      setUserInfo(newUserData);
+      setOriginalData(newProfileData);
+      setUserInfo(updatedUser);
 
       // Hiển thị thông báo thành công
       setMessage('Cập nhật thông tin thành công!');

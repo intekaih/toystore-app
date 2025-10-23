@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import React, { useState } from 'react';
+import * as authApi from '../../api/auth.api';
+import { useNavigate } from 'react-router-dom';
 
-const LoginPage = () => {
-  // State quản lý form đăng nhập
+const RegisterPage = () => {
+  // State quản lý form
   const [formData, setFormData] = useState({
     TenDangNhap: '',
-    MatKhau: ''
+    MatKhau: '',
+    NhapLaiMatKhau: '',
+    HoTen: '',
+    Email: '',
+    DienThoai: ''
   });
 
   // State quản lý trạng thái UI
@@ -15,23 +19,8 @@ const LoginPage = () => {
   const [message, setMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Hook điều hướng và auth
+  // Hook điều hướng
   const navigate = useNavigate();
-  const location = useLocation();
-  const { user, login } = useAuth();
-
-  // Redirect path từ ProtectedRoute hoặc mặc định về Homepage
-  const from = location.state?.from?.pathname || '/';
-
-  /**
-   * Kiểm tra nếu user đã đăng nhập thì chuyển hướng
-   */
-  useEffect(() => {
-    if (user) {
-      console.log('👤 User đã đăng nhập, chuyển hướng về:', from);
-      navigate(from, { replace: true });
-    }
-  }, [user, navigate, from]);
 
   /**
    * Xử lý thay đổi giá trị input
@@ -52,11 +41,6 @@ const LoginPage = () => {
         [name]: ''
       }));
     }
-
-    // Xóa message khi user bắt đầu nhập
-    if (message) {
-      setMessage('');
-    }
   };
 
   /**
@@ -66,11 +50,29 @@ const LoginPage = () => {
   const validateForm = () => {
     const newErrors = {};
 
-    // Validate tên đăng nhập/email
+    // Validate tên đăng nhập
     if (!formData.TenDangNhap.trim()) {
-      newErrors.TenDangNhap = 'Tên đăng nhập hoặc email không được để trống';
+      newErrors.TenDangNhap = 'Tên đăng nhập không được để trống';
     } else if (formData.TenDangNhap.length < 3) {
       newErrors.TenDangNhap = 'Tên đăng nhập phải có ít nhất 3 ký tự';
+    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.TenDangNhap)) {
+      newErrors.TenDangNhap = 'Tên đăng nhập chỉ chứa chữ, số và dấu gạch dưới';
+    }
+
+    // Validate họ tên
+    if (!formData.HoTen.trim()) {
+      newErrors.HoTen = 'Họ tên không được để trống';
+    } else if (formData.HoTen.length < 2) {
+      newErrors.HoTen = 'Họ tên phải có ít nhất 2 ký tự';
+    } else if (!/^[a-zA-ZÀ-ỹ\s]+$/.test(formData.HoTen.trim())) {
+      newErrors.HoTen = 'Họ tên chỉ được chứa chữ cái và khoảng trắng';
+    }
+
+    // Validate email
+    if (!formData.Email.trim()) {
+      newErrors.Email = 'Email không được để trống';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.Email)) {
+      newErrors.Email = 'Định dạng email không hợp lệ';
     }
 
     // Validate mật khẩu
@@ -80,12 +82,24 @@ const LoginPage = () => {
       newErrors.MatKhau = 'Mật khẩu phải có ít nhất 6 ký tự';
     }
 
+    // Validate nhập lại mật khẩu
+    if (!formData.NhapLaiMatKhau) {
+      newErrors.NhapLaiMatKhau = 'Vui lòng nhập lại mật khẩu';
+    } else if (formData.MatKhau !== formData.NhapLaiMatKhau) {
+      newErrors.NhapLaiMatKhau = 'Mật khẩu nhập lại không khớp';
+    }
+
+    // Validate số điện thoại (tùy chọn)
+    if (formData.DienThoai && !/^(0|\+84)[0-9]{9,10}$/.test(formData.DienThoai.replace(/\s/g, ''))) {
+      newErrors.DienThoai = 'Số điện thoại phải có định dạng Việt Nam hợp lệ';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   /**
-   * Xử lý submit form đăng nhập
+   * Xử lý submit form đăng ký
    * @param {Event} e - Submit event
    */
   const handleSubmit = async (e) => {
@@ -103,51 +117,55 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      // Chuẩn bị dữ liệu đăng nhập
-      const loginData = {
+      // Chuẩn bị dữ liệu gửi đi (loại bỏ NhapLaiMatKhau)
+      const registerData = {
         TenDangNhap: formData.TenDangNhap.trim(),
-        MatKhau: formData.MatKhau
+        MatKhau: formData.MatKhau,
+        HoTen: formData.HoTen.trim(),
+        Email: formData.Email.trim().toLowerCase(),
+        DienThoai: formData.DienThoai.trim() || undefined
       };
 
-      console.log('🔐 Đăng nhập với dữ liệu:', { TenDangNhap: loginData.TenDangNhap });
+      console.log('📝 Đăng ký với dữ liệu:', { ...registerData, MatKhau: '***' });
 
-      // Gọi login từ AuthContext
-      await login(loginData);
+      // Gọi API đăng ký từ auth.api.js
+      const result = await authApi.register(registerData);
 
-      console.log('✅ Đăng nhập thành công');
+      console.log('✅ Đăng ký thành công:', result);
 
       // Hiển thị thông báo thành công
-      setMessage('Đăng nhập thành công! Đang chuyển hướng...');
+      setMessage('Đăng ký tài khoản thành công! Đang chuyển hướng...');
       
       // Reset form
       setFormData({
         TenDangNhap: '',
-        MatKhau: ''
+        MatKhau: '',
+        NhapLaiMatKhau: '',
+        HoTen: '',
+        Email: '',
+        DienThoai: ''
       });
 
-      // Chuyển hướng sẽ được xử lý bởi useEffect khi user state thay đổi
+      // Chuyển hướng về trang đăng nhập sau 2 giây
+      setTimeout(() => {
+        navigate('/login');
+        console.log('🔄 Chuyển hướng về trang đăng nhập');
+      }, 2000);
 
     } catch (error) {
-      console.error('❌ Lỗi đăng nhập:', error);
+      console.error('❌ Lỗi đăng ký:', error);
       
       // Hiển thị thông báo lỗi cho người dùng
-      setMessage(error.message || 'Có lỗi xảy ra trong quá trình đăng nhập');
+      setMessage(error.message || 'Có lỗi xảy ra trong quá trình đăng ký');
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * Chuyển hướng đến trang đăng ký
-   */
-  const goToRegister = () => {
-    navigate('/register');
-  };
-
   return (
     <div style={styles.container}>
       <div style={styles.formWrapper}>
-        <h2 style={styles.title}>🔐 Đăng nhập</h2>
+        <h2 style={styles.title}>Đăng ký tài khoản</h2>
         
         {/* Hiển thị thông báo */}
         {message && (
@@ -162,9 +180,9 @@ const LoginPage = () => {
         )}
 
         <form onSubmit={handleSubmit} style={styles.form}>
-          {/* Tên đăng nhập hoặc Email */}
+          {/* Tên đăng nhập */}
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Tên đăng nhập hoặc Email *</label>
+            <label style={styles.label}>Tên đăng nhập *</label>
             <input
               type="text"
               name="TenDangNhap"
@@ -174,12 +192,71 @@ const LoginPage = () => {
                 ...styles.input,
                 borderColor: errors.TenDangNhap ? '#dc3545' : '#ddd'
               }}
-              placeholder="Nhập tên đăng nhập hoặc email"
+              placeholder="Nhập tên đăng nhập"
               disabled={loading}
-              autoComplete="username"
             />
             {errors.TenDangNhap && (
               <span style={styles.error}>{errors.TenDangNhap}</span>
+            )}
+          </div>
+
+          {/* Họ tên */}
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Họ tên *</label>
+            <input
+              type="text"
+              name="HoTen"
+              value={formData.HoTen}
+              onChange={handleInputChange}
+              style={{
+                ...styles.input,
+                borderColor: errors.HoTen ? '#dc3545' : '#ddd'
+              }}
+              placeholder="Nhập họ tên đầy đủ"
+              disabled={loading}
+            />
+            {errors.HoTen && (
+              <span style={styles.error}>{errors.HoTen}</span>
+            )}
+          </div>
+
+          {/* Email */}
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Email *</label>
+            <input
+              type="email"
+              name="Email"
+              value={formData.Email}
+              onChange={handleInputChange}
+              style={{
+                ...styles.input,
+                borderColor: errors.Email ? '#dc3545' : '#ddd'
+              }}
+              placeholder="Nhập địa chỉ email"
+              disabled={loading}
+            />
+            {errors.Email && (
+              <span style={styles.error}>{errors.Email}</span>
+            )}
+          </div>
+
+          {/* Số điện thoại */}
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Số điện thoại</label>
+            <input
+              type="tel"
+              name="DienThoai"
+              value={formData.DienThoai}
+              onChange={handleInputChange}
+              style={{
+                ...styles.input,
+                borderColor: errors.DienThoai ? '#dc3545' : '#ddd'
+              }}
+              placeholder="Nhập số điện thoại (tùy chọn)"
+              disabled={loading}
+            />
+            {errors.DienThoai && (
+              <span style={styles.error}>{errors.DienThoai}</span>
             )}
           </div>
 
@@ -199,7 +276,6 @@ const LoginPage = () => {
                 }}
                 placeholder="Nhập mật khẩu"
                 disabled={loading}
-                autoComplete="current-password"
               />
               <button
                 type="button"
@@ -215,7 +291,27 @@ const LoginPage = () => {
             )}
           </div>
 
-          {/* Nút đăng nhập */}
+          {/* Nhập lại mật khẩu */}
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Nhập lại mật khẩu *</label>
+            <input
+              type="password"
+              name="NhapLaiMatKhau"
+              value={formData.NhapLaiMatKhau}
+              onChange={handleInputChange}
+              style={{
+                ...styles.input,
+                borderColor: errors.NhapLaiMatKhau ? '#dc3545' : '#ddd'
+              }}
+              placeholder="Nhập lại mật khẩu"
+              disabled={loading}
+            />
+            {errors.NhapLaiMatKhau && (
+              <span style={styles.error}>{errors.NhapLaiMatKhau}</span>
+            )}
+          </div>
+
+          {/* Nút đăng ký */}
           <button
             type="submit"
             style={{
@@ -225,45 +321,29 @@ const LoginPage = () => {
             }}
             disabled={loading}
           >
-            {loading ? '⏳ Đang đăng nhập...' : '🚀 Đăng nhập'}
+            {loading ? 'Đang đăng ký...' : 'Đăng ký'}
           </button>
         </form>
 
-        {/* Link đăng ký */}
+        {/* Link đăng nhập */}
         <div style={styles.footer}>
-          <p>Chưa có tài khoản? 
+          <p>Đã có tài khoản? 
             <button 
               style={styles.linkBtn}
-              onClick={goToRegister}
+              onClick={() => navigate('/login')}
               disabled={loading}
             >
-              Đăng ký ngay
+              Đăng nhập ngay
             </button>
           </p>
         </div>
-
-        {/* Thông tin test */}
-        <div style={styles.testInfo}>
-          <p style={styles.testTitle}>🧪 Tài khoản test:</p>
-          <p><strong>Admin:</strong> admin / admin123</p>
-          <p><strong>User:</strong> user1 / user123</p>
-        </div>
-
-        {/* Debug info (chỉ hiển thị trong development) */}
-        {process.env.NODE_ENV === 'development' && (
-          <div style={styles.debugInfo}>
-            <p><strong>Current user:</strong> {user ? user.tenDangNhap : 'None'}</p>
-            <p><strong>Redirect to:</strong> {from}</p>
-          </div>
-        )}
       </div>
     </div>
   );
 };
 
-// CSS Styles (giữ nguyên như cũ, chỉ thêm debugInfo)
+// CSS Styles
 const styles = {
-  // ... các styles khác giữ nguyên
   container: {
     minHeight: '100vh',
     display: 'flex',
@@ -278,7 +358,7 @@ const styles = {
     borderRadius: '8px',
     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
     width: '100%',
-    maxWidth: '450px'
+    maxWidth: '500px'
   },
   title: {
     textAlign: 'center',
@@ -333,8 +413,7 @@ const styles = {
     borderRadius: '4px',
     marginBottom: '20px',
     border: '1px solid',
-    textAlign: 'center',
-    fontSize: '14px'
+    textAlign: 'center'
   },
   submitBtn: {
     padding: '12px',
@@ -360,27 +439,7 @@ const styles = {
     textDecoration: 'underline',
     fontSize: '14px',
     marginLeft: '5px'
-  },
-  testInfo: {
-    marginTop: '30px',
-    padding: '15px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '4px',
-    border: '1px solid #dee2e6'
-  },
-  testTitle: {
-    margin: '0 0 10px 0',
-    fontWeight: 'bold',
-    color: '#495057'
-  },
-  debugInfo: {
-    marginTop: '15px',
-    padding: '10px',
-    backgroundColor: '#e9ecef',
-    borderRadius: '4px',
-    fontSize: '12px',
-    color: '#495057'
   }
 };
 
-export default LoginPage;
+export default RegisterPage;

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import authService from '../services/authService';
+import { useAuth } from '../../contexts/AuthContext';
 
 const LogoutButton = ({ style, className, children }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   /**
    * Xử lý đăng xuất
@@ -13,13 +14,10 @@ const LogoutButton = ({ style, className, children }) => {
     try {
       setLoading(true);
       
-      // Xóa token và thông tin user khỏi localStorage
-      authService.logout();
+      // Gọi logout từ AuthContext
+      await logout();
       
       console.log('🔓 Đăng xuất thành công');
-      
-      // Hiển thị thông báo (optional)
-      alert('Đăng xuất thành công!');
       
       // Chuyển hướng về trang đăng nhập
       navigate('/login');

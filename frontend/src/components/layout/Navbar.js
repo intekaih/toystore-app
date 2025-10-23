@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext.js';
+import { useAuth } from '../../contexts/AuthContext';
+import { useCart } from '../../contexts/CartContext';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const { totalItems } = useCart();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -31,6 +33,17 @@ const Navbar = () => {
           <Link to="/" style={styles.navLink}>
             🏠 Trang chủ
           </Link>
+          <Link to="/cart" style={styles.navLink}>
+            🛒 Giỏ hàng
+            {totalItems > 0 && (
+              <span style={styles.cartBadge}>{totalItems}</span>
+            )}
+          </Link>
+          {user && (
+            <Link to="/orders" style={styles.navLink}>
+              📜 Đơn hàng
+            </Link>
+          )}
         </div>
 
         <div style={styles.navRight}>
@@ -170,6 +183,14 @@ const styles = {
     transition: 'all 0.3s ease',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     backdropFilter: 'blur(10px)',
+  },
+  cartBadge: {
+    background: 'red',
+    color: 'white',
+    borderRadius: '50%',
+    padding: '0.2rem 0.5rem',
+    fontSize: '0.8rem',
+    marginLeft: '0.5rem',
   },
   navRight: {
     position: 'relative',

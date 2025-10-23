@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProducts } from '../../api/productApi.js';
-import Pagination from '../../components/Pagination.js';
+import { getProducts } from '../../api/productApi';
+import Pagination from '../../components/common/Pagination';
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
@@ -18,17 +18,20 @@ const ProductList = () => {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const response = await getProducts(currentPage, searchTerm);
+      // getProducts() đã return { products: [...], pagination: {...} }
+      const data = await getProducts(currentPage, searchTerm);
       
-      // API trả về cấu trúc: response.data.products
-      if (response.data && response.data.products) {
-        setProducts(response.data.products);
-        setTotalPages(response.data.pagination?.totalPages || 1);
+      console.log('📦 Products data received:', data);
+      
+      // API trả về cấu trúc: { products, pagination }
+      if (data && data.products) {
+        setProducts(data.products);
+        setTotalPages(data.pagination?.totalPages || 1);
       } else {
         setProducts([]);
       }
     } catch (error) {
-      console.error('Error loading products:', error);
+      console.error('❌ Error loading products:', error);
       setProducts([]);
     } finally {
       setLoading(false);

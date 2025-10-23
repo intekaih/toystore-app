@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import authService from '../services/authService';
-import userService from '../services/userService'; // Import userService
-import LogoutButton from '../components/LogoutButton';
+import * as userApi from '../../api/user.api';
+import { getToken, getUser, isAuthenticated, setUser } from '../../utils/storage';
+import LogoutButton from '../../components/layout/LogoutButton';
 
 const ProfilePage = () => {
   // State quản lý thông tin user
@@ -20,21 +20,21 @@ const ProfilePage = () => {
     const loadUserData = async () => {
       try {
         // Kiểm tra user đã đăng nhập chưa
-        if (!authService.isLoggedIn()) {
+        if (!isAuthenticated()) {
           console.log('❌ User chưa đăng nhập, chuyển hướng về login');
           navigate('/login');
           return;
         }
 
         // Lấy thông tin user từ localStorage
-        const localUserInfo = authService.getUserInfo();
+        const localUserInfo = getUser();
         setUserInfo(localUserInfo);
 
         // Lấy thông tin profile từ API (để có dữ liệu mới nhất)
         try {
-          const profileResponse = await userService.getProfile(); // Sử dụng userService
-          setProfileData(profileResponse.data.user);
-          console.log('✅ Đã load profile data từ API:', profileResponse.data.user);
+          const userData = await userApi.getProfile();
+          setProfileData(userData);
+          console.log('✅ Đã load profile data từ API:', userData);
         } catch (apiError) {
           console.warn('⚠️ Không thể load profile từ API, sử dụng dữ liệu local:', apiError.message);
           // Nếu API lỗi, vẫn hiển thị dữ liệu từ localStorage
@@ -56,7 +56,7 @@ const ProfilePage = () => {
    * Chuyển đến trang chỉnh sửa profile
    */
   const goToEditProfile = () => {
-    navigate('/edit-profile'); // Chuyển đến trang edit profile
+    navigate('/profile/edit');
   };
 
   /**
@@ -65,11 +65,11 @@ const ProfilePage = () => {
   const refreshProfile = async () => {
     try {
       setLoading(true);
-      const profileResponse = await userService.getProfile(); // Sử dụng userService
-      setProfileData(profileResponse.data.user);
+      const userData = await userApi.getProfile();
+      setProfileData(userData);
       
       // Cập nhật localStorage với dữ liệu mới
-      authService.saveUserInfo(profileResponse.data.user);
+      setUser(userData);
       
       console.log('🔄 Đã refresh profile data');
     } catch (error) {
@@ -204,7 +204,7 @@ const ProfilePage = () => {
         {process.env.NODE_ENV === 'development' && (
           <div style={styles.debugInfo}>
             <h4>🐛 Debug Info:</h4>
-            <p><strong>Token:</strong> {authService.getToken() ? 'Có' : 'Không'}</p>
+            <p><strong>Token:</strong> {getToken() ? 'Có' : 'Không'}</p>
             <p><strong>LocalStorage User:</strong> {userInfo ? 'Có' : 'Không'}</p>
             <p><strong>API Profile:</strong> {profileData ? 'Có' : 'Không'}</p>
           </div>

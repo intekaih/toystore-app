@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { getProducts } from '../api/productApi.js';
+import { useAuth } from '../../contexts/AuthContext';
+import { getProducts } from '../../api/productApi';
 
 const Homepage = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
@@ -22,14 +22,21 @@ const Homepage = () => {
   const loadFeaturedProducts = async () => {
     try {
       setLoading(true);
-      const response = await getProducts(1, '', 6); // Lấy 6 sản phẩm đầu tiên
+      // getProducts() đã return response.data.data rồi
+      // Cấu trúc: { products: [...], pagination: {...} }
+      const data = await getProducts(1, '', 6);
       
-      if (response.data && response.data.products) {
-        setFeaturedProducts(response.data.products.slice(0, 6));
-        setStats(prev => ({ ...prev, totalProducts: response.data.total || 0 }));
+      console.log('📦 Products data received:', data);
+      
+      if (data && data.products) {
+        setFeaturedProducts(data.products.slice(0, 6));
+        setStats(prev => ({ 
+          ...prev, 
+          totalProducts: data.pagination?.totalProducts || 0 
+        }));
       }
     } catch (error) {
-      console.error('Error loading featured products:', error);
+      console.error('❌ Error loading featured products:', error);
       // Fallback với dữ liệu mock nếu API không khả dụng
       setFeaturedProducts([
         { id: 1, tenSP: 'Búp bê Barbie', giaBan: 150000, hinhAnh: '/placeholder.jpg', soLuongTon: 50 },

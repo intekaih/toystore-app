@@ -1,8 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import authService from '../services/authService';
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import * as authApi from '../api/auth.api';
+import { getUser, getToken, clearAuth, isAuthenticated } from '../utils/storage';
+import { SUCCESS_MESSAGES } from '../utils/constants';
 
-const AuthContext = createContext();
+export const AuthContext = createContext();
 
+// Export useAuth hook để các file cũ có thể import
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -15,45 +18,89 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Khởi tạo auth state từ localStorage
   useEffect(() => {
-    // Kiểm tra token trong localStorage khi app khởi động
     try {
-      if (authService.isLoggedIn()) {
-        const userData = authService.getUser();
+      if (isAuthenticated()) {
+        const userData = getUser();
         setUser(userData);
         console.log('👤 User đã đăng nhập:', userData);
       }
     } catch (error) {
-      console.error('Error loading auth state:', error);
-      authService.logout(); // Clear invalid data
+      console.error('❌ Lỗi load auth state:', error);
+      clearAuth();
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   }, []);
 
-  const login = async (loginData) => {
+  /**
+   * Đăng nhập
+   */
+  const login = async (credentials) => {
     try {
-      const result = await authService.login(loginData);
-      setUser(result.user);
-      return result;
+      const { token, user: userData } = await authApi.login(credentials);
+      setUser(userData);
+      console.log('✅', SUCCESS_MESSAGES.LOGIN_SUCCESS);
+      return { token, user: userData };
     } catch (error) {
-      console.error('Login error in context:', error);
+      console.error('❌ Lỗi đăng nhập:', error);
       throw error;
     }
   };
 
-  const logout = () => {
-    authService.logout();
-    setUser(null);
+  /**
+   * Đăng ký
+   */
+  const register = async (userData) => {
+    try {
+      const result = await authApi.register(userData);
+      console.log('✅', SUCCESS_MESSAGES.REGISTER_SUCCESS);
+      return result;
+    } catch (error) {
+      console.error('❌ Lỗi đăng ký:', error);
+      throw error;
+    }
+  };
+
+  /**
+   * Đăng xuất
+   */
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch (error) {
+      console.error('❌ Lỗi đăng xuất:', error);
+    } finally {
+      clearAuth();
+      setUser(null);
+      console.log('✅', SUCCESS_MESSAGES.LOGOUT_SUCCESS);
+    }
+  };
+
+  /**
+   * Cập nhật thông tin user trong context
+   */
+  const updateUser = (updatedUser) => {
+    setUser(updatedUser);
+  };
+
+  /**
+   * Kiểm tra user có phải admin không
+   */
+  const isAdmin = () => {
+    return user && user.vaiTro === 'admin';
   };
 
   const value = {
     user,
     login,
+    register,
     logout,
+    updateUser,
     loading,
-    isLoggedIn: () => authService.isLoggedIn(),
-    isAdmin: () => authService.isAdmin(),
+    isLoggedIn: () => isAuthenticated(),
+    isAdmin,
   };
 
   return (
