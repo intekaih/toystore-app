@@ -14,7 +14,8 @@ const CartPage = () => {
     totalItems,
     totalAmount,
     loading,
-    updateCartItem,
+    incrementCartItem,
+    decrementCartItem,
     removeFromCart,
     clearCart,
   } = useCart();
@@ -28,28 +29,35 @@ const CartPage = () => {
     }
   }, [user, navigate]);
 
-  const handleUpdateQuantity = async (itemId, currentQty, change) => {
-    const newQty = currentQty + change;
-    
-    if (newQty < 1) {
-      return;
-    }
-
+  const handleIncrement = async (sanPhamId) => {
     try {
-      await updateCartItem(itemId, newQty);
-      showMessage('Cập nhật giỏ hàng thành công', 'success');
+      await incrementCartItem(sanPhamId);
+      showMessage('Đã tăng số lượng', 'success');
     } catch (error) {
       showMessage(error.message, 'error');
     }
   };
 
-  const handleRemoveItem = async (itemId) => {
+  const handleDecrement = async (sanPhamId) => {
+    try {
+      const result = await decrementCartItem(sanPhamId);
+      if (result.removed) {
+        showMessage('Đã xóa sản phẩm khỏi giỏ hàng', 'success');
+      } else {
+        showMessage('Đã giảm số lượng', 'success');
+      }
+    } catch (error) {
+      showMessage(error.message, 'error');
+    }
+  };
+
+  const handleRemoveItem = async (sanPhamId) => {
     if (!window.confirm('Bạn có chắc muốn xóa sản phẩm này?')) {
       return;
     }
 
     try {
-      await removeFromCart(itemId);
+      await removeFromCart(sanPhamId);
       showMessage('Đã xóa sản phẩm khỏi giỏ hàng', 'success');
     } catch (error) {
       showMessage(error.message, 'error');
@@ -128,6 +136,7 @@ const CartPage = () => {
                     variant="danger"
                     size="small"
                     onClick={handleClearCart}
+                    disabled={loading}
                   >
                     🗑️ Xóa tất cả
                   </Button>
@@ -136,7 +145,7 @@ const CartPage = () => {
 
               <div className="cart-items-list">
                 {cartItems.map((item) => (
-                  <div key={item.id} className="cart-item">
+                  <div key={item.sanPhamId} className="cart-item">
                     <div className="cart-item-image">
                       <img
                         src={item.hinhAnh || '/placeholder.jpg'}
@@ -152,21 +161,24 @@ const CartPage = () => {
                       <p className="cart-item-price">
                         {formatCurrency(item.giaBan)}
                       </p>
+                      {item.ton > 0 && (
+                        <p className="cart-item-stock">Còn {item.ton} sản phẩm</p>
+                      )}
                     </div>
 
                     <div className="cart-item-quantity">
                       <button
                         className="qty-btn"
-                        onClick={() => handleUpdateQuantity(item.id, item.soLuong, -1)}
-                        disabled={loading || item.soLuong <= 1}
+                        onClick={() => handleDecrement(item.sanPhamId)}
+                        disabled={loading}
                       >
                         −
                       </button>
                       <span className="qty-value">{item.soLuong}</span>
                       <button
                         className="qty-btn"
-                        onClick={() => handleUpdateQuantity(item.id, item.soLuong, 1)}
-                        disabled={loading}
+                        onClick={() => handleIncrement(item.sanPhamId)}
+                        disabled={loading || item.soLuong >= item.ton}
                       >
                         +
                       </button>
@@ -181,8 +193,9 @@ const CartPage = () => {
                     <div className="cart-item-actions">
                       <button
                         className="remove-btn"
-                        onClick={() => handleRemoveItem(item.id)}
+                        onClick={() => handleRemoveItem(item.sanPhamId)}
                         disabled={loading}
+                        title="Xóa sản phẩm"
                       >
                         🗑️
                       </button>

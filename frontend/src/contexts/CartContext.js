@@ -27,30 +27,14 @@ export const CartProvider = ({ children }) => {
   const { user } = useContext(AuthContext);
 
   /**
-   * Tính tổng số lượng và tổng tiền
-   */
-  const calculateTotals = useCallback((items) => {
-    if (!items || items.length === 0) {
-      setTotalItems(0);
-      setTotalAmount(0);
-      return;
-    }
-
-    const itemCount = items.reduce((sum, item) => sum + item.soLuong, 0);
-    const amount = items.reduce((sum, item) => sum + (item.giaBan * item.soLuong), 0);
-
-    setTotalItems(itemCount);
-    setTotalAmount(amount);
-  }, []);
-
-  /**
    * Load giỏ hàng từ API
    */
   const fetchCart = useCallback(async () => {
     if (!isAuthenticated() || !user) {
       setCart(null);
       setCartItems([]);
-      calculateTotals([]);
+      setTotalItems(0);
+      setTotalAmount(0);
       return;
     }
 
@@ -58,19 +42,20 @@ export const CartProvider = ({ children }) => {
       setLoading(true);
       const data = await cartApi.getCart();
       
-      setCart(data.cart);
       setCartItems(data.items || []);
-      calculateTotals(data.items || []);
+      setTotalItems(data.totalItems || 0);
+      setTotalAmount(data.totalAmount || 0);
       
       console.log('🛒 Cart loaded:', data);
     } catch (error) {
       console.error('❌ Error loading cart:', error);
       setCartItems([]);
-      calculateTotals([]);
+      setTotalItems(0);
+      setTotalAmount(0);
     } finally {
       setLoading(false);
     }
-  }, [user, calculateTotals]);
+  }, [user]);
 
   /**
    * Load giỏ hàng khi user đăng nhập
@@ -85,12 +70,12 @@ export const CartProvider = ({ children }) => {
   const addToCart = async (productId, quantity = 1) => {
     try {
       setLoading(true);
-      const data = await cartApi.addToCart(productId, quantity);
+      await cartApi.addToCart(productId, quantity);
       
-      setCartItems(data.items || []);
-      calculateTotals(data.items || []);
+      // Reload cart để lấy data mới nhất
+      await fetchCart();
       
-      console.log('✅ Added to cart:', data);
+      console.log('✅ Added to cart');
       return { success: true, message: 'Đã thêm vào giỏ hàng' };
     } catch (error) {
       console.error('❌ Error adding to cart:', error);
@@ -101,17 +86,17 @@ export const CartProvider = ({ children }) => {
   };
 
   /**
-   * Cập nhật số lượng sản phẩm
+   * Cập nhật số lượng sản phẩm (dùng cho input số lượng)
    */
-  const updateCartItem = async (itemId, quantity) => {
+  const updateCartItem = async (sanPhamId, quantity) => {
     try {
       setLoading(true);
-      const data = await cartApi.updateCartItem(itemId, quantity);
+      await cartApi.updateCartItem(sanPhamId, quantity);
       
-      setCartItems(data.items || []);
-      calculateTotals(data.items || []);
+      // Reload cart
+      await fetchCart();
       
-      console.log('✅ Cart updated:', data);
+      console.log('✅ Cart updated');
       return { success: true };
     } catch (error) {
       console.error('❌ Error updating cart:', error);
@@ -122,15 +107,62 @@ export const CartProvider = ({ children }) => {
   };
 
   /**
-   * Xóa sản phẩm khỏi giỏ hàng
+   * Tăng 1 đơn vị sản phẩm
    */
-  const removeFromCart = async (itemId) => {
+  const incrementCartItem = async (productId) => {
     try {
       setLoading(true);
-      const data = await cartApi.removeFromCart(itemId);
+      await cartApi.incrementCartItem(productId);
       
-      setCartItems(data.items || []);
-      calculateTotals(data.items || []);
+      // Reload cart
+      await fetchCart();
+      
+      console.log('✅ Incremented item');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error incrementing:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Giảm 1 đơn vị sản phẩm
+   */
+  const decrementCartItem = async (productId) => {
+    try {
+      setLoading(true);
+      const result = await cartApi.decrementCartItem(productId);
+      
+      // Reload cart
+      await fetchCart();
+      
+      if (result.removed) {
+        console.log('🗑️ Item removed (quantity was 1)');
+      } else {
+        console.log('✅ Decremented item');
+      }
+      
+      return { success: true, removed: result.removed };
+    } catch (error) {
+      console.error('❌ Error decrementing:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Xóa sản phẩm khỏi giỏ hàng
+   */
+  const removeFromCart = async (productId) => {
+    try {
+      setLoading(true);
+      await cartApi.removeFromCart(productId);
+      
+      // Reload cart
+      await fetchCart();
       
       console.log('✅ Item removed from cart');
       return { success: true, message: 'Đã xóa khỏi giỏ hàng' };
@@ -151,7 +183,8 @@ export const CartProvider = ({ children }) => {
       await cartApi.clearCart();
       
       setCartItems([]);
-      calculateTotals([]);
+      setTotalItems(0);
+      setTotalAmount(0);
       
       console.log('✅ Cart cleared');
       return { success: true };
@@ -178,6 +211,8 @@ export const CartProvider = ({ children }) => {
     loading,
     addToCart,
     updateCartItem,
+    incrementCartItem,
+    decrementCartItem,
     removeFromCart,
     clearCart,
     refreshCart,

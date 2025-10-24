@@ -26,17 +26,20 @@ module.exports = (sequelize, Sequelize) => {
       allowNull: false,
       defaultValue: 1
     },
-    DonGia: {
-      type: Sequelize.DECIMAL(15, 0),
-      allowNull: false
-    },
     NgayThem: {
       type: Sequelize.DATE,
-      allowNull: true
+      allowNull: true,
+      defaultValue: Sequelize.literal('GETDATE()') // ✅ SQL Server function
+    },
+    Enable: {
+      type: Sequelize.BOOLEAN,
+      allowNull: true,
+      defaultValue: true
     }
   }, {
     tableName: 'GioHangChiTiet',
-    timestamps: false
+    timestamps: false,
+    freezeTableName: true
   });
 
   return GioHangChiTiet;

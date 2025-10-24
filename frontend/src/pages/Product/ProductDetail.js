@@ -26,16 +26,15 @@ const ProductDetail = () => {
   const loadProduct = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Loading product with ID:', id);
+      // ✅ getProductById đã normalize data rồi, chỉ cần dùng trực tiếp
+      const data = await getProductById(id);
       
-      // getProductById đã return trực tiếp product object
-      const productData = await getProductById(id);
-      console.log('📦 Product data received:', productData);
+      console.log('✅ Normalized product:', data);
       
-      setProduct(productData);
+      setProduct(data);
     } catch (error) {
-      console.error('❌ Error loading product:', error);
-      setMessage(error.message || 'Không thể tải thông tin sản phẩm');
+      console.error('Error loading product:', error);
+      setMessage(error.message);
       setMessageType('error');
     } finally {
       setLoading(false);
@@ -52,6 +51,12 @@ const ProductDetail = () => {
       return;
     }
 
+    if (!product?.id) {
+      setMessage('Không tìm thấy mã sản phẩm');
+      setMessageType('error');
+      return;
+    }
+
     if (quantity > product.ton) {
       setMessage(`Chỉ còn ${product.ton} sản phẩm trong kho`);
       setMessageType('error');
@@ -59,13 +64,17 @@ const ProductDetail = () => {
     }
 
     try {
+      console.log('🛒 Adding to cart:', { productId: product.id, quantity });
+      
       await addToCart(product.id, quantity);
+      
       setMessage('✅ Đã thêm vào giỏ hàng!');
       setMessageType('success');
       
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
-      setMessage(error.message);
+      console.error('❌ Add to cart error:', error);
+      setMessage(error.message || 'Có lỗi xảy ra khi thêm vào giỏ hàng');
       setMessageType('error');
     }
   };
@@ -76,12 +85,14 @@ const ProductDetail = () => {
     if (newQty > product.ton) {
       setMessage(`Chỉ còn ${product.ton} sản phẩm trong kho`);
       setMessageType('warning');
+      setTimeout(() => setMessage(''), 2000);
       return;
     }
     setQuantity(newQty);
   };
 
   if (loading) return <Loading fullScreen text="Đang tải sản phẩm..." />;
+  
   if (!product) return (
     <div className="product-detail">
       <ErrorMessage message="Không tìm thấy sản phẩm" type="error" />

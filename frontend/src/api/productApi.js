@@ -5,6 +5,7 @@
 
 import apiClient from './client';
 import config from '../config';
+import { normalizeProduct } from '../utils/normalize';
 
 /**
  * Lấy danh sách sản phẩm với phân trang và tìm kiếm
@@ -19,7 +20,12 @@ export const getProducts = async (page = 1, search = '', limit = 10) => {
   });
   
   if (response.data.success) {
-    return response.data.data;
+    const data = response.data.data;
+    
+    return {
+      products: (data.products || []).map(normalizeProduct),
+      pagination: data.pagination || {}
+    };
   }
   
   throw new Error(response.data.message || 'Không thể tải danh sách sản phẩm');
@@ -36,7 +42,10 @@ export const getProductById = async (id) => {
   console.log('📦 Product API response:', response.data);
   
   if (response.data.success) {
-    return response.data.data.product;
+    const product = response.data.data.product;
+    
+    // ✅ Normalize data trước khi return
+    return normalizeProduct(product);
   }
   
   throw new Error(response.data.message || 'Không thể tải thông tin sản phẩm');

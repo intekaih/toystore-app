@@ -1,97 +1,65 @@
+import apiClient from './client';
+
 /**
  * Order API
  * Order related API calls
  */
 
-import apiClient from './client';
-
-/**
- * Tạo đơn hàng mới từ giỏ hàng
- * @param {Object} orderData - Thông tin đơn hàng
- * @param {number} orderData.KhachHangID - ID khách hàng
- * @param {number} orderData.PhuongThucThanhToanID - ID phương thức thanh toán
- * @param {string} [orderData.GhiChu] - Ghi chú đơn hàng
- * @returns {Promise<Object>} - Order data
- */
+// Tạo đơn hàng từ giỏ hàng
 export const createOrder = async (orderData) => {
-  const response = await apiClient.post('/orders/create', orderData);
-  
-  if (response.data.success) {
-    return response.data.data;
+  try {
+    console.log('🛒 Creating order with data:', orderData);  // ← DEBUG
+    
+    // ✅ GỬI ĐẦY ĐỦ TẤT CẢ FIELD
+    const response = await apiClient.post('/orders/create', orderData);  // ← GỬI TOÀN BỘ orderData
+    
+    console.log('✅ Order created successfully:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Create order error:', error.response?.data || error);
+    throw new Error(error.response?.data?.message || 'Không thể tạo đơn hàng');
   }
-  
-  throw new Error(response.data.message || 'Không thể tạo đơn hàng');
 };
 
-/**
- * Lấy lịch sử đơn hàng của user
- * @param {number} page - Trang hiện tại
- * @param {number} limit - Số đơn hàng mỗi trang
- * @returns {Promise<Object>} - Orders list với pagination
- */
-export const getOrderHistory = async (page = 1, limit = 10) => {
-  const response = await apiClient.get('/orders/history', {
-    params: { page, limit }
-  });
-  
-  if (response.data.success) {
-    return response.data.data;
+// Lấy danh sách đơn hàng của user
+export const getOrderHistory = async (params = {}) => {
+  try {
+    const response = await apiClient.get('/orders', { params });
+    return response.data;
+  } catch (error) {
+    console.error('❌ Get order history error:', error.response?.data || error);
+    throw new Error(error.response?.data?.message || 'Không thể lấy lịch sử đơn hàng');
   }
-  
-  throw new Error(response.data.message || 'Không thể tải lịch sử đơn hàng');
 };
 
-/**
- * Lấy chi tiết đơn hàng
- * @param {number} orderId - ID đơn hàng
- * @returns {Promise<Object>} - Order detail
- */
+// Lấy chi tiết đơn hàng
 export const getOrderDetail = async (orderId) => {
-  const response = await apiClient.get(`/orders/${orderId}`);
-  
-  if (response.data.success) {
-    return response.data.data;
+  try {
+    const response = await apiClient.get(`/orders/${orderId}`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Get order detail error:', error.response?.data || error);
+    throw new Error(error.response?.data?.message || 'Không thể lấy chi tiết đơn hàng');
   }
-  
-  throw new Error(response.data.message || 'Không thể tải chi tiết đơn hàng');
 };
 
-/**
- * Hủy đơn hàng
- * @param {number} orderId - ID đơn hàng
- * @param {string} reason - Lý do hủy
- * @returns {Promise<Object>} - Updated order
- */
-export const cancelOrder = async (orderId, reason) => {
-  const response = await apiClient.put(`/orders/${orderId}/cancel`, { reason });
-  
-  if (response.data.success) {
-    return response.data.data;
+// Hủy đơn hàng
+export const cancelOrder = async (orderId) => {
+  try {
+    const response = await apiClient.patch(`/orders/${orderId}/cancel`);
+    return response.data;
+  } catch (error) {
+    console.error('❌ Cancel order error:', error.response?.data || error);
+    throw new Error(error.response?.data?.message || 'Không thể hủy đơn hàng');
   }
-  
-  throw new Error(response.data.message || 'Không thể hủy đơn hàng');
 };
 
-/**
- * Lấy danh sách phương thức thanh toán
- * @returns {Promise<Array>} - Payment methods list
- */
-export const getPaymentMethods = async () => {
-  const response = await apiClient.get('/payment-methods');
-  
-  if (response.data.success) {
-    return response.data.data;
-  }
-  
-  throw new Error(response.data.message || 'Không thể tải phương thức thanh toán');
-};
-
+// ✅ Export as named exports (ESLint compliant)
 const orderApi = {
   createOrder,
   getOrderHistory,
   getOrderDetail,
-  cancelOrder,
-  getPaymentMethods,
+  cancelOrder
 };
 
 export default orderApi;

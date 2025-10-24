@@ -35,14 +35,56 @@ const generateOrderCode = async () => {
 
 // Tạo đơn hàng từ giỏ hàng
 exports.createOrder = async (req, res) => {
-  // Bắt đầu transaction
   const transaction = await db.sequelize.transaction();
   
   try {
-    console.log('🛒 Bắt đầu tạo đơn hàng cho user:', req.user.id);
+    console.log('🛒 Request body:', req.body);
     
     const taiKhoanId = req.user.id;
-    const { phuongThucThanhToanId = 1, ghiChu = '', diaChiGiaoHang = '' } = req.body;
+    
+    const { 
+      phuongThucThanhToanId = 1, 
+      ghiChu = '', 
+      diaChiGiaoHang = '',
+      hoTen = '',
+      email = '',
+      dienThoai = ''
+    } = req.body;
+
+    console.log('📝 Extracted data:', { hoTen, email, dienThoai, diaChiGiaoHang });
+
+    // ✅ Validate thông tin khách hàng
+    if (!hoTen || !hoTen.trim()) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Họ tên không được để trống'
+      });
+    }
+
+    if (!email || !email.trim()) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Email không được để trống'
+      });
+    }
+
+    if (!dienThoai || !dienThoai.trim()) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Số điện thoại không được để trống'
+      });
+    }
+
+    if (!diaChiGiaoHang || !diaChiGiaoHang.trim()) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Địa chỉ giao hàng không được để trống'
+      });
+    }
 
     // Validate phương thức thanh toán
     if (!phuongThucThanhToanId) {
@@ -53,28 +95,13 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    // Kiểm tra phương thức thanh toán có tồn tại không
-    const phuongThucThanhToan = await PhuongThucThanhToan.findOne({
-      where: {
-        ID: phuongThucThanhToanId,
-        Enable: true
-      }
-    });
-
-    if (!phuongThucThanhToan) {
-      await transaction.rollback();
-      return res.status(404).json({
-        success: false,
-        message: 'Phương thức thanh toán không hợp lệ'
-      });
-    }
-
     // Bước 1: Lấy giỏ hàng của người dùng
     const gioHang = await GioHang.findOne({
       where: { TaiKhoanID: taiKhoanId },
       include: [{
         model: GioHangChiTiet,
         as: 'chiTiet',
+        attributes: ['ID', 'GioHangID', 'SanPhamID', 'SoLuong', 'NgayThem'],
         include: [{
           model: SanPham,
           as: 'sanPham',
@@ -84,6 +111,9 @@ exports.createOrder = async (req, res) => {
       transaction
     });
 
+    console.log('🛒 Giỏ hàng tìm thấy:', gioHang ? 'Có' : 'Không');
+    console.log('📦 Số lượng items:', gioHang?.chiTiet?.length || 0);
+
     // Kiểm tra giỏ hàng có tồn tại và có sản phẩm không
     if (!gioHang || !gioHang.chiTiet || gioHang.chiTiet.length === 0) {
       await transaction.rollback();
@@ -92,8 +122,6 @@ exports.createOrder = async (req, res) => {
         message: 'Giỏ hàng của bạn đang trống'
       });
     }
-
-    console.log(`📦 Tìm thấy ${gioHang.chiTiet.length} sản phẩm trong giỏ hàng`);
 
     // Validate từng sản phẩm trong giỏ hàng
     const validationErrors = [];
@@ -117,49 +145,46 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    // Tính tổng tiền
+    // Tính tổng tiền từ GiaBan
     let tongTien = 0;
     gioHang.chiTiet.forEach(item => {
-      tongTien += parseFloat(item.DonGia) * item.SoLuong;
+      const giaBan = parseFloat(item.sanPham.GiaBan);
+      tongTien += giaBan * item.SoLuong;
     });
 
     console.log(`💰 Tổng tiền đơn hàng: ${tongTien.toLocaleString('vi-VN')} VNĐ`);
 
-    // Lấy thông tin tài khoản để tạo khách hàng
-    const taiKhoan = await TaiKhoan.findByPk(taiKhoanId, { transaction });
-
-    // Tạo hoặc lấy khách hàng
+    // Tạo hoặc lấy khách hàng từ form data
     let khachHang = await KhachHang.findOne({
-      where: {
-        Email: taiKhoan.Email || null,
-        HoTen: taiKhoan.HoTen
-      },
+      where: { Email: email.trim() },
       transaction
     });
 
     if (!khachHang) {
-      // Tạo khách hàng mới
       khachHang = await KhachHang.create({
-        HoTen: taiKhoan.HoTen,
-        Email: taiKhoan.Email || null,
-        DienThoai: taiKhoan.DienThoai || null,
-        DiaChi: diaChiGiaoHang || null
+        HoTen: hoTen.trim(),
+        Email: email.trim(),
+        DienThoai: dienThoai.trim(),
+        DiaChi: diaChiGiaoHang.trim()
       }, { transaction });
       
-      console.log('👤 Đã tạo khách hàng mới:', khachHang.ID);
+      console.log('✅ Đã tạo khách hàng mới:', khachHang.ID);
     } else {
-      // Cập nhật địa chỉ nếu có
-      if (diaChiGiaoHang) {
-        await khachHang.update({ DiaChi: diaChiGiaoHang }, { transaction });
-      }
-      console.log('👤 Sử dụng khách hàng có sẵn:', khachHang.ID);
+      // Cập nhật thông tin khách hàng
+      await khachHang.update({
+        HoTen: hoTen.trim(),
+        DienThoai: dienThoai.trim(),
+        DiaChi: diaChiGiaoHang.trim()
+      }, { transaction });
+      
+      console.log('✅ Cập nhật thông tin khách hàng:', khachHang.ID);
     }
 
-    // Bước 2: Tạo mã hóa đơn
+    // Tạo mã hóa đơn
     const maHoaDon = await generateOrderCode();
     console.log('📄 Mã hóa đơn:', maHoaDon);
 
-    // Bước 2: Tạo hóa đơn
+    // Tạo hóa đơn
     const hoaDon = await HoaDon.create({
       MaHD: maHoaDon,
       KhachHangID: khachHang.ID,
@@ -171,43 +196,44 @@ exports.createOrder = async (req, res) => {
 
     console.log('✅ Đã tạo hóa đơn:', hoaDon.ID);
 
-    // Bước 3: Thêm chi tiết hóa đơn và cập nhật tồn kho
-    const chiTietHoaDonData = [];
+    // Thêm chi tiết hóa đơn và cập nhật tồn kho
     for (const item of gioHang.chiTiet) {
+      const giaBan = parseFloat(item.sanPham.GiaBan);
+      const thanhTien = giaBan * item.SoLuong;
+      
       // Tạo chi tiết hóa đơn
-      const chiTiet = await ChiTietHoaDon.create({
+      await ChiTietHoaDon.create({
         HoaDonID: hoaDon.ID,
         SanPhamID: item.SanPhamID,
         SoLuong: item.SoLuong,
-        DonGia: item.DonGia,
-        GiaBan: item.DonGia, // GiaBan và DonGia giống nhau
-        ThanhTien: parseFloat(item.DonGia) * item.SoLuong
+        DonGia: giaBan,
+        GiaBan: giaBan,
+        ThanhTien: thanhTien
       }, { transaction });
 
-      chiTietHoaDonData.push(chiTiet);
+      // Trừ tồn kho
+      await item.sanPham.update({
+        Ton: item.sanPham.Ton - item.SoLuong
+      }, { transaction });
 
-      // Cập nhật số lượng tồn kho
-      await SanPham.update(
-        { Ton: db.Sequelize.literal(`Ton - ${item.SoLuong}`) },
-        {
-          where: { ID: item.SanPhamID },
-          transaction
-        }
-      );
-
-      console.log(`📦 Đã thêm sản phẩm "${item.sanPham.Ten}" vào hóa đơn và cập nhật tồn kho`);
+      console.log(`✅ Đã trừ tồn kho ${item.sanPham.Ten}: ${item.sanPham.Ton + item.SoLuong} → ${item.sanPham.Ton}`);
     }
 
-    // Bước 4: Xóa giỏ hàng sau khi tạo đơn thành công
-    await GioHangChiTiet.destroy({
-      where: { GioHangID: gioHang.ID },
-      transaction
-    });
-
-    console.log('🗑️ Đã xóa giỏ hàng');
-
-    // Commit transaction
+    // ✅ COMMIT TRANSACTION TRƯỚC
     await transaction.commit();
+    console.log('✅ Transaction committed successfully');
+
+    // ✅ XÓA GIỎ HÀNG SAU KHI COMMIT (NGOÀI TRANSACTION)
+    try {
+      const deleteCount = await GioHangChiTiet.destroy({
+        where: { GioHangID: gioHang.ID }
+      });
+
+      console.log(`🗑️ Đã xóa ${deleteCount} items từ giỏ hàng`);
+    } catch (deleteError) {
+      console.error('⚠️ Lỗi khi xóa giỏ hàng (không ảnh hưởng đơn hàng):', deleteError);
+      // KHÔNG throw error vì đơn hàng đã tạo thành công
+    }
 
     // Lấy lại thông tin đầy đủ của hóa đơn vừa tạo
     const hoaDonDetail = await HoaDon.findOne({
@@ -238,7 +264,7 @@ exports.createOrder = async (req, res) => {
     console.log('✅ Tạo đơn hàng thành công:', hoaDon.MaHD);
 
     // Trả về kết quả
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Tạo đơn hàng thành công',
       data: {
@@ -279,27 +305,12 @@ exports.createOrder = async (req, res) => {
     await transaction.rollback();
     
     console.error('❌ Lỗi tạo đơn hàng:', error);
+    console.error('❌ Error stack:', error.stack);
 
-    // Xử lý lỗi cụ thể
-    if (error.name === 'SequelizeUniqueConstraintError') {
-      return res.status(409).json({
-        success: false,
-        message: 'Mã hóa đơn bị trùng, vui lòng thử lại'
-      });
-    }
-
-    if (error.name === 'SequelizeDatabaseError') {
-      return res.status(500).json({
-        success: false,
-        message: 'Lỗi cơ sở dữ liệu',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Database Error'
-      });
-    }
-
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Lỗi server nội bộ khi tạo đơn hàng',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
@@ -308,42 +319,86 @@ exports.createOrder = async (req, res) => {
 exports.getMyOrders = async (req, res) => {
   try {
     const taiKhoanId = req.user.id;
-    
-    // Lấy thông tin tài khoản
+    const { page = 1, limit = 10, trangThai = '' } = req.query;
+
+    console.log('📦 Getting orders for user:', taiKhoanId);
+
+    // ✅ Lấy thông tin tài khoản
     const taiKhoan = await TaiKhoan.findByPk(taiKhoanId);
     
-    // Tìm khách hàng dựa trên email hoặc tên
-    const khachHang = await KhachHang.findOne({
-      where: {
-        [db.Sequelize.Op.or]: [
-          { Email: taiKhoan.Email || null },
-          { HoTen: taiKhoan.HoTen }
-        ]
-      }
-    });
+    if (!taiKhoan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy tài khoản'
+      });
+    }
 
+    console.log('👤 User info:', { email: taiKhoan.Email, hoTen: taiKhoan.HoTen });
+
+    // ✅ Tìm khách hàng dựa trên email HOẶC họ tên
+    let khachHang = null;
+
+    if (taiKhoan.Email) {
+      khachHang = await KhachHang.findOne({
+        where: { Email: taiKhoan.Email }
+      });
+    }
+
+    // Nếu không tìm thấy theo email, thử tìm theo họ tên
+    if (!khachHang && taiKhoan.HoTen) {
+      khachHang = await KhachHang.findOne({
+        where: { HoTen: taiKhoan.HoTen }
+      });
+    }
+
+    console.log('🔍 Khách hàng tìm thấy:', khachHang ? `ID: ${khachHang.ID}` : 'Không có');
+
+    // ✅ Nếu không tìm thấy khách hàng, trả về danh sách rỗng (không lỗi)
     if (!khachHang) {
       return res.status(200).json({
         success: true,
-        message: 'Bạn chưa có đơn hàng nào',
         data: {
           orders: [],
-          total: 0
+          pagination: {
+            currentPage: 1,
+            totalPages: 0,
+            totalOrders: 0,
+            limit: parseInt(limit)
+          }
         }
       });
     }
 
-    // Lấy danh sách đơn hàng
+    // ✅ Build WHERE clause
+    const whereClause = {
+      KhachHangID: khachHang.ID,
+      Enable: true
+    };
+
+    if (trangThai && trangThai.trim()) {
+      whereClause.TrangThai = trangThai.trim();
+    }
+
+    // ✅ Đếm tổng số đơn hàng
+    const totalOrders = await HoaDon.count({ where: whereClause });
+
+    console.log(`📊 Tổng số đơn hàng: ${totalOrders}`);
+
+    // ✅ Lấy danh sách đơn hàng với phân trang
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
     const hoaDons = await HoaDon.findAll({
-      where: {
-        KhachHangID: khachHang.ID,
-        Enable: true
-      },
+      where: whereClause,
       include: [
+        {
+          model: KhachHang,
+          as: 'khachHang',
+          attributes: ['ID', 'HoTen', 'Email', 'DienThoai', 'DiaChi']
+        },
         {
           model: PhuongThucThanhToan,
           as: 'phuongThucThanhToan',
-          attributes: ['ID', 'Ten']
+          attributes: ['ID', 'Ten', 'MoTa']
         },
         {
           model: ChiTietHoaDon,
@@ -355,35 +410,67 @@ exports.getMyOrders = async (req, res) => {
           }]
         }
       ],
-      order: [['NgayLap', 'DESC']]
+      order: [['NgayLap', 'DESC']],
+      limit: parseInt(limit),
+      offset: offset
     });
 
-    const orders = hoaDons.map(hd => ({
-      id: hd.ID,
-      maHD: hd.MaHD,
-      ngayLap: hd.NgayLap,
-      tongTien: parseFloat(hd.TongTien),
-      trangThai: hd.TrangThai,
-      ghiChu: hd.GhiChu,
-      phuongThucThanhToan: hd.phuongThucThanhToan.Ten,
-      soLuongSanPham: hd.chiTiet.length
-    }));
+    console.log(`✅ Đã lấy ${hoaDons.length} đơn hàng`);
 
-    res.status(200).json({
+    // ✅ Format data để trả về
+    const orders = hoaDons.map(hd => {
+      const chiTiet = hd.chiTiet || [];
+      
+      return {
+        id: hd.ID,
+        maHD: hd.MaHD,
+        ngayLap: hd.NgayLap,
+        tongTien: parseFloat(hd.TongTien),
+        trangThai: hd.TrangThai,
+        ghiChu: hd.GhiChu,
+        phuongThucThanhToan: {
+          id: hd.phuongThucThanhToan?.ID,
+          ten: hd.phuongThucThanhToan?.Ten,
+          moTa: hd.phuongThucThanhToan?.MoTa
+        },
+        // ✅ Thông tin tổng hợp
+        soLoaiSanPham: chiTiet.length,
+        tongSoLuongSanPham: chiTiet.reduce((sum, item) => sum + item.SoLuong, 0),
+        // ✅ Danh sách sản phẩm
+        sanPhams: chiTiet.map(item => ({
+          id: item.ID,
+          sanPhamId: item.SanPhamID,
+          tenSanPham: item.sanPham?.Ten || 'N/A',
+          hinhAnh: item.sanPham?.HinhAnhURL || null,
+          soLuong: item.SoLuong,
+          donGia: parseFloat(item.DonGia),
+          thanhTien: parseFloat(item.ThanhTien)
+        }))
+      };
+    });
+
+    // ✅ Trả về kết quả
+    return res.status(200).json({
       success: true,
-      message: 'Lấy danh sách đơn hàng thành công',
       data: {
         orders: orders,
-        total: orders.length
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(totalOrders / parseInt(limit)),
+          totalOrders: totalOrders,
+          limit: parseInt(limit)
+        }
       }
     });
 
   } catch (error) {
     console.error('❌ Lỗi lấy danh sách đơn hàng:', error);
-    res.status(500).json({
+    console.error('❌ Error stack:', error.stack);
+
+    return res.status(500).json({
       success: false,
       message: 'Lỗi server nội bộ',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
