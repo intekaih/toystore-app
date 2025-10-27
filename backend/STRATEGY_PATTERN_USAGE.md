@@ -73,10 +73,10 @@ GET http://localhost:5000/api/products?filter=bestSeller
   "data": {
     "products": [
       {
-        "id": 1,
-        "tenSP": "Búp bê Barbie",
-        "giaBan": 250000,
-        "soLuongBan": 150,  ← Thêm field này
+        "ID": 1,
+        "Ten": "Búp bê Barbie",
+        "GiaBan": 250000,
+        "SoLuongBan": 150,  ← Thêm field này
         ...
       }
     ]
@@ -107,14 +107,32 @@ GET http://localhost:5000/api/products?filter=priceDesc&search=lego&minPrice=200
 
 ## 📊 RESPONSE FORMAT
 
-Mọi request đều trả về format chuẩn:
+Mọi request đều trả về format chuẩn theo Database Schema (PascalCase):
 
 ```json
 {
   "success": true,
   "message": "Lấy danh sách sản phẩm thành công",
   "data": {
-    "products": [...],
+    "products": [
+      {
+        "ID": 1,
+        "Ten": "Búp bê Barbie",
+        "MoTa": "Búp bê xinh đẹp cho bé gái",
+        "GiaBan": 250000,
+        "Ton": 50,
+        "HinhAnhURL": "http://localhost:5000/uploads/barbie.jpg",
+        "LoaiID": 2,
+        "NgayTao": "2024-10-27T10:30:00.000Z",
+        "Enable": true,
+        "SoLuongBan": 150,
+        "LoaiSP": {
+          "ID": 2,
+          "Ten": "Búp bê",
+          "MoTa": "Danh mục búp bê"
+        }
+      }
+    ],
     "pagination": {
       "currentPage": 1,
       "totalPages": 5,
@@ -131,7 +149,7 @@ Mọi request đều trả về format chuẩn:
       "categoryId": null,
       "availableFilters": [
         "newest",
-        "priceAsc",
+        "priceAsc", 
         "priceDesc",
         "bestSeller"
       ]

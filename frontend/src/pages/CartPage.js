@@ -8,6 +8,41 @@ import { Button, Badge, Loading, Modal } from '../components/ui';
 import Toast from '../components/Toast';
 
 const CartPage = () => {
+  // Backend API URL
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  
+  // Build full image URL
+  const buildImageUrl = (imagePath) => {
+    if (!imagePath) return '/barbie.jpg';
+    
+    // Nếu đã là full URL (http/https)
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    
+    // Nếu bắt đầu với /uploads/
+    if (imagePath.startsWith('/uploads/')) {
+      return `${API_BASE_URL}${imagePath}`;
+    }
+    
+    // Nếu chỉ là filename
+    if (!imagePath.startsWith('/')) {
+      return `${API_BASE_URL}/uploads/${imagePath}`;
+    }
+    
+    return '/barbie.jpg';
+  };
+  
+  // Handle image error với multiple fallback
+  const handleImageError = (e) => {
+    console.warn('❌ Lỗi load ảnh trong giỏ hàng:', e.target.src);
+    
+    // Fallback: Thử ảnh barbie.jpg trong public
+    if (!e.target.src.includes('barbie.jpg')) {
+      e.target.src = '/barbie.jpg';
+    }
+  };
+
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState({});
@@ -221,6 +256,9 @@ const CartPage = () => {
               const itemTotal = parseFloat(item.DonGia) * item.SoLuong;
               const isOutOfStock = item.sanPham.Ton <= 0;
               const isMaxQuantity = item.SoLuong >= item.sanPham.Ton;
+              
+              // Build image URL từ backend
+              const imageUrl = buildImageUrl(item.sanPham.HinhAnhURL);
 
               return (
                 <div 
@@ -233,12 +271,11 @@ const CartPage = () => {
                     {/* Product Image */}
                     <div className="relative w-full md:w-24 h-24 flex-shrink-0">
                       <img
-                        src={item.sanPham.HinhAnhURL || '/barbie.jpg'}
+                        src={imageUrl}
                         alt={item.sanPham.Ten}
                         className="w-full h-full object-cover rounded-cute"
-                        onError={(e) => {
-                          e.target.src = '/barbie.jpg';
-                        }}
+                        onError={handleImageError}
+                        loading="lazy"
                       />
                       {isOutOfStock && (
                         <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-cute">

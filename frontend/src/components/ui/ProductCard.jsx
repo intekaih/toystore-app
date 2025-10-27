@@ -12,11 +12,39 @@ const ProductCard = ({
   onFavorite,
   className = '',
 }) => {
+  // Backend API URL - có thể config trong .env
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  
   // Hỗ trợ cả 2 format: chữ hoa (MaSP, TenSP) và chữ thường (maSP, tenSP)
   const productId = product.id || product.MaSP || product.maSP;
   const productName = product.tenSP || product.TenSP || product.ten || 'Sản phẩm';
   const productPrice = product.giaBan || product.GiaBan || product.donGia || product.DonGia || product.price || 0;
-  const productImage = product.hinhAnh || product.HinhAnh || product.hinhAnhURL || product.HinhAnhURL || product.image || '/barbie.jpg';
+  
+  // Build full image URL
+  const buildImageUrl = (imagePath) => {
+    if (!imagePath) return '/barbie.jpg'; // Fallback to default
+    
+    // Nếu đã là full URL (http/https)
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    
+    // Nếu bắt đầu với /uploads/
+    if (imagePath.startsWith('/uploads/')) {
+      return `${API_BASE_URL}${imagePath}`;
+    }
+    
+    // Nếu chỉ là filename
+    if (!imagePath.startsWith('/')) {
+      return `${API_BASE_URL}/uploads/${imagePath}`;
+    }
+    
+    return '/barbie.jpg'; // Fallback
+  };
+  
+  const productImageRaw = product.hinhAnh || product.HinhAnh || product.hinhAnhURL || product.HinhAnhURL || product.image;
+  const productImage = buildImageUrl(productImageRaw);
+  
   const productStock = product.soLuongTon !== undefined ? product.soLuongTon : 
                        product.SoLuongTon !== undefined ? product.SoLuongTon : 
                        product.ton !== undefined ? product.ton :
@@ -38,6 +66,24 @@ const ProductCard = ({
     return { variant: 'success', text: 'Còn hàng' };
   };
 
+  // Handle image error với multiple fallback
+  const handleImageError = (e) => {
+    console.warn('❌ Lỗi load ảnh:', e.target.src);
+    
+    // Fallback 1: Thử ảnh barbie.jpg trong public
+    if (!e.target.src.includes('barbie.jpg')) {
+      e.target.src = '/barbie.jpg';
+      return;
+    }
+    
+    // Fallback 2: Placeholder image với text
+    e.target.style.display = 'none';
+    const placeholder = e.target.nextElementSibling;
+    if (placeholder && placeholder.classList.contains('image-placeholder')) {
+      placeholder.style.display = 'flex';
+    }
+  };
+
   const stockStatus = getStockStatus();
 
   return (
@@ -48,8 +94,22 @@ const ProductCard = ({
           src={productImage} 
           alt={productName}
           className="w-full h-full object-cover"
-          onError={(e) => { e.target.src = '/barbie.jpg'; }}
+          onError={handleImageError}
+          loading="lazy"
         />
+        
+        {/* Image Placeholder - hiển thị khi ảnh lỗi */}
+        <div 
+          className="image-placeholder absolute inset-0 bg-gray-100 flex flex-col items-center justify-center text-gray-400 text-sm"
+          style={{ display: 'none' }}
+        >
+          <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center mb-2">
+            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <span>Không có ảnh</span>
+        </div>
         
         {/* Stock Badge */}
         <div className="absolute top-3 right-3">

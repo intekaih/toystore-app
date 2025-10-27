@@ -9,6 +9,39 @@ import { Button, Badge, Loading } from '../../components/ui';
 import Toast from '../../components/Toast.js';
 
 const ProductDetail = () => {
+  // Backend API URL
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  
+  // Build full image URL
+  const buildImageUrl = (imagePath) => {
+    if (!imagePath) return '/barbie.jpg';
+    
+    // Nếu đã là full URL (http/https)
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    
+    // Nếu bắt đầu với /uploads/
+    if (imagePath.startsWith('/uploads/')) {
+      return `${API_BASE_URL}${imagePath}`;
+    }
+    
+    // Nếu chỉ là filename
+    if (!imagePath.startsWith('/')) {
+      return `${API_BASE_URL}/uploads/${imagePath}`;
+    }
+    
+    return '/barbie.jpg';
+  };
+  
+  // Handle image error
+  const handleImageError = (e) => {
+    console.warn('❌ Lỗi load ảnh sản phẩm:', e.target.src);
+    if (!e.target.src.includes('barbie.jpg')) {
+      e.target.src = '/barbie.jpg';
+    }
+  };
+
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
@@ -155,12 +188,11 @@ const ProductDetail = () => {
           <div className="relative">
             <div className="bg-gradient-to-br from-primary-50 to-rose-50 rounded-bubble overflow-hidden shadow-soft border-2 border-primary-100 sticky top-24">
               <img
-                src={product.hinhAnhURL || '/barbie.jpg'}
+                src={buildImageUrl(product.hinhAnhURL)}
                 alt={product.ten}
                 className="w-full h-auto object-cover transition-transform duration-500 hover:scale-105"
-                onError={(e) => {
-                  e.target.src = '/barbie.jpg';
-                }}
+                onError={handleImageError}
+                loading="lazy"
               />
               
               {/* Out of Stock Badge */}

@@ -22,14 +22,14 @@ exports.getProfile = async (req, res) => {
       message: 'Lấy thông tin cá nhân thành công',
       data: {
         user: {
-          id: user.ID,
-          tenDangNhap: user.TenDangNhap,
-          hoTen: user.HoTen,
-          email: user.Email,
-          dienThoai: user.DienThoai,
-          vaiTro: user.VaiTro,
-          ngayTao: user.NgayTao,
-          enable: user.Enable
+          ID: user.ID,
+          TenDangNhap: user.TenDangNhap,
+          HoTen: user.HoTen,
+          Email: user.Email,
+          DienThoai: user.DienThoai,
+          VaiTro: user.VaiTro,
+          NgayTao: user.NgayTao,
+          Enable: user.Enable
         }
       }
     });
@@ -160,14 +160,14 @@ exports.updateProfile = async (req, res) => {
       message: 'Cập nhật thông tin cá nhân thành công',
       data: {
         user: {
-          id: updatedUser.ID,
-          tenDangNhap: updatedUser.TenDangNhap,
-          hoTen: updatedUser.HoTen,
-          email: updatedUser.Email,
-          dienThoai: updatedUser.DienThoai,
-          vaiTro: updatedUser.VaiTro,
-          ngayTao: updatedUser.NgayTao,
-          enable: updatedUser.Enable
+          ID: updatedUser.ID,
+          TenDangNhap: updatedUser.TenDangNhap,
+          HoTen: updatedUser.HoTen,
+          Email: updatedUser.Email,
+          DienThoai: updatedUser.DienThoai,
+          VaiTro: updatedUser.VaiTro,
+          NgayTao: updatedUser.NgayTao,
+          Enable: updatedUser.Enable
         }
       }
     });

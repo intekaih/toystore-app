@@ -128,23 +128,23 @@ exports.getAllProducts = async (req, res) => {
     // Lấy base URL từ request
     const baseUrl = `${req.protocol}://${req.get('host')}`;
 
-    // Format dữ liệu trả về theo cấu trúc chuẩn
+    // Format dữ liệu trả về theo cấu trúc chuẩn - CHUẨN HÓA THEO DATABASE
     const products = paginatedProducts.map(product => ({
-      id: product.ID,
-      tenSP: product.Ten,
-      moTa: product.MoTa,
-      giaBan: parseFloat(product.GiaBan),
-      soLuongTon: product.Ton,
-      hinhAnh: product.HinhAnhURL ? `${baseUrl}${product.HinhAnhURL}` : null,
-      loaiID: product.LoaiID,
-      ngayTao: product.NgayTao,
-      trangThai: product.Enable,
+      ID: product.ID,
+      Ten: product.Ten,
+      MoTa: product.MoTa,
+      GiaBan: parseFloat(product.GiaBan),
+      Ton: product.Ton,
+      HinhAnhURL: product.HinhAnhURL ? `${baseUrl}${product.HinhAnhURL}` : null,
+      LoaiID: product.LoaiID,
+      NgayTao: product.NgayTao,
+      Enable: product.Enable,
       // Thêm totalSold nếu là bestSeller strategy
-      ...(product.totalSold !== undefined && { soLuongBan: product.totalSold }),
-      loaiSP: product.loaiSP ? {
-        id: product.loaiSP.ID,
-        tenLoai: product.loaiSP.Ten,
-        moTa: product.loaiSP.MoTa
+      ...(product.totalSold !== undefined && { SoLuongBan: product.totalSold }),
+      LoaiSP: product.loaiSP ? {
+        ID: product.loaiSP.ID,
+        Ten: product.loaiSP.Ten,
+        MoTa: product.loaiSP.MoTa
       } : null
     }));
 
@@ -257,26 +257,26 @@ exports.getProductById = async (req, res) => {
     // Lấy base URL từ request
     const baseUrl = `${req.protocol}://${req.get('host')}`;
 
-    // Format dữ liệu trả về với URL đầy đủ
+    // Format dữ liệu trả về với URL đầy đủ - CHUẨN HÓA THEO DATABASE
     const productDetail = {
-      id: product.ID,
-      ten: product.Ten,
-      moTa: product.MoTa,
+      ID: product.ID,
+      Ten: product.Ten,
+      MoTa: product.MoTa,
       // Thêm base URL vào đường dẫn ảnh
-      hinhAnhURL: product.HinhAnhURL ? `${baseUrl}${product.HinhAnhURL}` : null,
-      giaBan: parseFloat(product.GiaBan),
-      ton: product.Ton,
-      loaiID: product.LoaiID,
-      ngayTao: product.NgayTao,
-      trangThai: product.Enable,
-      loaiSP: product.loaiSP ? {
-        id: product.loaiSP.ID,
-        ten: product.loaiSP.Ten,
-        moTa: product.loaiSP.MoTa
+      HinhAnhURL: product.HinhAnhURL ? `${baseUrl}${product.HinhAnhURL}` : null,
+      GiaBan: parseFloat(product.GiaBan),
+      Ton: product.Ton,
+      LoaiID: product.LoaiID,
+      NgayTao: product.NgayTao,
+      Enable: product.Enable,
+      LoaiSP: product.loaiSP ? {
+        ID: product.loaiSP.ID,
+        Ten: product.loaiSP.Ten,
+        MoTa: product.loaiSP.MoTa
       } : null
     };
 
-    console.log('✅ Lấy chi tiết sản phẩm thành công:', productDetail.ten);
+    console.log('✅ Lấy chi tiết sản phẩm thành công:', productDetail.Ten);
 
     // Trả về thông tin chi tiết sản phẩm
     res.status(200).json({

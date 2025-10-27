@@ -10,6 +10,39 @@ import { Button, Badge, Loading } from '../components/ui';
 import Toast from '../components/Toast';
 
 const CheckoutPage = () => {
+  // Backend API URL
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  
+  // Build full image URL
+  const buildImageUrl = (imagePath) => {
+    if (!imagePath) return '/barbie.jpg';
+    
+    // Nếu đã là full URL (http/https)
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    
+    // Nếu bắt đầu với /uploads/
+    if (imagePath.startsWith('/uploads/')) {
+      return `${API_BASE_URL}${imagePath}`;
+    }
+    
+    // Nếu chỉ là filename
+    if (!imagePath.startsWith('/')) {
+      return `${API_BASE_URL}/uploads/${imagePath}`;
+    }
+    
+    return '/barbie.jpg';
+  };
+  
+  // Handle image error
+  const handleImageError = (e) => {
+    console.warn('❌ Lỗi load ảnh trong checkout:', e.target.src);
+    if (!e.target.src.includes('barbie.jpg')) {
+      e.target.src = '/barbie.jpg';
+    }
+  };
+
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -428,12 +461,10 @@ const CheckoutPage = () => {
                   {cartItems.map((item) => (
                     <div key={item.ID} className="flex gap-3 p-3 bg-white rounded-cute border border-primary-100">
                       <img
-                        src={item.sanPham?.HinhAnhURL || '/barbie.jpg'}
+                        src={buildImageUrl(item.sanPham?.HinhAnhURL)}
                         alt={item.sanPham?.Ten}
                         className="w-16 h-16 object-cover rounded-cute flex-shrink-0"
-                        onError={(e) => {
-                          e.target.src = '/barbie.jpg';
-                        }}
+                        onError={handleImageError}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-gray-800 text-sm line-clamp-1">

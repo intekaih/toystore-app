@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import OrderTable from '../components/OrderTable';
 import Pagination from '../components/Pagination';
 import Toast from '../components/Toast';
+import { Button, Card, Input } from '../components/ui';
 import authService from '../services/authService';
 import axios from 'axios';
 import '../styles/OrderManagementPage.css';
@@ -38,12 +39,12 @@ const OrderManagementPage = () => {
 
   // Danh sách trạng thái
   const statusList = [
-    { value: '', label: 'Tất cả đơn hàng' },
-    { value: 'Chờ xử lý', label: '⏳ Chờ xử lý' },
-    { value: 'Đang giao', label: '🚚 Đang giao' },
-    { value: 'Đã giao', label: '📦 Đã giao' },
-    { value: 'Hoàn thành', label: '✅ Hoàn thành' },
-    { value: 'Đã hủy', label: '❌ Đã hủy' }
+    { value: '', label: 'Tất cả đơn hàng', icon: '📦', color: 'gray' },
+    { value: 'Chờ xử lý', label: 'Chờ xử lý', icon: '⏳', color: 'yellow' },
+    { value: 'Đang giao', label: 'Đang giao', icon: '🚚', color: 'blue' },
+    { value: 'Đã giao', label: 'Đã giao', icon: '📦', color: 'green' },
+    { value: 'Hoàn thành', label: 'Hoàn thành', icon: '✅', color: 'green' },
+    { value: 'Đã hủy', label: 'Đã hủy', icon: '❌', color: 'red' }
   ];
 
   // Hiển thị toast
@@ -186,103 +187,135 @@ const OrderManagementPage = () => {
   };
 
   return (
-    <div className="order-management-page">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 p-6">
       {/* Header */}
-      <div className="page-header">
-        <div className="header-content">
-          <div className="header-left">
-            <button className="btn-back" onClick={() => navigate('/admin/dashboard')}>
-              ⬅️ Dashboard
-            </button>
-            <h1>🛒 Quản lý đơn hàng</h1>
-          </div>
-          <div className="header-right">
-            <span className="welcome-text">Xin chào, <strong>{user?.hoTen || 'Admin'}</strong></span>
-            <button className="btn-logout" onClick={handleLogout}>
-              🚪 Đăng xuất
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="page-content">
-        {/* Statistics Bar */}
-        <div className="stats-bar">
-          <div className="stat-card">
-            <div className="stat-icon">📦</div>
-            <div className="stat-info">
-              <span className="stat-label">Tổng đơn hàng</span>
-              <span className="stat-value">{orderStats.total}</span>
+      <Card className="mb-6 border-primary-200" padding="md">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/admin/dashboard')}
+              icon="⬅️"
+            >
+              Dashboard
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-primary-400 to-primary-500 rounded-cute text-white">
+                🛒
+              </div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+                Quản lý đơn hàng
+              </h1>
             </div>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon">💰</div>
-            <div className="stat-info">
-              <span className="stat-label">Tổng doanh thu</span>
-              <span className="stat-value">
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-sm text-gray-600">Xin chào,</p>
+              <p className="font-semibold text-primary-600">{user?.hoTen || 'Admin'}</p>
+            </div>
+            <Button
+              variant="danger"
+              onClick={handleLogout}
+              icon="🚪"
+            >
+              Đăng xuất
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <Card padding="md" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-blue-500 rounded-cute text-white text-xl">📦</div>
+            <div>
+              <p className="text-sm text-blue-600">Tổng đơn hàng</p>
+              <p className="text-2xl font-bold text-blue-700">{orderStats.total}</p>
+            </div>
+          </div>
+        </Card>
+        
+        <Card padding="md" className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-green-500 rounded-cute text-white text-xl">💰</div>
+            <div>
+              <p className="text-sm text-green-600">Tổng doanh thu</p>
+              <p className="text-xl font-bold text-green-700">
                 {new Intl.NumberFormat('vi-VN', {
                   style: 'currency',
                   currency: 'VND'
                 }).format(orderStats.totalRevenue)}
-              </span>
+              </p>
             </div>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon">📊</div>
-            <div className="stat-info">
-              <span className="stat-label">Sản phẩm đã bán</span>
-              <span className="stat-value">{orderStats.totalProducts}</span>
+        </Card>
+        
+        <Card padding="md" className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-purple-500 rounded-cute text-white text-xl">📊</div>
+            <div>
+              <p className="text-sm text-purple-600">Sản phẩm đã bán</p>
+              <p className="text-2xl font-bold text-purple-700">{orderStats.totalProducts}</p>
             </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Filter Section */}
+      <Card className="mb-6" padding="md">
+        {/* Status Filters */}
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-gray-700 mb-3">Lọc theo trạng thái:</h3>
+          <div className="flex flex-wrap gap-2">
+            {statusList.map((status) => (
+              <Button
+                key={status.value}
+                variant={selectedStatus === status.value ? 'primary' : 'outline'}
+                size="sm"
+                onClick={() => handleStatusChange(status.value)}
+                icon={status.icon}
+              >
+                {status.label}
+              </Button>
+            ))}
           </div>
         </div>
 
-        {/* Filter Bar */}
-        <div className="filter-bar">
-          <div className="filter-section">
-            <label>Lọc theo trạng thái:</label>
-            <div className="status-filters">
-              {statusList.map((status) => (
-                <button
-                  key={status.value}
-                  className={`filter-btn ${selectedStatus === status.value ? 'active' : ''}`}
-                  onClick={() => handleStatusChange(status.value)}
-                >
-                  {status.label}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Search */}
+        <form onSubmit={handleSearch}>
+          <Input
+            type="text"
+            placeholder="Tìm kiếm theo mã đơn hàng..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            icon="🔍"
+          />
+          <Button type="submit" className="mt-2" fullWidth>
+            🔍 Tìm kiếm
+          </Button>
+        </form>
+      </Card>
 
-          <form className="search-section" onSubmit={handleSearch}>
-            <input
-              type="text"
-              placeholder="Tìm kiếm theo mã đơn hàng..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-            <button type="submit" className="btn-search">
-              🔍 Tìm kiếm
-            </button>
-          </form>
-        </div>
-
-        {/* Order Table */}
+      {/* Order Table */}
+      <Card padding="none" className="mb-6">
         <OrderTable
           orders={orders}
           onUpdateStatus={handleUpdateStatus}
           loading={loading}
         />
+      </Card>
 
-        {/* Pagination */}
-        {!loading && orders.length > 0 && (
+      {/* Pagination */}
+      {!loading && orders.length > 0 && (
+        <div className="flex justify-center">
           <Pagination
             currentPage={pagination.currentPage}
             totalPages={pagination.totalPages}
             onPageChange={handlePageChange}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toast.show && (

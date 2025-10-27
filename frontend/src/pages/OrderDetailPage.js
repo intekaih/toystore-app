@@ -8,6 +8,39 @@ import { ArrowLeft, Package, User, MapPin, Phone, Mail, Calendar, CreditCard, Fi
 import Toast from '../components/Toast';
 
 const OrderDetailPage = () => {
+  // Backend API URL
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  
+  // Build full image URL
+  const buildImageUrl = (imagePath) => {
+    if (!imagePath) return '/barbie.jpg';
+    
+    // Nếu đã là full URL (http/https)
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    
+    // Nếu bắt đầu với /uploads/
+    if (imagePath.startsWith('/uploads/')) {
+      return `${API_BASE_URL}${imagePath}`;
+    }
+    
+    // Nếu chỉ là filename
+    if (!imagePath.startsWith('/')) {
+      return `${API_BASE_URL}/uploads/${imagePath}`;
+    }
+    
+    return '/barbie.jpg';
+  };
+  
+  // Handle image error
+  const handleImageError = (e) => {
+    console.warn('❌ Lỗi load ảnh trong chi tiết đơn hàng:', e.target.src);
+    if (!e.target.src.includes('barbie.jpg')) {
+      e.target.src = '/barbie.jpg';
+    }
+  };
+
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -210,12 +243,10 @@ const OrderDetailPage = () => {
                     }`}
                   >
                     <img
-                      src={item.hinhAnh || '/barbie.jpg'}
+                      src={buildImageUrl(item.hinhAnh)}
                       alt={item.tenSanPham}
                       className="w-20 h-20 object-cover rounded-cute border-2 border-primary-100 flex-shrink-0"
-                      onError={(e) => {
-                        e.target.src = '/barbie.jpg';
-                      }}
+                      onError={handleImageError}
                     />
                     <div className="flex-grow">
                       <Link 

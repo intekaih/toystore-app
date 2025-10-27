@@ -9,6 +9,39 @@ import Toast from '../components/Toast';
 import Pagination from '../components/Pagination';
 
 const OrderHistoryPage = () => {
+  // Backend API URL
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  
+  // Build full image URL
+  const buildImageUrl = (imagePath) => {
+    if (!imagePath) return '/barbie.jpg';
+    
+    // Nếu đã là full URL (http/https)
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    
+    // Nếu bắt đầu với /uploads/
+    if (imagePath.startsWith('/uploads/')) {
+      return `${API_BASE_URL}${imagePath}`;
+    }
+    
+    // Nếu chỉ là filename
+    if (!imagePath.startsWith('/')) {
+      return `${API_BASE_URL}/uploads/${imagePath}`;
+    }
+    
+    return '/barbie.jpg';
+  };
+  
+  // Handle image error
+  const handleImageError = (e) => {
+    console.warn('❌ Lỗi load ảnh trong đơn hàng:', e.target.src);
+    if (!e.target.src.includes('barbie.jpg')) {
+      e.target.src = '/barbie.jpg';
+    }
+  };
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -219,12 +252,10 @@ const OrderHistoryPage = () => {
                       {order.sanPhams.slice(0, 3).map((product) => (
                         <div key={product.id} className="flex gap-4 items-center">
                           <img
-                            src={product.hinhAnh || '/barbie.jpg'}
+                            src={buildImageUrl(product.hinhAnh)}
                             alt={product.tenSanPham}
                             className="w-16 h-16 object-cover rounded-cute flex-shrink-0"
-                            onError={(e) => {
-                              e.target.src = '/barbie.jpg';
-                            }}
+                            onError={handleImageError}
                           />
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-gray-800 line-clamp-1">

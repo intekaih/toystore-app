@@ -6,14 +6,13 @@ import UserTable from '../components/UserTable';
 import UserModal from '../components/UserModal';
 import Toast from '../components/Toast';
 import Pagination from '../components/Pagination';
+import { Button, Card, Input, Badge } from '../components/ui';
 import * as userApi from '../api/userApi';
-import '../styles/UserManagementPage.css';
 
 const UserManagementPage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
-  // State quản lý danh sách user
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
@@ -23,33 +22,28 @@ const UserManagementPage = () => {
     usersPerPage: 10
   });
 
-  // State cho filters
   const [filters, setFilters] = useState({
     search: '',
     role: '',
     status: ''
   });
 
-  // State cho modal
   const [modalState, setModalState] = useState({
     isOpen: false,
-    mode: 'create', // 'create' hoặc 'edit'
+    mode: 'create',
     editingUser: null
   });
 
-  // State cho toast notification
   const [toast, setToast] = useState({
     show: false,
     message: '',
     type: 'info'
   });
 
-  // Hiển thị toast
   const showToast = (message, type = 'info') => {
     setToast({ show: true, message, type });
   };
 
-  // Fetch danh sách users
   const fetchUsers = useCallback(async (page = 1) => {
     try {
       setLoading(true);
@@ -82,18 +76,15 @@ const UserManagementPage = () => {
     }
   }, [filters, logout, navigate]);
 
-  // Load users khi component mount hoặc filters thay đổi
   useEffect(() => {
     fetchUsers(1);
   }, [fetchUsers]);
 
-  // Xử lý tìm kiếm
   const handleSearch = (e) => {
     e.preventDefault();
     fetchUsers(1);
   };
 
-  // Xử lý thay đổi filter
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({
@@ -102,7 +93,6 @@ const UserManagementPage = () => {
     }));
   };
 
-  // Reset filters
   const handleResetFilters = () => {
     setFilters({
       search: '',
@@ -111,7 +101,6 @@ const UserManagementPage = () => {
     });
   };
 
-  // Mở modal thêm mới
   const handleOpenCreateModal = () => {
     setModalState({
       isOpen: true,
@@ -120,7 +109,6 @@ const UserManagementPage = () => {
     });
   };
 
-  // Mở modal chỉnh sửa
   const handleOpenEditModal = (user) => {
     setModalState({
       isOpen: true,
@@ -129,7 +117,6 @@ const UserManagementPage = () => {
     });
   };
 
-  // Đóng modal
   const handleCloseModal = () => {
     setModalState({
       isOpen: false,
@@ -138,7 +125,6 @@ const UserManagementPage = () => {
     });
   };
 
-  // Xử lý tạo user mới
   const handleCreateUser = async (userData) => {
     try {
       const response = await userApi.createUser(userData);
@@ -154,7 +140,6 @@ const UserManagementPage = () => {
     }
   };
 
-  // Xử lý cập nhật user
   const handleUpdateUser = async (userData) => {
     try {
       const response = await userApi.updateUser(modalState.editingUser.id, userData);
@@ -170,7 +155,6 @@ const UserManagementPage = () => {
     }
   };
 
-  // Xử lý submit modal (create hoặc update)
   const handleModalSubmit = async (userData) => {
     if (modalState.mode === 'create') {
       await handleCreateUser(userData);
@@ -179,38 +163,26 @@ const UserManagementPage = () => {
     }
   };
 
-  // Xử lý khóa/mở khóa tài khoản
   const handleToggleStatus = async (user) => {
     const action = user.enable ? 'khóa' : 'mở khóa';
-    
-    console.log('🔒 Frontend - Đang thực hiện:', action);
-    console.log('👤 User được chọn:', user);
-    console.log('📊 Enable hiện tại:', user.enable);
-    console.log('📊 Enable mới sẽ gửi:', !user.enable);
     
     if (!window.confirm(`Bạn có chắc chắn muốn ${action} tài khoản "${user.tenDangNhap}"?`)) {
       return;
     }
 
     try {
-      console.log('🚀 Gọi API updateUserStatus với userId:', user.id, ', enable:', !user.enable);
       const response = await userApi.updateUserStatus(user.id, !user.enable);
-      
-      console.log('✅ Response từ server:', response);
       
       if (response.success) {
         showToast(response.message || `${action.charAt(0).toUpperCase() + action.slice(1)} tài khoản thành công`, 'success');
         fetchUsers(pagination.currentPage);
       }
     } catch (error) {
-      console.error('❌ Error toggling user status:', error);
-      console.error('📝 Error response:', error.response);
-      console.error('📝 Error message:', error.response?.data?.message);
+      console.error('Error toggling user status:', error);
       showToast(error.response?.data?.message || `Lỗi khi ${action} tài khoản`, 'error');
     }
   };
 
-  // Xử lý xóa user
   const handleDeleteUser = async (user) => {
     if (!window.confirm(`⚠️ BẠN CÓ CHẮC CHẮN MUỐN XÓA VĨNH VIỄN TÀI KHOẢN "${user.tenDangNhap}"?\n\nHành động này không thể hoàn tác!`)) {
       return;
@@ -222,7 +194,6 @@ const UserManagementPage = () => {
       if (response.success) {
         showToast(response.message || 'Xóa tài khoản thành công', 'success');
         
-        // Nếu xóa user cuối cùng của trang và không phải trang 1, quay về trang trước
         if (users.length === 1 && pagination.currentPage > 1) {
           fetchUsers(pagination.currentPage - 1);
         } else {
@@ -235,53 +206,72 @@ const UserManagementPage = () => {
     }
   };
 
-  // Xử lý đăng xuất
   const handleLogout = () => {
     logout();
     navigate('/admin/login');
   };
 
   return (
-    <div className="user-management-page">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 p-6">
       {/* Header */}
-      <div className="page-header">
-        <div className="header-content">
-          <div className="header-left">
-            <button className="btn-back" onClick={() => navigate('/admin/dashboard')}>
-              ⬅️ Dashboard
-            </button>
-            <h1>👥 Quản lý người dùng</h1>
+      <Card className="mb-6 border-primary-200" padding="md">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/admin/dashboard')}
+              icon="⬅️"
+            >
+              Dashboard
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-primary-400 to-primary-500 rounded-cute text-white">
+                👥
+              </div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+                Quản lý người dùng
+              </h1>
+            </div>
           </div>
-          <div className="header-right">
-            <span className="welcome-text">Xin chào, <strong>{user?.hoTen || 'Admin'}</strong></span>
-            <button className="btn-logout" onClick={handleLogout}>
-              🚪 Đăng xuất
-            </button>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-sm text-gray-600">Xin chào,</p>
+              <p className="font-semibold text-primary-600">{user?.hoTen || 'Admin'}</p>
+            </div>
+            <Button
+              variant="danger"
+              onClick={handleLogout}
+              icon="🚪"
+            >
+              Đăng xuất
+            </Button>
           </div>
         </div>
-      </div>
+      </Card>
 
-      <div className="page-content">
-        {/* Filters & Actions */}
-        <div className="filters-section">
-          <form onSubmit={handleSearch} className="search-form">
-            <input
-              type="text"
-              name="search"
-              placeholder="🔍 Tìm kiếm theo tên, email, tên đăng nhập..."
-              value={filters.search}
-              onChange={handleFilterChange}
-              className="search-input"
-            />
-            <button type="submit" className="btn-search">Tìm kiếm</button>
-          </form>
+      {/* Filters & Actions */}
+      <Card className="mb-6" padding="md">
+        <form onSubmit={handleSearch} className="mb-4">
+          <Input
+            type="text"
+            name="search"
+            placeholder="🔍 Tìm kiếm theo tên, email, tên đăng nhập..."
+            value={filters.search}
+            onChange={handleFilterChange}
+            icon="🔍"
+          />
+          <Button type="submit" className="mt-2" fullWidth>
+            Tìm kiếm
+          </Button>
+        </form>
 
-          <div className="filter-controls">
+        <div className="flex flex-wrap gap-3 items-center justify-between">
+          <div className="flex flex-wrap gap-3">
             <select
               name="role"
               value={filters.role}
               onChange={handleFilterChange}
-              className="filter-select"
+              className="input-cute min-w-[150px]"
             >
               <option value="">Tất cả vai trò</option>
               <option value="admin">👑 Admin</option>
@@ -292,36 +282,59 @@ const UserManagementPage = () => {
               name="status"
               value={filters.status}
               onChange={handleFilterChange}
-              className="filter-select"
+              className="input-cute min-w-[150px]"
             >
               <option value="">Tất cả trạng thái</option>
               <option value="active">✅ Hoạt động</option>
               <option value="inactive">🔒 Bị khóa</option>
             </select>
 
-            <button className="btn-reset" onClick={handleResetFilters}>
-              🔄 Reset
-            </button>
-
-            <button className="btn-create" onClick={handleOpenCreateModal}>
-              ➕ Thêm mới
-            </button>
+            <Button variant="secondary" onClick={handleResetFilters} icon="🔄">
+              Reset
+            </Button>
           </div>
+
+          <Button onClick={handleOpenCreateModal} icon="➕">
+            Thêm mới
+          </Button>
         </div>
+      </Card>
 
-        {/* Statistics */}
-        <div className="stats-bar">
-          <div className="stat-item">
-            <span className="stat-label">Tổng số:</span>
-            <span className="stat-value">{pagination.totalUsers}</span>
+      {/* Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <Card padding="md" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-blue-500 rounded-cute text-white text-xl">📊</div>
+            <div>
+              <p className="text-sm text-blue-600">Tổng số người dùng</p>
+              <p className="text-2xl font-bold text-blue-700">{pagination.totalUsers}</p>
+            </div>
           </div>
-          <div className="stat-item">
-            <span className="stat-label">Trang hiện tại:</span>
-            <span className="stat-value">{pagination.currentPage}/{pagination.totalPages}</span>
+        </Card>
+        
+        <Card padding="md" className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-green-500 rounded-cute text-white text-xl">📄</div>
+            <div>
+              <p className="text-sm text-green-600">Trang hiện tại</p>
+              <p className="text-2xl font-bold text-green-700">{pagination.currentPage}</p>
+            </div>
           </div>
-        </div>
+        </Card>
+        
+        <Card padding="md" className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-purple-500 rounded-cute text-white text-xl">📚</div>
+            <div>
+              <p className="text-sm text-purple-600">Tổng số trang</p>
+              <p className="text-2xl font-bold text-purple-700">{pagination.totalPages}</p>
+            </div>
+          </div>
+        </Card>
+      </div>
 
-        {/* Table */}
+      {/* Table */}
+      <Card padding="none" className="mb-6">
         <UserTable
           users={users}
           onEdit={handleOpenEditModal}
@@ -329,16 +342,18 @@ const UserManagementPage = () => {
           onToggleStatus={handleToggleStatus}
           loading={loading}
         />
+      </Card>
 
-        {/* Pagination */}
-        {!loading && users.length > 0 && (
+      {/* Pagination */}
+      {!loading && users.length > 0 && (
+        <div className="flex justify-center">
           <Pagination
             currentPage={pagination.currentPage}
             totalPages={pagination.totalPages}
             onPageChange={fetchUsers}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Modal */}
       <UserModal

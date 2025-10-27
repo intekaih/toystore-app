@@ -38,11 +38,11 @@ exports.getAllCategories = async (req, res) => {
       message: 'Lấy danh sách danh mục thành công',
       data: {
         categories: categories.map(cat => ({
-          id: cat.ID,
-          ten: cat.Ten,
-          moTa: cat.MoTa,
-          enable: cat.Enable,
-          soLuongSanPham: parseInt(cat.dataValues.soLuongSanPham) || 0
+          ID: cat.ID,
+          Ten: cat.Ten,
+          MoTa: cat.MoTa,
+          Enable: cat.Enable,
+          SoLuongSanPham: parseInt(cat.dataValues.soLuongSanPham) || 0
         })),
         total: categories.length
       }
@@ -130,10 +130,10 @@ exports.createCategory = async (req, res) => {
       message: 'Tạo danh mục mới thành công',
       data: {
         category: {
-          id: newCategory.ID,
-          ten: newCategory.Ten,
-          moTa: newCategory.MoTa,
-          enable: newCategory.Enable
+          ID: newCategory.ID,
+          Ten: newCategory.Ten,
+          MoTa: newCategory.MoTa,
+          Enable: newCategory.Enable
         }
       }
     });
@@ -281,10 +281,10 @@ exports.updateCategory = async (req, res) => {
       message: 'Cập nhật danh mục thành công',
       data: {
         category: {
-          id: updatedCategory.ID,
-          ten: updatedCategory.Ten,
-          moTa: updatedCategory.MoTa,
-          enable: updatedCategory.Enable
+          ID: updatedCategory.ID,
+          Ten: updatedCategory.Ten,
+          MoTa: updatedCategory.MoTa,
+          Enable: updatedCategory.Enable
         }
       }
     });
@@ -373,8 +373,8 @@ exports.deleteCategory = async (req, res) => {
       message: 'Xóa danh mục thành công',
       data: {
         deletedCategory: {
-          id: categoryId,
-          ten: categoryName
+          ID: categoryId,
+          Ten: categoryName
         }
       }
     });

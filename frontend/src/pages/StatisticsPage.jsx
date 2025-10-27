@@ -5,9 +5,9 @@ import { useAuth } from '../contexts/AuthContext';
 import RevenueChart from '../components/RevenueChart';
 import PaymentPieChart from '../components/PaymentPieChart';
 import Toast from '../components/Toast';
+import { Button, Card, Loading } from '../components/ui';
 import authService from '../services/authService';
 import axios from 'axios';
-import '../styles/StatisticsPage.css';
 
 const StatisticsPage = () => {
   const navigate = useNavigate();
@@ -166,41 +166,67 @@ const StatisticsPage = () => {
 
   if (loading) {
     return (
-      <div className="statistics-page">
-        <div className="loading-container">
-          <div className="spinner"></div>
-          <p>Đang tải dữ liệu thống kê...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 p-6 flex items-center justify-center">
+        <Card padding="lg" className="text-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+            <p className="text-gray-600">Đang tải dữ liệu thống kê...</p>
+          </div>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="statistics-page">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 p-6">
       {/* Header */}
-      <div className="page-header">
-        <div className="header-content">
-          <div className="header-left">
-            <button className="btn-back" onClick={() => navigate('/admin/dashboard')}>
-              ⬅️ Dashboard
-            </button>
-            <h1>📊 Thống kê đơn hàng</h1>
+      <Card className="mb-6 border-primary-200" padding="md">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/admin/dashboard')}
+              icon="⬅️"
+            >
+              Dashboard
+            </Button>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-primary-400 to-primary-500 rounded-cute text-white">
+                📊
+              </div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+                Thống kê đơn hàng
+              </h1>
+            </div>
           </div>
-          <div className="header-right">
-            <span className="welcome-text">Xin chào, <strong>{user?.hoTen || 'Admin'}</strong></span>
-            <button className="btn-logout" onClick={handleLogout}>
-              🚪 Đăng xuất
-            </button>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-sm text-gray-600">Xin chào,</p>
+              <p className="font-semibold text-primary-600">{user?.hoTen || 'Admin'}</p>
+            </div>
+            <Button
+              variant="danger"
+              onClick={handleLogout}
+              icon="🚪"
+            >
+              Đăng xuất
+            </Button>
           </div>
         </div>
-      </div>
+      </Card>
 
-      <div className="page-content">
-        {/* Filter Bar */}
-        <div className="filter-bar">
-          <div className="filter-group">
-            <label>Chọn tháng:</label>
-            <select value={selectedMonth} onChange={handleMonthChange} className="filter-select">
+      {/* Filter Bar */}
+      <Card className="mb-6" padding="md">
+        <div className="flex flex-wrap gap-4 items-end">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Chọn tháng:
+            </label>
+            <select 
+              value={selectedMonth} 
+              onChange={handleMonthChange} 
+              className="input-cute min-w-[150px]"
+            >
               {months.map(month => (
                 <option key={month.value} value={month.value}>
                   {month.label}
@@ -209,9 +235,15 @@ const StatisticsPage = () => {
             </select>
           </div>
 
-          <div className="filter-group">
-            <label>Chọn năm:</label>
-            <select value={selectedYear} onChange={handleYearChange} className="filter-select">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Chọn năm:
+            </label>
+            <select 
+              value={selectedYear} 
+              onChange={handleYearChange} 
+              className="input-cute min-w-[150px]"
+            >
               {years.map(year => (
                 <option key={year} value={year}>
                   {year}
@@ -220,119 +252,156 @@ const StatisticsPage = () => {
             </select>
           </div>
 
-          <button 
-            className="btn-refresh" 
+          <Button 
+            variant="secondary"
             onClick={() => fetchStatistics(selectedMonth, selectedYear)}
+            icon="🔄"
           >
-            🔄 Làm mới
-          </button>
+            Làm mới
+          </Button>
         </div>
+      </Card>
 
-        {/* Summary Cards */}
-        <div className="summary-cards">
-          <div className="summary-card revenue">
-            <div className="card-icon">💰</div>
-            <div className="card-content">
-              <h3>Tổng doanh thu tháng</h3>
-              <p className="value">{formatCurrency(statistics?.tongDoanhThu)}</p>
-              <span className="label">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <Card padding="md" className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
+          <div className="flex items-center gap-4">
+            <div className="p-4 bg-green-500 rounded-cute text-white text-3xl">💰</div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-green-700">Tổng doanh thu tháng</h3>
+              <p className="text-2xl font-bold text-green-800">{formatCurrency(statistics?.tongDoanhThu)}</p>
+              <span className="text-sm text-green-600">
                 Tháng {selectedMonth}/{selectedYear}
               </span>
             </div>
           </div>
+        </Card>
 
-          <div className="summary-card orders">
-            <div className="card-icon">📦</div>
-            <div className="card-content">
-              <h3>Tổng số đơn hàng</h3>
-              <p className="value">{statistics?.soDonHang || 0}</p>
-              <span className="label">
+        <Card padding="md" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+          <div className="flex items-center gap-4">
+            <div className="p-4 bg-blue-500 rounded-cute text-white text-3xl">📦</div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-blue-700">Tổng số đơn hàng</h3>
+              <p className="text-2xl font-bold text-blue-800">{statistics?.soDonHang || 0}</p>
+              <span className="text-sm text-blue-600">
                 Đơn hàng trong tháng
               </span>
             </div>
           </div>
+        </Card>
 
-          <div className="summary-card average">
-            <div className="card-icon">📈</div>
-            <div className="card-content">
-              <h3>Doanh thu trung bình</h3>
-              <p className="value">{formatCurrency(statistics?.doanhThuTrungBinh)}</p>
-              <span className="label">
+        <Card padding="md" className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
+          <div className="flex items-center gap-4">
+            <div className="p-4 bg-purple-500 rounded-cute text-white text-3xl">📈</div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-purple-700">Doanh thu trung bình</h3>
+              <p className="text-2xl font-bold text-purple-800">{formatCurrency(statistics?.doanhThuTrungBinh)}</p>
+              <span className="text-sm text-purple-600">
                 Trung bình/đơn hàng
               </span>
             </div>
           </div>
-        </div>
-
-        {/* Charts */}
-        <div className="charts-container">
-          <div className="chart-card">
-            <RevenueChart 
-              data={chartData} 
-              title="Số đơn hàng trong 7 ngày gần nhất"
-            />
-          </div>
-
-          <div className="chart-card">
-            <PaymentPieChart 
-              data={paymentData} 
-              title="Tỷ lệ đơn hàng theo trạng thái"
-            />
-          </div>
-        </div>
-
-        {/* Top Products */}
-        {statistics?.topSanPham && statistics.topSanPham.length > 0 && (
-          <div className="top-products-section">
-            <h2>🏆 Top 5 sản phẩm bán chạy</h2>
-            <div className="products-grid">
-              {statistics.topSanPham.map((product, index) => (
-                <div key={product.sanPhamId} className="product-item">
-                  <div className="rank">#{index + 1}</div>
-                  <div className="product-info">
-                    <h4>{product.tenSanPham}</h4>
-                    <p className="sold">Đã bán: {product.tongSoLuongBan} sản phẩm</p>
-                    <p className="revenue">Doanh thu: {formatCurrency(product.tongDoanhThu)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Top Customers */}
-        {statistics?.topKhachHang && statistics.topKhachHang.length > 0 && (
-          <div className="top-customers-section">
-            <h2>👥 Top 5 khách hàng thân thiết</h2>
-            <div className="customers-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Hạng</th>
-                    <th>Khách hàng</th>
-                    <th>Email</th>
-                    <th>Số đơn</th>
-                    <th>Tổng chi tiêu</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {statistics.topKhachHang.map((customer, index) => (
-                    <tr key={customer.khachHangId}>
-                      <td className="rank-cell">
-                        <span className={`rank-badge rank-${index + 1}`}>#{index + 1}</span>
-                      </td>
-                      <td>{customer.hoTen}</td>
-                      <td>{customer.email}</td>
-                      <td>{customer.soDonHang}</td>
-                      <td className="amount">{formatCurrency(customer.tongChiTieu)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        </Card>
       </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <Card padding="md">
+          <RevenueChart 
+            data={chartData} 
+            title="Số đơn hàng trong 7 ngày gần nhất"
+          />
+        </Card>
+
+        <Card padding="md">
+          <PaymentPieChart 
+            data={paymentData} 
+            title="Tỷ lệ đơn hàng theo trạng thái"
+          />
+        </Card>
+      </div>
+
+      {/* Top Products */}
+      {statistics?.topSanPham && statistics.topSanPham.length > 0 && (
+        <Card className="mb-6" padding="md">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            🏆 Top 5 sản phẩm bán chạy
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {statistics.topSanPham.map((product, index) => (
+              <div key={product.sanPhamId} className="relative">
+                <Card 
+                  padding="md" 
+                  className={`border-l-4 ${
+                    index === 0 ? 'border-yellow-400 bg-yellow-50' :
+                    index === 1 ? 'border-gray-400 bg-gray-50' :
+                    index === 2 ? 'border-amber-600 bg-amber-50' :
+                    'border-blue-400 bg-blue-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
+                      index === 0 ? 'bg-yellow-500' :
+                      index === 1 ? 'bg-gray-500' :
+                      index === 2 ? 'bg-amber-600' :
+                      'bg-blue-500'
+                    }`}>
+                      #{index + 1}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-800 truncate">{product.tenSanPham}</h4>
+                      <p className="text-sm text-gray-600">Đã bán: {product.tongSoLuongBan} sản phẩm</p>
+                      <p className="text-sm font-semibold text-green-600">{formatCurrency(product.tongDoanhThu)}</p>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Top Customers */}
+      {statistics?.topKhachHang && statistics.topKhachHang.length > 0 && (
+        <Card padding="md">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            👥 Top 5 khách hàng thân thiết
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-2 font-semibold text-gray-700">Hạng</th>
+                  <th className="text-left py-3 px-2 font-semibold text-gray-700">Khách hàng</th>
+                  <th className="text-left py-3 px-2 font-semibold text-gray-700">Email</th>
+                  <th className="text-left py-3 px-2 font-semibold text-gray-700">Số đơn</th>
+                  <th className="text-left py-3 px-2 font-semibold text-gray-700">Tổng chi tiêu</th>
+                </tr>
+              </thead>
+              <tbody>
+                {statistics.topKhachHang.map((customer, index) => (
+                  <tr key={customer.khachHangId} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-3 px-2">
+                      <div className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm ${
+                        index === 0 ? 'bg-yellow-500' :
+                        index === 1 ? 'bg-gray-500' :
+                        index === 2 ? 'bg-amber-600' :
+                        'bg-blue-500'
+                      }`}>
+                        #{index + 1}
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 font-medium text-gray-800">{customer.hoTen}</td>
+                    <td className="py-3 px-2 text-gray-600">{customer.email}</td>
+                    <td className="py-3 px-2 text-center">{customer.soDonHang}</td>
+                    <td className="py-3 px-2 font-semibold text-green-600">{formatCurrency(customer.tongChiTieu)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       {/* Toast Notification */}
       {toast.show && (
