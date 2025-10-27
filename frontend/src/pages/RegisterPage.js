@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import authService from '../services/authService';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { UserPlus, User, Mail, Phone, Lock, Eye, EyeOff, IdCard } from 'lucide-react';
+import { Button } from '../components/ui';
 
 const RegisterPage = () => {
-  // State quản lý form
   const [formData, setFormData] = useState({
     TenDangNhap: '',
     MatKhau: '',
@@ -13,19 +14,14 @@ const RegisterPage = () => {
     DienThoai: ''
   });
 
-  // State quản lý trạng thái UI
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Hook điều hướng
   const navigate = useNavigate();
 
-  /**
-   * Xử lý thay đổi giá trị input
-   * @param {Event} e - Event từ input
-   */
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
@@ -34,7 +30,6 @@ const RegisterPage = () => {
       [name]: value
     }));
 
-    // Xóa lỗi của field đang được chỉnh sửa
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -43,14 +38,9 @@ const RegisterPage = () => {
     }
   };
 
-  /**
-   * Validate form trước khi submit
-   * @returns {boolean} True nếu form hợp lệ
-   */
   const validateForm = () => {
     const newErrors = {};
 
-    // Validate tên đăng nhập
     if (!formData.TenDangNhap.trim()) {
       newErrors.TenDangNhap = 'Tên đăng nhập không được để trống';
     } else if (formData.TenDangNhap.length < 3) {
@@ -59,7 +49,6 @@ const RegisterPage = () => {
       newErrors.TenDangNhap = 'Tên đăng nhập chỉ chứa chữ, số và dấu gạch dưới';
     }
 
-    // Validate họ tên
     if (!formData.HoTen.trim()) {
       newErrors.HoTen = 'Họ tên không được để trống';
     } else if (formData.HoTen.length < 2) {
@@ -68,28 +57,24 @@ const RegisterPage = () => {
       newErrors.HoTen = 'Họ tên chỉ được chứa chữ cái và khoảng trắng';
     }
 
-    // Validate email
     if (!formData.Email.trim()) {
       newErrors.Email = 'Email không được để trống';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.Email)) {
       newErrors.Email = 'Định dạng email không hợp lệ';
     }
 
-    // Validate mật khẩu
     if (!formData.MatKhau) {
       newErrors.MatKhau = 'Mật khẩu không được để trống';
     } else if (formData.MatKhau.length < 6) {
       newErrors.MatKhau = 'Mật khẩu phải có ít nhất 6 ký tự';
     }
 
-    // Validate nhập lại mật khẩu
     if (!formData.NhapLaiMatKhau) {
       newErrors.NhapLaiMatKhau = 'Vui lòng nhập lại mật khẩu';
     } else if (formData.MatKhau !== formData.NhapLaiMatKhau) {
       newErrors.NhapLaiMatKhau = 'Mật khẩu nhập lại không khớp';
     }
 
-    // Validate số điện thoại (tùy chọn)
     if (formData.DienThoai && !/^(0|\+84)[0-9]{9,10}$/.test(formData.DienThoai.replace(/\s/g, ''))) {
       newErrors.DienThoai = 'Số điện thoại phải có định dạng Việt Nam hợp lệ';
     }
@@ -98,17 +83,10 @@ const RegisterPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  /**
-   * Xử lý submit form đăng ký
-   * @param {Event} e - Submit event
-   */
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Reset message trước đó
     setMessage('');
 
-    // Validate form
     if (!validateForm()) {
       setMessage('Vui lòng kiểm tra lại thông tin đã nhập');
       return;
@@ -117,7 +95,6 @@ const RegisterPage = () => {
     setLoading(true);
 
     try {
-      // Chuẩn bị dữ liệu gửi đi (loại bỏ NhapLaiMatKhau)
       const registerData = {
         TenDangNhap: formData.TenDangNhap.trim(),
         MatKhau: formData.MatKhau,
@@ -126,17 +103,9 @@ const RegisterPage = () => {
         DienThoai: formData.DienThoai.trim() || undefined
       };
 
-      console.log('📝 Đăng ký với dữ liệu:', { ...registerData, MatKhau: '***' });
-
-      // Gọi API đăng ký
       const result = await authService.register(registerData);
-
-      console.log('✅ Đăng ký thành công:', result);
-
-      // Hiển thị thông báo thành công
       setMessage('Đăng ký tài khoản thành công! Đang chuyển hướng...');
       
-      // Reset form
       setFormData({
         TenDangNhap: '',
         MatKhau: '',
@@ -146,16 +115,12 @@ const RegisterPage = () => {
         DienThoai: ''
       });
 
-      // Chuyển hướng về trang đăng nhập sau 2 giây
       setTimeout(() => {
         navigate('/login');
-        console.log('🔄 Chuyển hướng về trang đăng nhập');
       }, 2000);
 
     } catch (error) {
       console.error('❌ Lỗi đăng ký:', error);
-      
-      // Hiển thị thông báo lỗi cho người dùng
       setMessage(error.message || 'Có lỗi xảy ra trong quá trình đăng ký');
     } finally {
       setLoading(false);
@@ -163,283 +128,228 @@ const RegisterPage = () => {
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.formWrapper}>
-        <h2 style={styles.title}>Đăng ký tài khoản</h2>
-        
-        {/* Hiển thị thông báo */}
-        {message && (
-          <div style={{
-            ...styles.message,
-            backgroundColor: message.includes('thành công') ? '#d4edda' : '#f8d7da',
-            color: message.includes('thành công') ? '#155724' : '#721c24',
-            borderColor: message.includes('thành công') ? '#c3e6cb' : '#f5c6cb'
-          }}>
-            {message}
-          </div>
-        )}
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-rose-50 to-cream-100 flex items-center justify-center p-4">
+      {/* Decorative Elements */}
+      <div className="absolute top-10 left-10 text-6xl opacity-20 animate-float">🎀</div>
+      <div className="absolute bottom-10 right-10 text-6xl opacity-20 animate-float" style={{ animationDelay: '0.5s' }}>🧸</div>
+      <div className="absolute top-1/3 right-20 text-5xl opacity-20 animate-float" style={{ animationDelay: '1s' }}>💝</div>
+      <div className="absolute bottom-1/4 left-20 text-5xl opacity-20 animate-float" style={{ animationDelay: '1.5s' }}>⭐</div>
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          {/* Tên đăng nhập */}
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Tên đăng nhập *</label>
-            <input
-              type="text"
-              name="TenDangNhap"
-              value={formData.TenDangNhap}
-              onChange={handleInputChange}
-              style={{
-                ...styles.input,
-                borderColor: errors.TenDangNhap ? '#dc3545' : '#ddd'
-              }}
-              placeholder="Nhập tên đăng nhập"
-              disabled={loading}
-            />
-            {errors.TenDangNhap && (
-              <span style={styles.error}>{errors.TenDangNhap}</span>
-            )}
-          </div>
+      <div className="w-full max-w-2xl relative z-10">
+        {/* Header */}
+        <div className="text-center mb-8 animate-slide-up">
+          <div className="text-6xl mb-4 animate-bounce-soft">📝</div>
+          <h1 className="text-4xl font-display font-bold text-gradient-primary mb-2">
+            Đăng ký tài khoản
+          </h1>
+          <p className="text-gray-600">Tham gia cùng chúng tôi ngay hôm nay!</p>
+        </div>
 
-          {/* Họ tên */}
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Họ tên *</label>
-            <input
-              type="text"
-              name="HoTen"
-              value={formData.HoTen}
-              onChange={handleInputChange}
-              style={{
-                ...styles.input,
-                borderColor: errors.HoTen ? '#dc3545' : '#ddd'
-              }}
-              placeholder="Nhập họ tên đầy đủ"
-              disabled={loading}
-            />
-            {errors.HoTen && (
-              <span style={styles.error}>{errors.HoTen}</span>
-            )}
-          </div>
-
-          {/* Email */}
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Email *</label>
-            <input
-              type="email"
-              name="Email"
-              value={formData.Email}
-              onChange={handleInputChange}
-              style={{
-                ...styles.input,
-                borderColor: errors.Email ? '#dc3545' : '#ddd'
-              }}
-              placeholder="Nhập địa chỉ email"
-              disabled={loading}
-            />
-            {errors.Email && (
-              <span style={styles.error}>{errors.Email}</span>
-            )}
-          </div>
-
-          {/* Số điện thoại */}
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Số điện thoại</label>
-            <input
-              type="tel"
-              name="DienThoai"
-              value={formData.DienThoai}
-              onChange={handleInputChange}
-              style={{
-                ...styles.input,
-                borderColor: errors.DienThoai ? '#dc3545' : '#ddd'
-              }}
-              placeholder="Nhập số điện thoại (tùy chọn)"
-              disabled={loading}
-            />
-            {errors.DienThoai && (
-              <span style={styles.error}>{errors.DienThoai}</span>
-            )}
-          </div>
-
-          {/* Mật khẩu */}
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Mật khẩu *</label>
-            <div style={styles.passwordWrapper}>
-              <input
-                type={showPassword ? "text" : "password"}
-                name="MatKhau"
-                value={formData.MatKhau}
-                onChange={handleInputChange}
-                style={{
-                  ...styles.input,
-                  borderColor: errors.MatKhau ? '#dc3545' : '#ddd',
-                  paddingRight: '40px'
-                }}
-                placeholder="Nhập mật khẩu"
-                disabled={loading}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={styles.showPasswordBtn}
-                disabled={loading}
-              >
-                {showPassword ? '🙈' : '👁️'}
-              </button>
+        {/* Register Form */}
+        <div className="bg-white rounded-bubble shadow-bubble border-2 border-primary-100 p-8 animate-scale-in">
+          {/* Message */}
+          {message && (
+            <div className={`mb-6 p-4 rounded-cute border-2 ${
+              message.includes('thành công')
+                ? 'bg-green-50 border-green-200 text-green-700'
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}>
+              <p className="text-sm font-medium text-center">{message}</p>
             </div>
-            {errors.MatKhau && (
-              <span style={styles.error}>{errors.MatKhau}</span>
-            )}
-          </div>
+          )}
 
-          {/* Nhập lại mật khẩu */}
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Nhập lại mật khẩu *</label>
-            <input
-              type="password"
-              name="NhapLaiMatKhau"
-              value={formData.NhapLaiMatKhau}
-              onChange={handleInputChange}
-              style={{
-                ...styles.input,
-                borderColor: errors.NhapLaiMatKhau ? '#dc3545' : '#ddd'
-              }}
-              placeholder="Nhập lại mật khẩu"
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Username */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Tên đăng nhập <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-400" size={18} />
+                  <input
+                    type="text"
+                    name="TenDangNhap"
+                    value={formData.TenDangNhap}
+                    onChange={handleInputChange}
+                    placeholder="username"
+                    disabled={loading}
+                    className={`input-cute pl-11 ${errors.TenDangNhap ? 'border-red-400' : ''}`}
+                  />
+                </div>
+                {errors.TenDangNhap && (
+                  <p className="mt-1 text-xs text-red-500">⚠️ {errors.TenDangNhap}</p>
+                )}
+              </div>
+
+              {/* Full Name */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Họ tên <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <IdCard className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-400" size={18} />
+                  <input
+                    type="text"
+                    name="HoTen"
+                    value={formData.HoTen}
+                    onChange={handleInputChange}
+                    placeholder="Nguyễn Văn A"
+                    disabled={loading}
+                    className={`input-cute pl-11 ${errors.HoTen ? 'border-red-400' : ''}`}
+                  />
+                </div>
+                {errors.HoTen && (
+                  <p className="mt-1 text-xs text-red-500">⚠️ {errors.HoTen}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Email <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-400" size={18} />
+                  <input
+                    type="email"
+                    name="Email"
+                    value={formData.Email}
+                    onChange={handleInputChange}
+                    placeholder="email@example.com"
+                    disabled={loading}
+                    className={`input-cute pl-11 ${errors.Email ? 'border-red-400' : ''}`}
+                  />
+                </div>
+                {errors.Email && (
+                  <p className="mt-1 text-xs text-red-500">⚠️ {errors.Email}</p>
+                )}
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Số điện thoại
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-400" size={18} />
+                  <input
+                    type="tel"
+                    name="DienThoai"
+                    value={formData.DienThoai}
+                    onChange={handleInputChange}
+                    placeholder="0123456789"
+                    disabled={loading}
+                    className={`input-cute pl-11 ${errors.DienThoai ? 'border-red-400' : ''}`}
+                  />
+                </div>
+                {errors.DienThoai && (
+                  <p className="mt-1 text-xs text-red-500">⚠️ {errors.DienThoai}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Mật khẩu <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-400" size={18} />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="MatKhau"
+                  value={formData.MatKhau}
+                  onChange={handleInputChange}
+                  placeholder="Ít nhất 6 ký tự"
+                  disabled={loading}
+                  className={`input-cute pl-11 pr-11 ${errors.MatKhau ? 'border-red-400' : ''}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-primary-400 hover:text-primary-600"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              {errors.MatKhau && (
+                <p className="mt-1 text-xs text-red-500">⚠️ {errors.MatKhau}</p>
+              )}
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Nhập lại mật khẩu <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-400" size={18} />
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  name="NhapLaiMatKhau"
+                  value={formData.NhapLaiMatKhau}
+                  onChange={handleInputChange}
+                  placeholder="Nhập lại mật khẩu"
+                  disabled={loading}
+                  className={`input-cute pl-11 pr-11 ${errors.NhapLaiMatKhau ? 'border-red-400' : ''}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-primary-400 hover:text-primary-600"
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              {errors.NhapLaiMatKhau && (
+                <p className="mt-1 text-xs text-red-500">⚠️ {errors.NhapLaiMatKhau}</p>
+              )}
+            </div>
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              fullWidth
               disabled={loading}
-            />
-            {errors.NhapLaiMatKhau && (
-              <span style={styles.error}>{errors.NhapLaiMatKhau}</span>
-            )}
-          </div>
-
-          {/* Nút đăng ký */}
-          <button
-            type="submit"
-            style={{
-              ...styles.submitBtn,
-              backgroundColor: loading ? '#6c757d' : '#007bff',
-              cursor: loading ? 'not-allowed' : 'pointer'
-            }}
-            disabled={loading}
-          >
-            {loading ? 'Đang đăng ký...' : 'Đăng ký'}
-          </button>
-        </form>
-
-        {/* Link đăng nhập */}
-        <div style={styles.footer}>
-          <p>Đã có tài khoản? 
-            <button 
-              style={styles.linkBtn}
-              onClick={() => navigate('/login')}
-              disabled={loading}
+              loading={loading}
+              icon={<UserPlus size={20} />}
+              className="mt-6"
             >
-              Đăng nhập ngay
-            </button>
-          </p>
+              {loading ? 'Đang đăng ký...' : 'Đăng ký'}
+            </Button>
+          </form>
+
+          {/* Login Link */}
+          <div className="mt-6 text-center">
+            <p className="text-gray-600">
+              Đã có tài khoản?{' '}
+              <Link 
+                to="/login" 
+                className="text-primary-600 font-semibold hover:text-primary-700 transition-colors"
+              >
+                Đăng nhập ngay
+              </Link>
+            </p>
+          </div>
+        </div>
+
+        {/* Back to Home */}
+        <div className="text-center mt-6">
+          <Link 
+            to="/" 
+            className="text-primary-600 hover:text-primary-700 font-semibold transition-colors inline-flex items-center gap-2"
+          >
+            ← Về trang chủ
+          </Link>
         </div>
       </div>
     </div>
   );
-};
-
-// CSS Styles
-const styles = {
-  container: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f8f9fa',
-    padding: '20px'
-  },
-  formWrapper: {
-    backgroundColor: 'white',
-    padding: '40px',
-    borderRadius: '8px',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-    width: '100%',
-    maxWidth: '500px'
-  },
-  title: {
-    textAlign: 'center',
-    marginBottom: '30px',
-    color: '#333',
-    fontSize: '24px',
-    fontWeight: 'bold'
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px'
-  },
-  inputGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '5px'
-  },
-  label: {
-    fontWeight: 'bold',
-    color: '#555',
-    fontSize: '14px'
-  },
-  input: {
-    padding: '12px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '16px',
-    transition: 'border-color 0.3s',
-    outline: 'none'
-  },
-  passwordWrapper: {
-    position: 'relative'
-  },
-  showPasswordBtn: {
-    position: 'absolute',
-    right: '10px',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: '18px'
-  },
-  error: {
-    color: '#dc3545',
-    fontSize: '12px',
-    marginTop: '2px'
-  },
-  message: {
-    padding: '10px',
-    borderRadius: '4px',
-    marginBottom: '20px',
-    border: '1px solid',
-    textAlign: 'center'
-  },
-  submitBtn: {
-    padding: '12px',
-    backgroundColor: '#007bff',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    transition: 'background-color 0.3s',
-    marginTop: '10px'
-  },
-  footer: {
-    textAlign: 'center',
-    marginTop: '20px'
-  },
-  linkBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#007bff',
-    cursor: 'pointer',
-    textDecoration: 'underline',
-    fontSize: '14px',
-    marginLeft: '5px'
-  }
 };
 
 export default RegisterPage;

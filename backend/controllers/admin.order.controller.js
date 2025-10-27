@@ -329,8 +329,8 @@ exports.updateOrderStatus = async (req, res) => {
       });
     }
 
-    // Validate trangThai - Chỉ cho phép 3 trạng thái theo yêu cầu
-    const allowedStatuses = ['Chờ xử lý', 'Đang giao', 'Đã giao'];
+    // Validate trangThai - Thêm trạng thái "Hoàn thành"
+    const allowedStatuses = ['Chờ xử lý', 'Đang giao', 'Đã giao', 'Hoàn thành'];
     
     if (!trangThai) {
       return res.status(400).json({
@@ -379,11 +379,21 @@ exports.updateOrderStatus = async (req, res) => {
       });
     }
 
+    // Không cho phép cập nhật nếu đơn hàng đã hoàn thành
+    if (currentStatus === 'Hoàn thành') {
+      return res.status(400).json({
+        success: false,
+        message: 'Không thể cập nhật trạng thái của đơn hàng đã hoàn thành',
+        currentStatus: currentStatus
+      });
+    }
+
     // Không cho phép chuyển về trạng thái trước đó
     const statusOrder = {
       'Chờ xử lý': 0,
       'Đang giao': 1,
-      'Đã giao': 2
+      'Đã giao': 2,
+      'Hoàn thành': 3
     };
 
     if (statusOrder[trangThai] < statusOrder[currentStatus]) {

@@ -42,7 +42,27 @@ exports.createOrder = async (req, res) => {
     console.log('🛒 Bắt đầu tạo đơn hàng cho user:', req.user.id);
     
     const taiKhoanId = req.user.id;
-    const { phuongThucThanhToanId = 1, ghiChu = '', diaChiGiaoHang = '' } = req.body;
+    const { 
+      phuongThucThanhToanId = 1, 
+      ghiChu = '', 
+      diaChiGiaoHang = '',
+      // ✨ NHẬN DỮ LIỆU TỪ DECORATOR PATTERN (Frontend)
+      tongTienSauKhuyenMai,
+      apDungVAT,
+      tyLeVAT: tyLeVATFromFrontend,
+      voucher,
+      phiVanChuyen: phiVanChuyenFromFrontend,
+      miemPhiVanChuyen: miemPhiVanChuyenFromFrontend
+    } = req.body;
+
+    console.log('📦 Dữ liệu từ Decorator Pattern:', {
+      tongTienSauKhuyenMai,
+      apDungVAT,
+      tyLeVAT: tyLeVATFromFrontend,
+      voucher,
+      phiVanChuyen: phiVanChuyenFromFrontend,
+      miemPhiVanChuyen: miemPhiVanChuyenFromFrontend
+    });
 
     // Validate phương thức thanh toán
     if (!phuongThucThanhToanId) {
@@ -119,11 +139,64 @@ exports.createOrder = async (req, res) => {
 
     // Tính tổng tiền
     let tongTien = 0;
+    let tienGoc = 0;
+    let tienVAT = 0;
+    let tienGiamGia = 0; // ✅ Mặc định = 0, không để NULL
+    let phiVanChuyen = phiVanChuyenFromFrontend || 30000;
+    let maVoucher = null;
+    let tyLeVAT = 0;
+    let miemPhiVanChuyen = miemPhiVanChuyenFromFrontend || false;
+    
+    // Tính tạm tính (giá gốc từ giỏ hàng)
     gioHang.chiTiet.forEach(item => {
-      tongTien += parseFloat(item.DonGia) * item.SoLuong;
+      tienGoc += parseFloat(item.DonGia) * item.SoLuong;
     });
+    
+    if (tongTienSauKhuyenMai && tongTienSauKhuyenMai > 0) {
+      // ✅ Sử dụng dữ liệu từ Frontend (Decorator Pattern đã tính)
+      tongTien = tongTienSauKhuyenMai;
+      
+      // Lấy chi tiết từ Frontend
+      if (apDungVAT && tyLeVATFromFrontend) {
+        tyLeVAT = tyLeVATFromFrontend;
+        tienVAT = Math.round(tienGoc * tyLeVAT);
+      }
+      
+      // ✅ ĐẢM BẢO tienGiamGia LUÔN LÀ SỐ (0 hoặc > 0), KHÔNG BAO GIỜ NULL
+      if (voucher && voucher.code && voucher.discount) {
+        maVoucher = voucher.code;
+        tienGiamGia = Math.round(voucher.discount); // ✅ Làm tròn để đảm bảo là số nguyên
+      } else {
+        tienGiamGia = 0; // ✅ Không có voucher = 0 (không phải NULL)
+      }
+      
+      phiVanChuyen = miemPhiVanChuyen ? 0 : (phiVanChuyenFromFrontend || 30000);
+      
+      console.log(`💰 Chi tiết giá từ Decorator Pattern:`, {
+        tienGoc,
+        tienVAT,
+        tyLeVAT,
+        maVoucher,
+        tienGiamGia, // ✅ Luôn là số (0 hoặc > 0)
+        phiVanChuyen,
+        miemPhiVanChuyen,
+        tongTien
+      });
+    } else {
+      // ❌ Fallback: Tính từ giá gốc trong DB (nếu Frontend không gửi)
+      tongTien = tienGoc;
+      tienGiamGia = 0; // ✅ Đảm bảo = 0 thay vì NULL
+      console.log(`⚠️ Không nhận được dữ liệu Decorator Pattern, dùng giá gốc: ${tongTien.toLocaleString('vi-VN')} VNĐ`);
+    }
 
     console.log(`💰 Tổng tiền đơn hàng: ${tongTien.toLocaleString('vi-VN')} VNĐ`);
+
+    // ✨ TÍNH TỶ LỆ ÁP DỤNG CHO TỪNG SẢN PHẨM (để lưu vào ChiTietHoaDon)
+    const tyLeApDung = tongTienSauKhuyenMai && tienGoc > 0
+      ? tongTienSauKhuyenMai / tienGoc
+      : 1;
+
+    console.log(`📊 Tỷ lệ áp dụng cho từng sản phẩm: ${(tyLeApDung * 100).toFixed(2)}%`);
 
     // Lấy thông tin tài khoản để tạo khách hàng
     const taiKhoan = await TaiKhoan.findByPk(taiKhoanId, { transaction });
@@ -159,32 +232,61 @@ exports.createOrder = async (req, res) => {
     const maHoaDon = await generateOrderCode();
     console.log('📄 Mã hóa đơn:', maHoaDon);
 
-    // Bước 2: Tạo hóa đơn
+    // ✨ Tạo hóa đơn với TOÀN BỘ các trường mới
     const hoaDon = await HoaDon.create({
       MaHD: maHoaDon,
       KhachHangID: khachHang.ID,
       TongTien: tongTien,
+      
+      // ✨ LƯU CHI TIẾT VÀO CÁC TRƯỜNG MỚI (Decorator Pattern data)
+      TienGoc: tienGoc,
+      TienVAT: tienVAT,
+      TyLeVAT: tyLeVAT || 0,
+      MaVoucher: maVoucher,
+      TienGiamGia: tienGiamGia,
+      PhiVanChuyen: phiVanChuyen,
+      MiemPhiVanChuyen: miemPhiVanChuyen,
+      
       PhuongThucThanhToanID: phuongThucThanhToanId,
       TrangThai: 'Chờ xử lý',
       GhiChu: ghiChu || null
     }, { transaction });
 
-    console.log('✅ Đã tạo hóa đơn:', hoaDon.ID);
+    console.log('✅ Đã tạo hóa đơn:', hoaDon.ID, '- Chi tiết:', {
+      TienGoc: tienGoc,
+      TienVAT: tienVAT,
+      MaVoucher: maVoucher,
+      TienGiamGia: tienGiamGia,
+      PhiVanChuyen: phiVanChuyen,
+      TongTien: tongTien
+    });
 
-    // Bước 3: Thêm chi tiết hóa đơn và cập nhật tồn kho
+    // ✨ Bước 3: Thêm chi tiết hóa đơn VỚI GIÁ ĐÃ ÁP DỤNG VAT + VOUCHER
     const chiTietHoaDonData = [];
     for (const item of gioHang.chiTiet) {
-      // Tạo chi tiết hóa đơn
+      // Tính giá đã áp dụng VAT + Voucher cho từng sản phẩm
+      const donGiaGoc = parseFloat(item.DonGia);
+      const donGiaSauKhuyenMai = donGiaGoc * tyLeApDung;
+      const thanhTien = donGiaSauKhuyenMai * item.SoLuong;
+
+      // Tạo chi tiết hóa đơn với giá đã áp dụng khuyến mãi
       const chiTiet = await ChiTietHoaDon.create({
         HoaDonID: hoaDon.ID,
         SanPhamID: item.SanPhamID,
         SoLuong: item.SoLuong,
-        DonGia: item.DonGia,
-        GiaBan: item.DonGia, // GiaBan và DonGia giống nhau
-        ThanhTien: parseFloat(item.DonGia) * item.SoLuong
+        DonGia: Math.round(donGiaSauKhuyenMai), // ← Giá đã áp dụng VAT + Voucher
+        GiaBan: Math.round(donGiaSauKhuyenMai), // ← Giá đã áp dụng VAT + Voucher
+        ThanhTien: Math.round(thanhTien)
       }, { transaction });
 
       chiTietHoaDonData.push(chiTiet);
+
+      console.log(`📦 Sản phẩm "${item.sanPham.Ten}":`, {
+        donGiaGoc: donGiaGoc,
+        donGiaSauKhuyenMai: Math.round(donGiaSauKhuyenMai),
+        soLuong: item.SoLuong,
+        thanhTien: Math.round(thanhTien)
+      });
 
       // Cập nhật số lượng tồn kho
       await SanPham.update(
@@ -452,6 +554,7 @@ exports.getOrderDetail = async (req, res) => {
       });
     }
 
+    // ✅ ĐƠN GIẢN HÓA - CHỈ TRẢ VỀ DỮ LIỆU CƠ BẢN
     res.status(200).json({
       success: true,
       message: 'Lấy chi tiết đơn hàng thành công',
@@ -922,3 +1025,4 @@ exports.getOrderHistory = async (req, res) => {
     });
   }
 };
+

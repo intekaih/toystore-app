@@ -1,28 +1,9 @@
 const Sequelize = require("sequelize");
-const dbConfig = require("../config/db.config");
+const DBConnection = require("../utils/DBConnection");
 
-const sequelize = new Sequelize(
-  dbConfig.DB,
-  dbConfig.USER,
-  dbConfig.PASSWORD,
-  {
-    host: dbConfig.HOST,
-    dialect: dbConfig.dialect,
-    dialectOptions: dbConfig.dialectOptions,
-    port: dbConfig.port,
-    pool: dbConfig.pool,
-    logging: false,
-  }
-);
-
-// Test kết nối
-sequelize.authenticate()
-  .then(() => {
-    console.log("✅ Kết nối SQL Server thành công!");
-  })
-  .catch((err) => {
-    console.error("❌ Lỗi kết nối SQL:", err);
-  });
+// Lấy Sequelize instance từ DBConnection Singleton
+const dbConnection = DBConnection.getInstance();
+const sequelize = dbConnection.getSequelize();
 
 // Export database object
 const db = {};

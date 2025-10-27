@@ -2,6 +2,10 @@ const db = require('../models');
 const { Op } = require('sequelize');
 const SanPham = db.SanPham;
 const LoaiSP = db.LoaiSP;
+const ChiTietHoaDon = db.ChiTietHoaDon;
+
+// 🎯 Import Strategy Pattern
+const FilterContext = require('../strategies/FilterContext');
 
 // Lấy danh sách tất cả sản phẩm với phân trang và tìm kiếm
 exports.getAllProducts = async (req, res) => {
@@ -9,10 +13,19 @@ exports.getAllProducts = async (req, res) => {
     console.log('📦 Lấy danh sách sản phẩm - Query params:', req.query);
 
     // Lấy parameters từ query string
-    const page = parseInt(req.query.page) || 1; // Trang hiện tại, mặc định là 1
-    const limit = parseInt(req.query.limit) || 10; // Số sản phẩm mỗi trang, mặc định 10
-    const search = req.query.search || ''; // Từ khóa tìm kiếm
-    const offset = (page - 1) * limit; // Bỏ qua bao nhiêu bản ghi
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || '';
+    
+    // 🎯 STRATEGY PATTERN: Lấy filterType từ query
+    const filterType = req.query.filter || 'newest'; // Mặc định là 'newest'
+    
+    // Lấy các tham số lọc khác
+    const minPrice = req.query.minPrice ? parseFloat(req.query.minPrice) : null;
+    const maxPrice = req.query.maxPrice ? parseFloat(req.query.maxPrice) : null;
+    const categoryId = req.query.categoryId ? parseInt(req.query.categoryId) : null;
+    
+    const offset = (page - 1) * limit;
 
     // Validate parameters
     if (page < 1) {
@@ -29,70 +42,108 @@ exports.getAllProducts = async (req, res) => {
       });
     }
 
-    // Tạo điều kiện tìm kiếm - SỬA: Dùng Enable thay vì TrangThai
+    // Tạo điều kiện tìm kiếm
     const whereCondition = {
-      Enable: true // Chỉ lấy sản phẩm đang hoạt động
+      Enable: true
     };
 
-    // Thêm điều kiện tìm kiếm theo tên nếu có - SỬA: Dùng Ten thay vì TenSP
+    // Thêm điều kiện tìm kiếm theo tên nếu có
     if (search.trim()) {
       whereCondition.Ten = {
-        [Op.like]: `%${search.trim()}%` // Tìm kiếm gần đúng theo tên sản phẩm
+        [Op.like]: `%${search.trim()}%`
       };
     }
 
     console.log('🔍 Điều kiện tìm kiếm:', whereCondition);
+    console.log('🎯 Filter type:', filterType);
 
-    // Truy vấn database với JOIN và phân trang
+    // Truy vấn database - Lấy TẤT CẢ sản phẩm trước khi apply strategy
+    // Nếu dùng bestSeller strategy, cần include ChiTietHoaDon
+    const includeOptions = [
+      {
+        model: LoaiSP,
+        as: 'loaiSP',
+        attributes: ['ID', 'Ten', 'MoTa'],
+        where: { Enable: true }
+      }
+    ];
+
+    // Nếu filter là bestSeller, thêm include ChiTietHoaDon
+    if (filterType === 'bestSeller') {
+      includeOptions.push({
+        model: ChiTietHoaDon,
+        as: 'chiTietHoaDons', // ✅ Sửa từ 'ChiTietHoaDons' thành 'chiTietHoaDons'
+        attributes: ['SoLuong'],
+        required: false // LEFT JOIN để lấy cả sản phẩm chưa bán
+      });
+    }
+
     const { count, rows } = await SanPham.findAndCountAll({
       where: whereCondition,
-      include: [
-        {
-          model: LoaiSP,
-          as: 'loaiSP', // Alias đã định nghĩa trong relation
-          attributes: ['ID', 'Ten', 'MoTa'], // SỬA: Dùng Ten thay vì TenLoai
-          where: {
-            Enable: true // SỬA: Dùng Enable thay vì TrangThai
-          }
-        }
-      ],
+      include: includeOptions,
       attributes: [
         'ID', 
-        'Ten',        // SỬA: Dùng Ten thay vì TenSP
+        'Ten',
         'MoTa', 
         'GiaBan', 
-        'Ton',        // SỬA: Dùng Ton thay vì SoLuongTon
-        'HinhAnhURL', // SỬA: Dùng HinhAnhURL thay vì HinhAnh
-        'LoaiID',     // SỬA: Dùng LoaiID thay vì IDLoaiSP
+        'Ton',
+        'HinhAnhURL',
+        'LoaiID',
         'NgayTao',
-        'Enable'      // SỬA: Dùng Enable thay vì TrangThai
+        'Enable'
       ],
-      limit: limit,
-      offset: offset,
-      order: [['NgayTao', 'DESC']], // Sắp xếp theo ngày tạo mới nhất
-      distinct: true // Đảm bảo count chính xác khi có JOIN
+      distinct: true
     });
 
+    console.log(`📊 Tìm thấy ${count} sản phẩm trước khi áp dụng strategy`);
+
+    // 🎯 STRATEGY PATTERN: Áp dụng strategy để lọc và sắp xếp
+    const queryParams = {
+      minPrice,
+      maxPrice,
+      categoryId
+    };
+
+    // Chuyển đổi Sequelize models sang plain objects
+    const plainProducts = rows.map(p => p.toJSON());
+
+    // Áp dụng strategy
+    const filteredProducts = FilterContext.applyFilter(
+      plainProducts,
+      filterType,
+      queryParams
+    );
+
+    console.log(`✅ Sau khi áp dụng strategy '${filterType}': ${filteredProducts.length} sản phẩm`);
+
+    // Áp dụng phân trang SAU KHI đã lọc
+    const totalProducts = filteredProducts.length;
+    const paginatedProducts = filteredProducts.slice(offset, offset + limit);
+
     // Tính toán thông tin phân trang
-    const totalProducts = count;
     const totalPages = Math.ceil(totalProducts / limit);
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
 
+    // Lấy base URL từ request
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
     // Format dữ liệu trả về theo cấu trúc chuẩn
-    const products = rows.map(product => ({
+    const products = paginatedProducts.map(product => ({
       id: product.ID,
-      tenSP: product.Ten,        // SỬA: Lấy từ product.Ten
+      tenSP: product.Ten,
       moTa: product.MoTa,
-      giaBan: parseFloat(product.GiaBan), // Convert Decimal to Number
-      soLuongTon: product.Ton,   // SỬA: Lấy từ product.Ton
-      hinhAnh: product.HinhAnhURL, // SỬA: Lấy từ product.HinhAnhURL
-      loaiID: product.LoaiID,    // SỬA: Lấy từ product.LoaiID
+      giaBan: parseFloat(product.GiaBan),
+      soLuongTon: product.Ton,
+      hinhAnh: product.HinhAnhURL ? `${baseUrl}${product.HinhAnhURL}` : null,
+      loaiID: product.LoaiID,
       ngayTao: product.NgayTao,
-      trangThai: product.Enable, // SỬA: Lấy từ product.Enable
+      trangThai: product.Enable,
+      // Thêm totalSold nếu là bestSeller strategy
+      ...(product.totalSold !== undefined && { soLuongBan: product.totalSold }),
       loaiSP: product.loaiSP ? {
         id: product.loaiSP.ID,
-        tenLoai: product.loaiSP.Ten, // SỬA: Lấy từ product.loaiSP.Ten
+        tenLoai: product.loaiSP.Ten,
         moTa: product.loaiSP.MoTa
       } : null
     }));
@@ -113,7 +164,14 @@ exports.getAllProducts = async (req, res) => {
           hasNextPage: hasNextPage,
           hasPrevPage: hasPrevPage
         },
-        search: search.trim() || null
+        filters: {
+          filterType: filterType,
+          search: search.trim() || null,
+          minPrice: minPrice,
+          maxPrice: maxPrice,
+          categoryId: categoryId,
+          availableFilters: FilterContext.getAvailableFilters()
+        }
       }
     });
 
@@ -161,28 +219,28 @@ exports.getProductById = async (req, res) => {
     const product = await SanPham.findOne({
       where: {
         ID: productId,
-        Enable: true // Chỉ lấy sản phẩm đang hoạt động
+        Enable: true
       },
       include: [
         {
           model: LoaiSP,
-          as: 'loaiSP', // Alias đã định nghĩa trong relation
-          attributes: ['ID', 'Ten', 'MoTa'], // Lấy thông tin loại sản phẩm
+          as: 'loaiSP',
+          attributes: ['ID', 'Ten', 'MoTa'],
           where: {
-            Enable: true // Chỉ JOIN với loại sản phẩm đang hoạt động
+            Enable: true
           }
         }
       ],
       attributes: [
         'ID',
-        'Ten',        // Tên sản phẩm
-        'MoTa',       // Mô tả sản phẩm
-        'GiaBan',     // Giá bán
-        'Ton',        // Số lượng tồn kho
-        'HinhAnhURL', // Hình ảnh sản phẩm
-        'LoaiID',     // ID loại sản phẩm
-        'NgayTao',    // Ngày tạo
-        'Enable'      // Trạng thái hoạt động
+        'Ten',
+        'MoTa',
+        'GiaBan',
+        'Ton',
+        'HinhAnhURL',
+        'LoaiID',
+        'NgayTao',
+        'Enable'
       ]
     });
 
@@ -196,22 +254,25 @@ exports.getProductById = async (req, res) => {
 
     console.log('✅ Tìm thấy sản phẩm:', product.Ten);
 
-    // Format dữ liệu trả về theo yêu cầu
+    // Lấy base URL từ request
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    // Format dữ liệu trả về với URL đầy đủ
     const productDetail = {
       id: product.ID,
-      ten: product.Ten,                    // Tên sản phẩm
-      moTa: product.MoTa,                  // Mô tả sản phẩm
-      hinhAnhURL: product.HinhAnhURL,      // Link hình ảnh
-      giaBan: parseFloat(product.GiaBan),  // Giá bán (convert Decimal to Number)
-      ton: product.Ton,                    // Số lượng tồn kho
-      loaiID: product.LoaiID,              // ID loại sản phẩm
-      ngayTao: product.NgayTao,            // Ngày tạo sản phẩm
-      trangThai: product.Enable,           // Trạng thái hoạt động
-      // Thông tin loại sản phẩm (từ JOIN)
+      ten: product.Ten,
+      moTa: product.MoTa,
+      // Thêm base URL vào đường dẫn ảnh
+      hinhAnhURL: product.HinhAnhURL ? `${baseUrl}${product.HinhAnhURL}` : null,
+      giaBan: parseFloat(product.GiaBan),
+      ton: product.Ton,
+      loaiID: product.LoaiID,
+      ngayTao: product.NgayTao,
+      trangThai: product.Enable,
       loaiSP: product.loaiSP ? {
         id: product.loaiSP.ID,
-        ten: product.loaiSP.Ten,           // Tên loại sản phẩm
-        moTa: product.loaiSP.MoTa          // Mô tả loại sản phẩm
+        ten: product.loaiSP.Ten,
+        moTa: product.loaiSP.MoTa
       } : null
     };
 
@@ -229,12 +290,10 @@ exports.getProductById = async (req, res) => {
   } catch (error) {
     console.error('❌ Lỗi lấy chi tiết sản phẩm:', error);
 
-    // In chi tiết SQL query để debug nếu có lỗi
     if (error.sql) {
       console.error('📝 SQL Query gây lỗi:', error.sql);
     }
 
-    // Xử lý lỗi SQL cụ thể
     if (error.name === 'SequelizeDatabaseError') {
       return res.status(500).json({
         success: false,
@@ -243,7 +302,6 @@ exports.getProductById = async (req, res) => {
       });
     }
 
-    // Xử lý lỗi validation
     if (error.name === 'SequelizeValidationError') {
       return res.status(400).json({
         success: false,

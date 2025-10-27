@@ -2,7 +2,7 @@ const db = require('../models');
 const SanPham = db.SanPham;
 const LoaiSP = db.LoaiSP;
 const { Op } = require('sequelize');
-const { deleteOldImage } = require('../middlewares/upload.middleware');
+const { deleteOldImage, renameFileByProductId } = require('../middlewares/upload.middleware');
 
 /**
  * GET /api/admin/products
@@ -208,7 +208,7 @@ exports.createProduct = async (req, res) => {
       errors.push('Giá bán phải là số không âm');
     }
 
-    if (!Ton && Ton !== 0) {
+    if (!Ton && Ton !== 0 && Ton !== '0') {
       errors.push('Số lượng tồn kho là bắt buộc');
     } else if (isNaN(Ton) || parseInt(Ton) < 0) {
       errors.push('Số lượng tồn kho phải là số nguyên không âm');
@@ -274,22 +274,26 @@ exports.createProduct = async (req, res) => {
       });
     }
 
-    // Tạo đường dẫn ảnh (nếu có upload)
-    let hinhAnhURL = null;
-    if (req.file) {
-      hinhAnhURL = `/uploads/${req.file.filename}`;
-    }
-
-    // Tạo sản phẩm mới
+    // Tạo sản phẩm mới TRƯỚC (để có ID)
     const newProduct = await SanPham.create({
       Ten: Ten.trim(),
       MoTa: MoTa ? MoTa.trim() : null,
       GiaBan: parseFloat(GiaBan),
       Ton: parseInt(Ton),
       LoaiID: parseInt(LoaiID),
-      HinhAnhURL: hinhAnhURL,
+      HinhAnhURL: null, // Tạm thời null, sẽ update sau
       Enable: true
     });
+
+    // Rename file theo ID sản phẩm và cập nhật HinhAnhURL
+    let hinhAnhURL = null;
+    if (req.file) {
+      const newFilename = renameFileByProductId(req.file.filename, newProduct.ID);
+      hinhAnhURL = `/uploads/${newFilename}`;
+      
+      // Cập nhật HinhAnhURL vào database
+      await newProduct.update({ HinhAnhURL: hinhAnhURL });
+    }
 
     console.log('✅ Tạo sản phẩm mới thành công:', newProduct.Ten);
 
@@ -518,7 +522,10 @@ exports.updateProduct = async (req, res) => {
       if (product.HinhAnhURL) {
         deleteOldImage(product.HinhAnhURL);
       }
-      updateData.HinhAnhURL = `/uploads/${req.file.filename}`;
+      
+      // Rename file theo ID sản phẩm
+      const newFilename = renameFileByProductId(req.file.filename, productId);
+      updateData.HinhAnhURL = `/uploads/${newFilename}`;
     }
 
     // Kiểm tra có dữ liệu để cập nhật không

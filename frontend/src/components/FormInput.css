@@ -1,0 +1,151 @@
+/* FormInput.css */
+
+.form-input-wrapper {
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #374151;
+  transition: color 0.2s;
+}
+
+.required-mark {
+  color: #ef4444;
+  margin-left: 0.25rem;
+}
+
+.input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-container.has-error .form-input {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+.input-container.has-error .form-input:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.input-icon {
+  position: absolute;
+  left: 1rem;
+  font-size: 1.25rem;
+  color: #9ca3af;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #1f2937;
+  background-color: #ffffff;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease-in-out;
+  outline: none;
+}
+
+.form-input.has-icon {
+  padding-left: 3rem;
+}
+
+.form-input::placeholder {
+  color: #9ca3af;
+}
+
+.form-input:hover:not(:disabled) {
+  border-color: #d1d5db;
+}
+
+.form-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  background-color: #ffffff;
+}
+
+.form-input:disabled {
+  background-color: #f9fafb;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.form-input.error {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.25rem;
+  padding: 0.25rem;
+  line-height: 1;
+  color: #6b7280;
+  transition: color 0.2s;
+  z-index: 2;
+}
+
+.password-toggle:hover {
+  color: #374151;
+}
+
+.password-toggle:focus {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+.error-message {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #ef4444;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .form-input {
+    font-size: 0.9375rem;
+    padding: 0.75rem 0.875rem;
+  }
+
+  .form-input.has-icon {
+    padding-left: 2.75rem;
+  }
+
+  .input-icon {
+    left: 0.875rem;
+    font-size: 1.125rem;
+  }
+
+  .password-toggle {
+    right: 0.875rem;
+  }
+}

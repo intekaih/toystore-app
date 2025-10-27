@@ -506,6 +506,7 @@ exports.updateUserStatus = async (req, res) => {
     const userId = parseInt(req.params.id);
     console.log('🔒 Admin - Cập nhật trạng thái người dùng ID:', userId);
     console.log('📝 Dữ liệu nhận được:', req.body);
+    console.log('👤 Admin đang thực hiện:', req.user);
 
     // Validate userId
     if (!userId || userId < 1) {
@@ -534,6 +535,8 @@ exports.updateUserStatus = async (req, res) => {
         message: 'Không tìm thấy người dùng'
       });
     }
+
+    console.log('🔍 So sánh: userId =', userId, ', req.user.id =', req.user.id, ', Bằng nhau?', userId === req.user.id);
 
     // Không cho phép admin tự khóa tài khoản của chính mình
     if (userId === req.user.id) {

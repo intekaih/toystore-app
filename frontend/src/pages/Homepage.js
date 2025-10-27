@@ -2,10 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getProducts } from '../api/productApi.js';
+import { addToCart } from '../api/cartApi.js';
+import { ShoppingBag, Sparkles, TrendingUp, Users, Star, ArrowRight } from 'lucide-react';
+import MainLayout from '../layouts/MainLayout';
+import { ProductCard, Loading, Button } from '../components/ui';
+import Toast from '../components/Toast.js';
 
 const Homepage = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [toast, setToast] = useState(null);
   const [stats, setStats] = useState({
     totalProducts: 0,
     categories: 4,
@@ -22,7 +29,7 @@ const Homepage = () => {
   const loadFeaturedProducts = async () => {
     try {
       setLoading(true);
-      const response = await getProducts(1, '', 6); // Lấy 6 sản phẩm đầu tiên
+      const response = await getProducts(1, '', 6);
       
       if (response.data && response.data.products) {
         setFeaturedProducts(response.data.products.slice(0, 6));
@@ -30,194 +37,249 @@ const Homepage = () => {
       }
     } catch (error) {
       console.error('Error loading featured products:', error);
-      // Fallback với dữ liệu mock nếu API không khả dụng
-      setFeaturedProducts([
-        { id: 1, tenSP: 'Búp bê Barbie', giaBan: 150000, hinhAnh: '/placeholder.jpg', soLuongTon: 50 },
-        { id: 2, tenSP: 'Xe điều khiển', giaBan: 250000, hinhAnh: '/placeholder.jpg', soLuongTon: 30 },
-        { id: 3, tenSP: 'Lego City', giaBan: 350000, hinhAnh: '/placeholder.jpg', soLuongTon: 20 },
-      ]);
+      setFeaturedProducts([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const showToast = (message, type = 'info', duration = 3000) => {
+    setToast({ message, type, duration });
+  };
+
+  const handleAddToCart = async (product) => {
+    if (!user) {
+      showToast('Vui lòng đăng nhập để thêm vào giỏ hàng', 'warning', 3000);
+      setTimeout(() => navigate('/login'), 1500);
+      return;
+    }
+
+    try {
+      setAdding(true);
+      const productId = product.id || product.MaSP || product.maSP;
+      const response = await addToCart(productId, 1);
+
+      if (response.success) {
+        showToast(
+          response.message || `Đã thêm ${product.tenSP || product.TenSP || product.ten} vào giỏ hàng`,
+          'success',
+          3000
+        );
+      }
+    } catch (error) {
+      console.error('❌ Lỗi thêm vào giỏ hàng:', error);
+      showToast(error.message || 'Không thể thêm vào giỏ hàng', 'error', 4000);
+    } finally {
+      setAdding(false);
+    }
+  };
+
   return (
-    <div className="homepage">
-      {/* Hero Section */}
-      <section className="hero-section">
-        <div className="hero-content">
-          <div className="hero-text">
-            <h1>
-              🧸 Chào mừng đến với <span className="brand-name">ToyStore</span>
-            </h1>
-            <p className="hero-subtitle">
-              Thế giới đồ chơi tuyệt vời dành cho bé yêu của bạn
-            </p>
-            <p className="welcome-message">
+    <MainLayout>
+      {/* 🌸 Hero Section - Dễ thương */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-primary-50 via-rose-50 to-cream-100 py-20">
+        {/* Decorative Elements */}
+        <div className="absolute top-10 left-10 text-6xl opacity-20 animate-float">🧸</div>
+        <div className="absolute top-32 right-20 text-5xl opacity-20 animate-float" style={{ animationDelay: '0.5s' }}>🎀</div>
+        <div className="absolute bottom-20 left-1/4 text-5xl opacity-20 animate-float" style={{ animationDelay: '1s' }}>🎈</div>
+        <div className="absolute bottom-32 right-1/3 text-4xl opacity-20 animate-float" style={{ animationDelay: '1.5s' }}>⭐</div>
+
+        <div className="container-cute relative z-10">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="space-y-6 animate-slide-up">
+              <h1 className="text-5xl md:text-6xl font-display font-bold text-gray-800 leading-tight">
+                Chào mừng đến với{' '}
+                <span className="text-gradient-primary">ToyStore</span>
+              </h1>
+              <p className="text-xl text-gray-600 leading-relaxed">
+                Thế giới đồ chơi tuyệt vời dành cho bé yêu của bạn
+              </p>
               {user ? (
-                <>Xin chào <strong>{user.hoTen || user.tenDangNhap}</strong>! Khám phá những sản phẩm mới nhất 🎉</>
-              ) : (
-                'Khám phá hàng ngàn sản phẩm đồ chơi chất lượng cao'
-              )}
-            </p>
-            
-            <div className="hero-actions">
-              <Link to="/products" className="btn btn-primary btn-large">
-                🛍️ Mua sắm ngay
-              </Link>
-              {!user && (
-                <Link to="/register" className="btn btn-secondary btn-large">
-                  📝 Đăng ký tài khoản
-                </Link>
-              )}
+                <div className="flex items-center gap-2 bg-white px-4 py-3 rounded-cute shadow-soft w-fit">
+                  <span className="text-2xl">👋</span>
+                  <p className="text-gray-700">
+                    Xin chào <span className="font-bold text-primary-600">{user.hoTen || user.tenDangNhap}</span>!
+                  </p>
+                </div>
+              ) : null}
+              
+              <div className="flex flex-wrap gap-4 pt-4">
+                <Button 
+                  variant="primary" 
+                  size="lg"
+                  icon={<ShoppingBag size={20} />}
+                  onClick={() => navigate('/products')}
+                >
+                  Mua sắm ngay
+                </Button>
+                {!user && (
+                  <Button 
+                    variant="secondary" 
+                    size="lg"
+                    onClick={() => navigate('/register')}
+                  >
+                    Đăng ký tài khoản
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Hero Illustration */}
+            <div className="relative hidden md:block">
+              <div className="relative w-full h-96 flex items-center justify-center">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary-200 to-rose-200 rounded-bubble opacity-20"></div>
+                <div className="relative grid grid-cols-3 gap-4 p-8">
+                  <div className="text-7xl animate-bounce-soft">🚗</div>
+                  <div className="text-8xl animate-bounce-soft" style={{ animationDelay: '0.2s' }}>🧸</div>
+                  <div className="text-7xl animate-bounce-soft" style={{ animationDelay: '0.4s' }}>🎮</div>
+                  <div className="text-7xl animate-bounce-soft" style={{ animationDelay: '0.6s' }}>🪀</div>
+                  <div className="text-8xl animate-bounce-soft" style={{ animationDelay: '0.8s' }}>🎯</div>
+                  <div className="text-7xl animate-bounce-soft" style={{ animationDelay: '1s' }}>🎪</div>
+                </div>
+              </div>
             </div>
           </div>
-          
-          <div className="hero-image">
-            <div className="floating-toy toy-1">🚗</div>
-            <div className="floating-toy toy-2">🧸</div>
-            <div className="floating-toy toy-3">🎮</div>
-            <div className="floating-toy toy-4">🪀</div>
-            <div className="floating-toy toy-5">🎯</div>
+        </div>
+      </section>
+
+      {/* 📊 Stats Section */}
+      <section className="py-12 bg-white border-y-2 border-primary-100">
+        <div className="container-cute">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="text-center p-6 bg-gradient-to-br from-primary-50 to-rose-50 rounded-cute hover:shadow-cute transition-all">
+              <div className="text-4xl mb-3">🎪</div>
+              <div className="text-3xl font-bold text-gradient-primary">{stats.totalProducts}+</div>
+              <div className="text-gray-600 font-medium mt-1">Sản phẩm</div>
+            </div>
+            <div className="text-center p-6 bg-gradient-to-br from-rose-50 to-primary-50 rounded-cute hover:shadow-cute transition-all">
+              <div className="text-4xl mb-3">📦</div>
+              <div className="text-3xl font-bold text-gradient-primary">{stats.categories}</div>
+              <div className="text-gray-600 font-medium mt-1">Danh mục</div>
+            </div>
+            <div className="text-center p-6 bg-gradient-to-br from-primary-50 to-rose-50 rounded-cute hover:shadow-cute transition-all">
+              <div className="text-4xl mb-3">😊</div>
+              <div className="text-3xl font-bold text-gradient-primary">{stats.customers}+</div>
+              <div className="text-gray-600 font-medium mt-1">Khách hàng</div>
+            </div>
+            <div className="text-center p-6 bg-gradient-to-br from-rose-50 to-primary-50 rounded-cute hover:shadow-cute transition-all">
+              <div className="text-4xl mb-3">⭐</div>
+              <div className="text-3xl font-bold text-gradient-primary">4.8</div>
+              <div className="text-gray-600 font-medium mt-1">Đánh giá</div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="stats-section">
-        <div className="stats-container">
-          <div className="stat-item">
-            <div className="stat-icon">🎪</div>
-            <div className="stat-number">{stats.totalProducts}+</div>
-            <div className="stat-label">Sản phẩm</div>
+      {/* 🌟 Featured Products */}
+      <section className="py-16 container-cute">
+        <div className="text-center mb-12 space-y-3">
+          <div className="flex items-center justify-center gap-2">
+            <Sparkles className="text-primary-500" size={28} />
+            <h2 className="text-4xl font-display font-bold text-gray-800">Sản phẩm nổi bật</h2>
+            <Sparkles className="text-primary-500" size={28} />
           </div>
-          <div className="stat-item">
-            <div className="stat-icon">📦</div>
-            <div className="stat-number">{stats.categories}</div>
-            <div className="stat-label">Danh mục</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-icon">😊</div>
-            <div className="stat-number">{stats.customers}+</div>
-            <div className="stat-label">Khách hàng</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-icon">⭐</div>
-            <div className="stat-number">4.8</div>
-            <div className="stat-label">Đánh giá</div>
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Products */}
-      <section className="featured-section">
-        <div className="section-header">
-          <h2>🌟 Sản phẩm nổi bật</h2>
-          <p>Những món đồ chơi được yêu thích nhất</p>
+          <p className="text-lg text-gray-600">Những món đồ chơi được yêu thích nhất</p>
         </div>
 
         {loading ? (
-          <div className="loading-products">
-            <div className="loading-spinner"></div>
-            <p>Đang tải sản phẩm...</p>
-          </div>
+          <Loading text="Đang tải sản phẩm..." />
         ) : (
-          <div className="featured-grid">
-            {featuredProducts.map((product, index) => (
-              <div 
-                key={product.id} 
-                className="featured-product-card"
-                onClick={() => navigate(`/products/${product.id}`)}
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                <div className="product-image-wrapper">
-                  <img 
-                    src={product.hinhAnh || '/placeholder.jpg'} 
-                    alt={product.tenSP}
-                    onError={(e) => {
-                      e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOWNhM2FmIj7wn6eYPC90ZXh0Pjwvc3ZnPg==';
-                    }}
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {featuredProducts.map((product) => (
+                <div key={product.MaSP} onClick={() => navigate(`/products/${product.MaSP}`)}>
+                  <ProductCard 
+                    product={product}
+                    onAddToCart={handleAddToCart}
                   />
-                  <div className="product-overlay">
-                    <div className="overlay-content">
-                      <button className="view-btn">👁️ Xem chi tiết</button>
-                    </div>
-                  </div>
                 </div>
-                
-                <div className="product-info">
-                  <h3>{product.tenSP}</h3>
-                  <div className="price-section">
-                    <span className="price">{product.giaBan?.toLocaleString('vi-VN')} ₫</span>
-                  </div>
-                  <div className="product-meta">
-                    <span className="stock">📦 Còn {product.soLuongTon}</span>
-                    {product.loaiSP && (
-                      <span className="category">🏷️ {product.loaiSP.tenLoai}</span>
-                    )}
-                  </div>
-                </div>
+              ))}
+            </div>
+
+            <div className="text-center">
+              <Button 
+                variant="outline" 
+                size="lg"
+                icon={<ArrowRight size={20} />}
+                onClick={() => navigate('/products')}
+              >
+                Xem tất cả sản phẩm
+              </Button>
+            </div>
+          </>
+        )}
+      </section>
+
+      {/* 🎯 Categories Section */}
+      <section className="py-16 bg-gradient-to-br from-cream-50 via-primary-50 to-rose-50">
+        <div className="container-cute">
+          <div className="text-center mb-12 space-y-3">
+            <h2 className="text-4xl font-display font-bold text-gray-800">Danh mục sản phẩm</h2>
+            <p className="text-lg text-gray-600">Tìm đồ chơi phù hợp với lứa tuổi</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { icon: '🧠', title: 'Đồ chơi giáo dục', desc: 'Phát triển trí tuệ', category: 'educational' },
+              { icon: '🧱', title: 'Đồ chơi lắp ráp', desc: 'Lego, xếp hình', category: 'building' },
+              { icon: '👸', title: 'Búp bê', desc: 'Búp bê các loại', category: 'dolls' },
+              { icon: '🚗', title: 'Xe mô hình', desc: 'Xe đồ chơi', category: 'vehicles' },
+            ].map((cat, idx) => (
+              <div 
+                key={idx}
+                onClick={() => navigate(`/products?category=${cat.category}`)}
+                className="bg-white p-8 rounded-bubble text-center hover:shadow-bubble hover:-translate-y-2 transition-all cursor-pointer border-2 border-primary-100 group"
+              >
+                <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">{cat.icon}</div>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">{cat.title}</h3>
+                <p className="text-gray-600">{cat.desc}</p>
               </div>
             ))}
           </div>
-        )}
-
-        <div className="view-all-section">
-          <Link to="/products" className="btn btn-outline">
-            Xem tất cả sản phẩm →
-          </Link>
         </div>
       </section>
 
-      {/* Categories Section */}
-      <section className="categories-section">
-        <div className="section-header">
-          <h2>🎯 Danh mục sản phẩm</h2>
-          <p>Tìm đồ chơi phù hợp với lứa tuổi</p>
+      {/* 🎉 CTA Section */}
+      <section className="py-20 bg-gradient-to-r from-primary-400 via-primary-500 to-rose-400 text-white relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl"></div>
         </div>
-
-        <div className="categories-grid">
-          <div className="category-card" onClick={() => navigate('/products?category=educational')}>
-            <div className="category-icon">🧠</div>
-            <h3>Đồ chơi giáo dục</h3>
-            <p>Phát triển trí tuệ</p>
-          </div>
-          <div className="category-card" onClick={() => navigate('/products?category=building')}>
-            <div className="category-icon">🧱</div>
-            <h3>Đồ chơi lắp ráp</h3>
-            <p>Lego, xếp hình</p>
-          </div>
-          <div className="category-card" onClick={() => navigate('/products?category=dolls')}>
-            <div className="category-icon">👸</div>
-            <h3>Búp bê</h3>
-            <p>Búp bê các loại</p>
-          </div>
-          <div className="category-card" onClick={() => navigate('/products?category=vehicles')}>
-            <div className="category-icon">🚗</div>
-            <h3>Xe mô hình</h3>
-            <p>Xe đồ chơi</p>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="cta-section">
-        <div className="cta-content">
-          <h2>🎉 Sẵn sàng mua sắm?</h2>
-          <p>Khám phá hàng ngàn sản phẩm đồ chơi chất lượng với giá tốt nhất</p>
-          <div className="cta-actions">
-            <Link to="/products" className="btn btn-primary btn-large">
+        
+        <div className="container-cute text-center relative z-10 space-y-6">
+          <h2 className="text-4xl md:text-5xl font-display font-bold">Sẵn sàng mua sắm?</h2>
+          <p className="text-xl opacity-90 max-w-2xl mx-auto">
+            Khám phá hàng ngàn sản phẩm đồ chơi chất lượng với giá tốt nhất
+          </p>
+          <div className="flex flex-wrap gap-4 justify-center pt-4">
+            <button
+              onClick={() => navigate('/products')}
+              className="px-8 py-4 bg-white text-primary-600 font-bold rounded-cute shadow-cute hover:shadow-bubble hover:-translate-y-1 transition-all text-lg"
+            >
               🛍️ Mua sắm ngay
-            </Link>
+            </button>
             {!user && (
-              <Link to="/register" className="btn btn-secondary-outline btn-large">
-                📱 Tải ứng dụng
-              </Link>
+              <button
+                onClick={() => navigate('/register')}
+                className="px-8 py-4 bg-transparent border-2 border-white text-white font-bold rounded-cute hover:bg-white hover:text-primary-600 transition-all text-lg"
+              >
+                📝 Đăng ký ngay
+              </button>
             )}
           </div>
         </div>
       </section>
-    </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          duration={toast.duration}
+          onClose={() => setToast(null)}
+        />
+      )}
+    </MainLayout>
   );
 };
 

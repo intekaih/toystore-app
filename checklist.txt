@@ -7,11 +7,11 @@ A2	Đăng nhập / Đăng xuất	Xác thực tài khoản, tạo JWT/token/sessi
 A3	Cập nhật thông tin cá nhân	Cho phép sửa email, số điện thoại, họ tên,...	✅
 A4	Xem danh sách sản phẩm	Hiển thị từ bảng SanPham, phân trang, tìm kiếm	✅
 A5	Xem chi tiết sản phẩm	Tên, mô tả, ảnh, tồn kho, giá,...	✅
-A6	Thêm sản phẩm vào giỏ hàng	Tạo GioHang, GioHangChiTiet	⬜
-A7	Xem & cập nhật giỏ hàng	Tăng giảm số lượng, xóa sản phẩm	⬜
-A8	Đặt hàng (Tạo hóa đơn)	Tạo HoaDon, ChiTietHoaDon, xóa giỏ hàng	⬜
-A9	Lịch sử đơn hàng	Truy vấn từ HoaDon theo TaiKhoanID	⬜
-A10	Thanh toán VNPay demo	Gửi request tới sandbox VNPay, nhận IPN/Return	⬜
+A6	Thêm sản phẩm vào giỏ hàng	Tạo GioHang, GioHangChiTiet	✅
+A7	Xem & cập nhật giỏ hàng	Tăng giảm số lượng, xóa sản phẩm	✅
+A8	Đặt hàng (Tạo hóa đơn)	Tạo HoaDon, ChiTietHoaDon, xóa giỏ hàng	✅
+A9	Lịch sử đơn hàng	Truy vấn từ HoaDon theo TaiKhoanID	✅
+A10	Thanh toán VNPay demo	Gửi request tới sandbox VNPay, nhận IPN/Return	✅
 B. CHỨC NĂNG QUẢN TRỊ (ADMIN)			
 B1	Đăng nhập admin	Từ bảng TaiKhoan với role = 'admin'	⬜
 B2	Quản lý tài khoản người dùng	CRUD bảng TaiKhoan, khóa/mở tài khoản	⬜
@@ -20,9 +20,9 @@ B4	Quản lý sản phẩm	CRUD bảng SanPham, upload ảnh	⬜
 B5	Quản lý đơn hàng	Cập nhật trạng thái HoaDon: Chờ xử lý → Đã giao...	⬜
 B6	Xem thống kê đơn hàng	Tổng doanh thu, số đơn theo ngày/tháng...	⬜
 C. CHỨC NĂNG CHUNG / BỔ SUNG			
-C1	Tìm kiếm sản phẩm theo tên	Truy vấn LIKE tên sản phẩm	⬜
-C2	Phân trang / load động	Sử dụng limit/offset hoặc infinite scroll	⬜
-C3	Giao diện phản hồi (Responsive)	Giao diện dùng được trên desktop/mobile	⬜
-C4	Hiển thị sản phẩm nổi bật / mới nhất	Sắp xếp theo NgayTao hoặc thủ công	⬜
+C1	Tìm kiếm sản phẩm theo tên	Truy vấn LIKE tên sản phẩm	✅
+C2	Phân trang / load động	Sử dụng limit/offset hoặc infinite scroll	✅
+C3	Giao diện phản hồi (Responsive)	Giao diện dùng được trên desktop/mobile	✅
+C4	Hiển thị sản phẩm nổi bật / mới nhất	Sắp xếp theo NgayTao hoặc thủ công	✅
 C5	Gửi email xác nhận đơn hàng	Nếu tích hợp SMTP	⬜
 

@@ -3,8 +3,28 @@ const express = require('express');
 const db = require('./models');
 const path = require('path');
 
+// Import Singleton utilities
+const Logger = require('./utils/Logger');
+const ConfigService = require('./utils/ConfigService');
+const DBConnection = require('./utils/DBConnection');
+
 const app = express();
-const PORT = process.env.PORT || 5000;
+
+// Khởi tạo các Singleton
+const logger = Logger.getInstance();
+const config = ConfigService.getInstance();
+const dbConnection = DBConnection.getInstance();
+
+const PORT = config.getValue('server', 'port');
+
+// Middleware logging cho mọi request
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.url}`, {
+    ip: req.ip,
+    userAgent: req.get('user-agent')
+  });
+  next();
+});
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
@@ -15,8 +35,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // CORS middleware
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  const corsOrigin = config.getValue('server', 'corsOrigin');
+  res.header('Access-Control-Allow-Origin', corsOrigin === '*' ? '*' : corsOrigin);
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   
   if (req.method === 'OPTIONS') {
@@ -420,6 +441,7 @@ app.get('/api/admin',
 
 // 404 handler
 app.use('*', (req, res) => {
+  logger.warn(`404 Not Found: ${req.originalUrl}`);
   res.status(404).json({
     success: false,
     message: "Endpoint không tồn tại",
@@ -429,27 +451,33 @@ app.use('*', (req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('❌ Global Error:', err);
+  logger.logError(err, `Error at ${req.method} ${req.url}`);
   res.status(500).json({
     success: false,
     message: "Lỗi server nội bộ",
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error'
+    error: config.isDevelopment() ? err.message : 'Internal Server Error'
   });
 });
 
-// Kết nối database và khởi động server (KHÔNG sync để tránh thay đổi cấu trúc)
-db.sequelize.authenticate()
+// Kết nối database và khởi động server
+dbConnection.connect()
   .then(() => {
-    console.log("✅ Kết nối database thành công!");
+    logger.success("✅ Kết nối database thành công!");
+    
+    // In config hệ thống (ẩn thông tin nhạy cảm)
+    if (config.isDevelopment()) {
+      config.printConfigs();
+    }
+    
     app.listen(PORT, () => {
-      console.log('\n' + '='.repeat(80));
-      console.log('🎮 TOYSTORE BACKEND API SERVER');
-      console.log('='.repeat(80));
-      console.log(`🚀 Server đang chạy trên port ${PORT}`);
-      console.log(`📍 URL: http://localhost:${PORT}`);
-      console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`📊 Database: ${process.env.DB_NAME} - ${process.env.DB_HOST}`);
-      console.log('='.repeat(80));
+      logger.success('\n' + '='.repeat(80));
+      logger.info('🎮 TOYSTORE BACKEND API SERVER');
+      logger.info('='.repeat(80));
+      logger.success(`🚀 Server đang chạy trên port ${PORT}`);
+      logger.info(`📍 URL: http://localhost:${PORT}`);
+      logger.info(`🌐 Environment: ${config.getValue('server', 'env')}`);
+      logger.info(`📊 Database: ${config.getValue('database', 'name')} - ${config.getValue('database', 'host')}`);
+      logger.info('='.repeat(80));
       
       console.log('\n📚 AUTHENTICATION ENDPOINTS:');
       console.log('   POST   /api/auth/register           - Đăng ký tài khoản mới');

@@ -1,31 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { LogIn, User, Lock, Eye, EyeOff } from 'lucide-react';
+import { Button, Input } from '../components/ui';
 
 const LoginPage = () => {
-  // State quản lý form đăng nhập
   const [formData, setFormData] = useState({
     TenDangNhap: '',
     MatKhau: ''
   });
 
-  // State quản lý trạng thái UI
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Hook điều hướng và auth
   const navigate = useNavigate();
   const location = useLocation();
   const { user, login } = useAuth();
 
-  // Redirect path từ ProtectedRoute hoặc mặc định về Homepage
   const from = location.state?.from?.pathname || '/';
 
-  /**
-   * Kiểm tra nếu user đã đăng nhập thì chuyển hướng
-   */
   useEffect(() => {
     if (user) {
       console.log('👤 User đã đăng nhập, chuyển hướng về:', from);
@@ -33,10 +28,6 @@ const LoginPage = () => {
     }
   }, [user, navigate, from]);
 
-  /**
-   * Xử lý thay đổi giá trị input
-   * @param {Event} e - Event từ input
-   */
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     
@@ -45,7 +36,6 @@ const LoginPage = () => {
       [name]: value
     }));
 
-    // Xóa lỗi của field đang được chỉnh sửa
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -53,27 +43,20 @@ const LoginPage = () => {
       }));
     }
 
-    // Xóa message khi user bắt đầu nhập
     if (message) {
       setMessage('');
     }
   };
 
-  /**
-   * Validate form trước khi submit
-   * @returns {boolean} True nếu form hợp lệ
-   */
   const validateForm = () => {
     const newErrors = {};
 
-    // Validate tên đăng nhập/email
     if (!formData.TenDangNhap.trim()) {
       newErrors.TenDangNhap = 'Tên đăng nhập hoặc email không được để trống';
     } else if (formData.TenDangNhap.length < 3) {
       newErrors.TenDangNhap = 'Tên đăng nhập phải có ít nhất 3 ký tự';
     }
 
-    // Validate mật khẩu
     if (!formData.MatKhau) {
       newErrors.MatKhau = 'Mật khẩu không được để trống';
     } else if (formData.MatKhau.length < 6) {
@@ -84,17 +67,10 @@ const LoginPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  /**
-   * Xử lý submit form đăng nhập
-   * @param {Event} e - Submit event
-   */
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Reset message trước đó
     setMessage('');
 
-    // Validate form
     if (!validateForm()) {
       setMessage('Vui lòng kiểm tra lại thông tin đã nhập');
       return;
@@ -103,284 +79,169 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      // Chuẩn bị dữ liệu đăng nhập
       const loginData = {
         TenDangNhap: formData.TenDangNhap.trim(),
         MatKhau: formData.MatKhau
       };
 
-      console.log('🔐 Đăng nhập với dữ liệu:', { TenDangNhap: loginData.TenDangNhap });
-
-      // Gọi login từ AuthContext
       await login(loginData);
-
-      console.log('✅ Đăng nhập thành công');
-
-      // Hiển thị thông báo thành công
       setMessage('Đăng nhập thành công! Đang chuyển hướng...');
       
-      // Reset form
       setFormData({
         TenDangNhap: '',
         MatKhau: ''
       });
 
-      // Chuyển hướng sẽ được xử lý bởi useEffect khi user state thay đổi
-
     } catch (error) {
       console.error('❌ Lỗi đăng nhập:', error);
-      
-      // Hiển thị thông báo lỗi cho người dùng
       setMessage(error.message || 'Có lỗi xảy ra trong quá trình đăng nhập');
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * Chuyển hướng đến trang đăng ký
-   */
-  const goToRegister = () => {
-    navigate('/register');
-  };
-
   return (
-    <div style={styles.container}>
-      <div style={styles.formWrapper}>
-        <h2 style={styles.title}>🔐 Đăng nhập</h2>
-        
-        {/* Hiển thị thông báo */}
-        {message && (
-          <div style={{
-            ...styles.message,
-            backgroundColor: message.includes('thành công') ? '#d4edda' : '#f8d7da',
-            color: message.includes('thành công') ? '#155724' : '#721c24',
-            borderColor: message.includes('thành công') ? '#c3e6cb' : '#f5c6cb'
-          }}>
-            {message}
-          </div>
-        )}
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-rose-50 to-cream-100 flex items-center justify-center p-4">
+      {/* Decorative Elements */}
+      <div className="absolute top-10 left-10 text-6xl opacity-20 animate-float">🧸</div>
+      <div className="absolute bottom-10 right-10 text-6xl opacity-20 animate-float" style={{ animationDelay: '0.5s' }}>🎀</div>
+      <div className="absolute top-1/3 right-20 text-5xl opacity-20 animate-float" style={{ animationDelay: '1s' }}>⭐</div>
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          {/* Tên đăng nhập hoặc Email */}
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Tên đăng nhập hoặc Email *</label>
-            <input
-              type="text"
-              name="TenDangNhap"
-              value={formData.TenDangNhap}
-              onChange={handleInputChange}
-              style={{
-                ...styles.input,
-                borderColor: errors.TenDangNhap ? '#dc3545' : '#ddd'
-              }}
-              placeholder="Nhập tên đăng nhập hoặc email"
-              disabled={loading}
-              autoComplete="username"
-            />
-            {errors.TenDangNhap && (
-              <span style={styles.error}>{errors.TenDangNhap}</span>
-            )}
-          </div>
+      <div className="w-full max-w-md relative z-10">
+        {/* Logo/Header */}
+        <div className="text-center mb-8 animate-slide-up">
+          <div className="text-6xl mb-4 animate-bounce-soft">🔐</div>
+          <h1 className="text-4xl font-display font-bold text-gradient-primary mb-2">
+            Đăng nhập
+          </h1>
+          <p className="text-gray-600">Chào mừng bạn quay trở lại!</p>
+        </div>
 
-          {/* Mật khẩu */}
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Mật khẩu *</label>
-            <div style={styles.passwordWrapper}>
-              <input
-                type={showPassword ? "text" : "password"}
-                name="MatKhau"
-                value={formData.MatKhau}
-                onChange={handleInputChange}
-                style={{
-                  ...styles.input,
-                  borderColor: errors.MatKhau ? '#dc3545' : '#ddd',
-                  paddingRight: '40px'
-                }}
-                placeholder="Nhập mật khẩu"
-                disabled={loading}
-                autoComplete="current-password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={styles.showPasswordBtn}
-                disabled={loading}
-              >
-                {showPassword ? '🙈' : '👁️'}
-              </button>
+        {/* Login Form */}
+        <div className="bg-white rounded-bubble shadow-bubble border-2 border-primary-100 p-8 animate-scale-in">
+          {/* Message */}
+          {message && (
+            <div className={`mb-6 p-4 rounded-cute border-2 ${
+              message.includes('thành công')
+                ? 'bg-green-50 border-green-200 text-green-700'
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}>
+              <p className="text-sm font-medium text-center">{message}</p>
             </div>
-            {errors.MatKhau && (
-              <span style={styles.error}>{errors.MatKhau}</span>
-            )}
-          </div>
+          )}
 
-          {/* Nút đăng nhập */}
-          <button
-            type="submit"
-            style={{
-              ...styles.submitBtn,
-              backgroundColor: loading ? '#6c757d' : '#007bff',
-              cursor: loading ? 'not-allowed' : 'pointer'
-            }}
-            disabled={loading}
-          >
-            {loading ? '⏳ Đang đăng nhập...' : '🚀 Đăng nhập'}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Username/Email Input */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Tên đăng nhập hoặc Email <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-400" size={20} />
+                <input
+                  type="text"
+                  name="TenDangNhap"
+                  value={formData.TenDangNhap}
+                  onChange={handleInputChange}
+                  placeholder="Nhập tên đăng nhập hoặc email"
+                  disabled={loading}
+                  autoComplete="username"
+                  className={`input-cute pl-12 ${errors.TenDangNhap ? 'border-red-400' : ''}`}
+                />
+              </div>
+              {errors.TenDangNhap && (
+                <p className="mt-2 text-sm text-red-500 flex items-center gap-1">
+                  <span>⚠️</span> {errors.TenDangNhap}
+                </p>
+              )}
+            </div>
 
-        {/* Link đăng ký */}
-        <div style={styles.footer}>
-          <p>Chưa có tài khoản? 
-            <button 
-              style={styles.linkBtn}
-              onClick={goToRegister}
+            {/* Password Input */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Mật khẩu <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-400" size={20} />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="MatKhau"
+                  value={formData.MatKhau}
+                  onChange={handleInputChange}
+                  placeholder="Nhập mật khẩu"
+                  disabled={loading}
+                  autoComplete="current-password"
+                  className={`input-cute pl-12 pr-12 ${errors.MatKhau ? 'border-red-400' : ''}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-primary-400 hover:text-primary-600"
+                  disabled={loading}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+              {errors.MatKhau && (
+                <p className="mt-2 text-sm text-red-500 flex items-center gap-1">
+                  <span>⚠️</span> {errors.MatKhau}
+                </p>
+              )}
+            </div>
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              fullWidth
               disabled={loading}
+              loading={loading}
+              icon={<LogIn size={20} />}
+              className="mt-6"
             >
-              Đăng ký ngay
-            </button>
-          </p>
-        </div>
+              {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+            </Button>
+          </form>
 
-        {/* Thông tin test */}
-        <div style={styles.testInfo}>
-          <p style={styles.testTitle}>🧪 Tài khoản test:</p>
-          <p><strong>Admin:</strong> admin / admin123</p>
-          <p><strong>User:</strong> user1 / user123</p>
-        </div>
-
-        {/* Debug info (chỉ hiển thị trong development) */}
-        {process.env.NODE_ENV === 'development' && (
-          <div style={styles.debugInfo}>
-            <p><strong>Current user:</strong> {user ? user.tenDangNhap : 'None'}</p>
-            <p><strong>Redirect to:</strong> {from}</p>
+          {/* Register Link */}
+          <div className="mt-6 text-center">
+            <p className="text-gray-600">
+              Chưa có tài khoản?{' '}
+              <Link 
+                to="/register" 
+                className="text-primary-600 font-semibold hover:text-primary-700 transition-colors"
+              >
+                Đăng ký ngay
+              </Link>
+            </p>
           </div>
-        )}
+
+          {/* Test Accounts Info */}
+          <div className="mt-6 p-4 bg-gradient-to-r from-primary-50 to-rose-50 rounded-cute border-2 border-primary-200">
+            <p className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+              <span className="text-lg">🧪</span>
+              Tài khoản test:
+            </p>
+            <div className="text-sm text-gray-600 space-y-1">
+              <p><strong>Admin:</strong> admin / admin123</p>
+              <p><strong>User:</strong> user1 / user123</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Back to Home */}
+        <div className="text-center mt-6">
+          <Link 
+            to="/" 
+            className="text-primary-600 hover:text-primary-700 font-semibold transition-colors inline-flex items-center gap-2"
+          >
+            ← Về trang chủ
+          </Link>
+        </div>
       </div>
     </div>
   );
-};
-
-// CSS Styles (giữ nguyên như cũ, chỉ thêm debugInfo)
-const styles = {
-  // ... các styles khác giữ nguyên
-  container: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f8f9fa',
-    padding: '20px'
-  },
-  formWrapper: {
-    backgroundColor: 'white',
-    padding: '40px',
-    borderRadius: '8px',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-    width: '100%',
-    maxWidth: '450px'
-  },
-  title: {
-    textAlign: 'center',
-    marginBottom: '30px',
-    color: '#333',
-    fontSize: '24px',
-    fontWeight: 'bold'
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px'
-  },
-  inputGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '5px'
-  },
-  label: {
-    fontWeight: 'bold',
-    color: '#555',
-    fontSize: '14px'
-  },
-  input: {
-    padding: '12px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '16px',
-    transition: 'border-color 0.3s',
-    outline: 'none'
-  },
-  passwordWrapper: {
-    position: 'relative'
-  },
-  showPasswordBtn: {
-    position: 'absolute',
-    right: '10px',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: '18px'
-  },
-  error: {
-    color: '#dc3545',
-    fontSize: '12px',
-    marginTop: '2px'
-  },
-  message: {
-    padding: '10px',
-    borderRadius: '4px',
-    marginBottom: '20px',
-    border: '1px solid',
-    textAlign: 'center',
-    fontSize: '14px'
-  },
-  submitBtn: {
-    padding: '12px',
-    backgroundColor: '#007bff',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    transition: 'background-color 0.3s',
-    marginTop: '10px'
-  },
-  footer: {
-    textAlign: 'center',
-    marginTop: '20px'
-  },
-  linkBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#007bff',
-    cursor: 'pointer',
-    textDecoration: 'underline',
-    fontSize: '14px',
-    marginLeft: '5px'
-  },
-  testInfo: {
-    marginTop: '30px',
-    padding: '15px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '4px',
-    border: '1px solid #dee2e6'
-  },
-  testTitle: {
-    margin: '0 0 10px 0',
-    fontWeight: 'bold',
-    color: '#495057'
-  },
-  debugInfo: {
-    marginTop: '15px',
-    padding: '10px',
-    backgroundColor: '#e9ecef',
-    borderRadius: '4px',
-    fontSize: '12px',
-    color: '#495057'
-  }
 };
 
 export default LoginPage;

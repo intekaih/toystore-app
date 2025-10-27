@@ -15,7 +15,7 @@ const storage = multer.diskStorage({
     cb(null, uploadDir); // Thư mục lưu file
   },
   filename: function (req, file, cb) {
-    // Tạo tên file unique: timestamp-randomstring-originalname
+    // Tạo tên file tạm thời (sẽ rename sau khi có ID)
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
     const nameWithoutExt = path.basename(file.originalname, ext);
@@ -23,7 +23,7 @@ const storage = multer.diskStorage({
     // Loại bỏ ký tự đặc biệt trong tên file
     const sanitizedName = nameWithoutExt.replace(/[^a-zA-Z0-9]/g, '_');
     
-    cb(null, `${sanitizedName}-${uniqueSuffix}${ext}`);
+    cb(null, `temp_${sanitizedName}-${uniqueSuffix}${ext}`);
   }
 });
 
@@ -85,8 +85,14 @@ const handleUploadError = (err, req, res, next) => {
 const deleteOldImage = (imagePath) => {
   if (!imagePath) return;
   
-  // Lấy tên file từ URL
-  const filename = path.basename(imagePath);
+  // Lấy tên file từ URL hoặc path
+  let filename = imagePath;
+  if (imagePath.startsWith('/uploads/')) {
+    filename = imagePath.replace('/uploads/', '');
+  } else {
+    filename = path.basename(imagePath);
+  }
+  
   const filePath = path.join(uploadDir, filename);
   
   // Kiểm tra file có tồn tại không
@@ -100,8 +106,35 @@ const deleteOldImage = (imagePath) => {
   }
 };
 
+// Hàm rename file theo ID sản phẩm
+const renameFileByProductId = (oldFilename, productId) => {
+  if (!oldFilename || !productId) return null;
+  
+  try {
+    const oldPath = path.join(uploadDir, oldFilename);
+    const ext = path.extname(oldFilename);
+    
+    // Tên file mới: product_<ID>_<timestamp><ext>
+    const newFilename = `product_${productId}_${Date.now()}${ext}`;
+    const newPath = path.join(uploadDir, newFilename);
+    
+    // Kiểm tra file cũ có tồn tại không
+    if (fs.existsSync(oldPath)) {
+      fs.renameSync(oldPath, newPath);
+      console.log(`✅ Đã đổi tên file: ${oldFilename} -> ${newFilename}`);
+      return newFilename;
+    }
+    
+    return oldFilename;
+  } catch (error) {
+    console.error('❌ Lỗi đổi tên file:', error);
+    return oldFilename;
+  }
+};
+
 module.exports = {
   upload,
   handleUploadError,
-  deleteOldImage
+  deleteOldImage,
+  renameFileByProductId
 };

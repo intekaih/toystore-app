@@ -205,11 +205,9 @@ exports.vnpayReturn = async (req, res) => {
     // Verify secure hash
     if (secureHash !== checkSum) {
       console.error('❌ Chữ ký không hợp lệ');
-      return res.status(400).json({
-        success: false,
-        message: 'Chữ ký không hợp lệ',
-        code: '97'
-      });
+      // Redirect về frontend với error
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/payment/return?success=false&message=Invalid_signature`);
     }
 
     // Lấy thông tin từ VNPay
@@ -250,19 +248,20 @@ exports.vnpayReturn = async (req, res) => {
         console.log('✅ Cập nhật trạng thái đơn hàng thành công');
       }
 
-      return res.status(200).json({
-        success: true,
-        message: 'Thanh toán thành công',
-        code: vnp_ResponseCode,
-        data: {
-          orderId: hoaDon?.ID,
-          orderCode: orderCode,
-          amount: vnp_Amount,
-          transactionNo: vnp_TransactionNo,
-          bankCode: vnp_BankCode,
-          payDate: vnp_PayDate
-        }
+      // Redirect về frontend với success
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const redirectParams = new URLSearchParams({
+        success: 'true',
+        orderId: hoaDon?.ID || '',
+        orderCode: orderCode,
+        amount: vnp_Amount,
+        transactionNo: vnp_TransactionNo,
+        bankCode: vnp_BankCode,
+        payDate: vnp_PayDate,
+        responseCode: vnp_ResponseCode
       });
+      
+      return res.redirect(`${frontendUrl}/payment/return?${redirectParams.toString()}`);
     } else {
       // Thanh toán thất bại
       console.log('❌ Giao dịch thất bại - Mã lỗi:', vnp_ResponseCode);
@@ -285,24 +284,23 @@ exports.vnpayReturn = async (req, res) => {
 
       const errorMessage = errorMessages[vnp_ResponseCode] || 'Giao dịch không thành công';
 
-      return res.status(400).json({
-        success: false,
-        message: errorMessage,
-        code: vnp_ResponseCode,
-        data: {
-          txnRef: vnp_TxnRef,
-          amount: vnp_Amount
-        }
+      // Redirect về frontend với error
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const redirectParams = new URLSearchParams({
+        success: 'false',
+        responseCode: vnp_ResponseCode,
+        message: encodeURIComponent(errorMessage),
+        txnRef: vnp_TxnRef,
+        amount: vnp_Amount
       });
+      
+      return res.redirect(`${frontendUrl}/payment/return?${redirectParams.toString()}`);
     }
 
   } catch (error) {
     console.error('❌ Lỗi xử lý VNPay return:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi server nội bộ',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
-    });
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    return res.redirect(`${frontendUrl}/payment/return?success=false&message=Server_error`);
   }
 };
 

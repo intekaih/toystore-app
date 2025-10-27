@@ -36,7 +36,7 @@ module.exports = (sequelize, Sequelize) => {
     NgayTao: {
       type: Sequelize.DATE,
       allowNull: true,
-      defaultValue: Sequelize.NOW
+      defaultValue: Sequelize.literal('GETDATE()') // Sử dụng GETDATE() của SQL Server
     },
     Enable: {  // Tên cột trong DB là "Enable"
       type: Sequelize.BOOLEAN,
@@ -44,7 +44,16 @@ module.exports = (sequelize, Sequelize) => {
     }
   }, {
     tableName: 'SanPham',
-    timestamps: false
+    timestamps: false, // Tắt createdAt, updatedAt tự động
+    hooks: {
+      // Hook để loại bỏ NgayTao khỏi INSERT nếu không được set explicitly
+      beforeCreate: (instance, options) => {
+        // Nếu NgayTao không được set, xóa nó để SQL Server dùng DEFAULT
+        if (!instance.changed('NgayTao')) {
+          delete instance.dataValues.NgayTao;
+        }
+      }
+    }
   });
 
   return SanPham;

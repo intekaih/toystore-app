@@ -42,115 +42,193 @@ exports.getStatistics = async (req, res) => {
       }
     }
 
-    // 1. Tính tổng doanh thu và số đơn hàng
-    const totalStats = await HoaDon.findOne({
-      where: whereCondition,
-      attributes: [
-        [db.sequelize.fn('SUM', db.sequelize.col('TongTien')), 'tongDoanhThu'],
-        [db.sequelize.fn('COUNT', db.sequelize.col('ID')), 'soDonHang']
-      ],
-      raw: true
-    });
+    // 1. Tính tổng doanh thu và số đơn hàng - SỬA: Xử lý date đúng cách cho SQL Server
+    let totalStats = { tongDoanhThu: 0, soDonHang: 0 };
+    try {
+      let whereClause = 'WHERE Enable = 1';
+      const params = {};
+      
+      if (startDate && endDate) {
+        // Convert string date sang DATETIME cho SQL Server
+        whereClause += ' AND CAST(NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)';
+        params.startDate = startDate;
+        params.endDate = endDate;
+      }
 
-    // 2. Thống kê theo trạng thái đơn hàng
-    const statusStats = await HoaDon.findAll({
-      where: whereCondition,
-      attributes: [
-        'TrangThai',
-        [db.sequelize.fn('COUNT', db.sequelize.col('ID')), 'soLuong'],
-        [db.sequelize.fn('SUM', db.sequelize.col('TongTien')), 'tongTien']
-      ],
-      group: ['TrangThai'],
-      raw: true
-    });
+      const result = await db.sequelize.query(`
+        SELECT 
+          ISNULL(SUM(TongTien), 0) AS tongDoanhThu,
+          COUNT(ID) AS soDonHang
+        FROM HoaDon
+        ${whereClause}
+      `, {
+        replacements: params,
+        type: db.sequelize.QueryTypes.SELECT
+      });
+      
+      if (result && result.length > 0 && result[0]) {
+        totalStats = {
+          tongDoanhThu: result[0].tongDoanhThu || 0,
+          soDonHang: result[0].soDonHang || 0
+        };
+      }
+    } catch (error) {
+      console.error('⚠️ Lỗi query totalStats:', error.message);
+    }
 
-    // 3. Thống kê theo tháng
-    // SQL Server sử dụng FORMAT hoặc DATEPART để lấy tháng
-    const monthlyStats = await db.sequelize.query(`
-      SELECT 
-        FORMAT(NgayLap, 'yyyy-MM') as thang,
-        COUNT(*) as soDonHang,
-        SUM(TongTien) as doanhThu
-      FROM HoaDon
-      WHERE Enable = 1
-        ${startDate && endDate ? `AND NgayLap BETWEEN '${startDate}' AND '${endDate}'` : ''}
-        ${year && !startDate ? `AND YEAR(NgayLap) = ${parseInt(year)}` : ''}
-      GROUP BY FORMAT(NgayLap, 'yyyy-MM')
-      ORDER BY FORMAT(NgayLap, 'yyyy-MM') DESC
-    `, {
-      type: db.sequelize.QueryTypes.SELECT
-    });
+    // 2. Thống kê theo trạng thái đơn hàng - SỬA: Dùng CAST AS DATE
+    let statusStats = [];
+    try {
+      let whereClause = 'WHERE Enable = 1';
+      const params = {};
+      
+      if (startDate && endDate) {
+        whereClause += ' AND CAST(NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)';
+        params.startDate = startDate;
+        params.endDate = endDate;
+      }
+
+      statusStats = await db.sequelize.query(`
+        SELECT 
+          TrangThai,
+          COUNT(ID) AS soLuong,
+          ISNULL(SUM(TongTien), 0) AS tongTien
+        FROM HoaDon
+        ${whereClause}
+        GROUP BY TrangThai
+      `, {
+        replacements: params,
+        type: db.sequelize.QueryTypes.SELECT
+      });
+    } catch (error) {
+      console.error('⚠️ Lỗi query statusStats:', error.message);
+      statusStats = [];
+    }
+
+    // 3. Thống kê theo tháng - SỬA: Dùng CAST AS DATE
+    let monthlyStats = [];
+    try {
+      let whereClause = 'WHERE Enable = 1';
+      const params = {};
+      
+      if (startDate && endDate) {
+        whereClause += ' AND CAST(NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)';
+        params.startDate = startDate;
+        params.endDate = endDate;
+      } else if (year && !startDate) {
+        whereClause += ' AND YEAR(NgayLap) = :year';
+        params.year = parseInt(year);
+      }
+
+      monthlyStats = await db.sequelize.query(`
+        SELECT 
+          FORMAT(NgayLap, 'yyyy-MM') as thang,
+          COUNT(*) as soDonHang,
+          ISNULL(SUM(TongTien), 0) as doanhThu
+        FROM HoaDon
+        ${whereClause}
+        GROUP BY FORMAT(NgayLap, 'yyyy-MM')
+        ORDER BY FORMAT(NgayLap, 'yyyy-MM') DESC
+      `, {
+        replacements: params,
+        type: db.sequelize.QueryTypes.SELECT
+      });
+    } catch (error) {
+      console.error('⚠️ Lỗi query monthlyStats:', error.message);
+      monthlyStats = [];
+    }
 
     // 4. Top 5 khách hàng mua nhiều nhất
-    const topCustomers = await HoaDon.findAll({
-      where: whereCondition,
-      attributes: [
-        'KhachHangID',
-        [db.sequelize.fn('COUNT', db.sequelize.col('HoaDon.ID')), 'soDonHang'],
-        [db.sequelize.fn('SUM', db.sequelize.col('HoaDon.TongTien')), 'tongChiTieu']
-      ],
-      include: [{
-        model: KhachHang,
-        as: 'khachHang',
-        attributes: ['ID', 'HoTen', 'Email', 'DienThoai']
-      }],
-      group: ['HoaDon.KhachHangID', 'khachHang.ID', 'khachHang.HoTen', 'khachHang.Email', 'khachHang.DienThoai'],
-      order: [[db.sequelize.literal('tongChiTieu'), 'DESC']],
-      limit: 5,
-      subQuery: false
-    });
+    let topCustomers = [];
+    try {
+      topCustomers = await HoaDon.findAll({
+        where: whereCondition,
+        attributes: [
+          'KhachHangID',
+          [db.sequelize.fn('COUNT', db.sequelize.col('HoaDon.ID')), 'soDonHang'],
+          [db.sequelize.fn('SUM', db.sequelize.col('HoaDon.TongTien')), 'tongChiTieu']
+        ],
+        include: [{
+          model: KhachHang,
+          as: 'khachHang',
+          attributes: ['ID', 'HoTen', 'Email', 'DienThoai'],
+          required: false
+        }],
+        group: ['HoaDon.KhachHangID', 'khachHang.ID', 'khachHang.HoTen', 'khachHang.Email', 'khachHang.DienThoai'],
+        order: [[db.sequelize.literal('tongChiTieu'), 'DESC']],
+        limit: 5,
+        subQuery: false
+      });
+    } catch (error) {
+      console.error('⚠️ Lỗi query topCustomers:', error.message);
+      topCustomers = [];
+    }
 
     // 5. Top 5 sản phẩm bán chạy nhất
-    const topProducts = await ChiTietHoaDon.findAll({
-      attributes: [
-        'SanPhamID',
-        [db.sequelize.fn('SUM', db.sequelize.col('SoLuong')), 'tongSoLuongBan'],
-        [db.sequelize.fn('SUM', db.sequelize.col('ThanhTien')), 'tongDoanhThu'],
-        [db.sequelize.fn('COUNT', db.sequelize.col('ChiTietHoaDon.ID')), 'soLanMua']
-      ],
-      include: [
-        {
-          model: SanPham,
-          as: 'sanPham',
-          attributes: ['ID', 'Ten', 'HinhAnhURL', 'GiaBan', 'Ton']
+    let topProducts = [];
+    try {
+      topProducts = await ChiTietHoaDon.findAll({
+        attributes: [
+          'SanPhamID',
+          [db.sequelize.fn('SUM', db.sequelize.col('SoLuong')), 'tongSoLuongBan'],
+          [db.sequelize.fn('SUM', db.sequelize.col('ThanhTien')), 'tongDoanhThu'],
+          [db.sequelize.fn('COUNT', db.sequelize.col('ChiTietHoaDon.ID')), 'soLanMua']
+        ],
+        include: [
+          {
+            model: SanPham,
+            as: 'sanPham',
+            attributes: ['ID', 'Ten', 'HinhAnhURL', 'GiaBan', 'Ton'],
+            required: false
+          },
+          {
+            model: HoaDon,
+            as: 'hoaDon',
+            attributes: [],
+            where: whereCondition,
+            required: true
+          }
+        ],
+        where: {
+          Enable: true
         },
-        {
-          model: HoaDon,
-          as: 'hoaDon',
-          attributes: [],
-          where: whereCondition
-        }
-      ],
-      where: {
-        Enable: true
-      },
-      group: ['ChiTietHoaDon.SanPhamID', 'sanPham.ID', 'sanPham.Ten', 'sanPham.HinhAnhURL', 'sanPham.GiaBan', 'sanPham.Ton'],
-      order: [[db.sequelize.literal('tongSoLuongBan'), 'DESC']],
-      limit: 5,
-      subQuery: false
-    });
+        group: ['ChiTietHoaDon.SanPhamID', 'sanPham.ID', 'sanPham.Ten', 'sanPham.HinhAnhURL', 'sanPham.GiaBan', 'sanPham.Ton'],
+        order: [[db.sequelize.literal('tongSoLuongBan'), 'DESC']],
+        limit: 5,
+        subQuery: false
+      });
+    } catch (error) {
+      console.error('⚠️ Lỗi query topProducts:', error.message);
+      topProducts = [];
+    }
 
     // 6. Thống kê số đơn hàng theo ngày trong 7 ngày gần nhất
-    const last7DaysStats = await db.sequelize.query(`
-      SELECT 
-        CAST(NgayLap AS DATE) as ngay,
-        COUNT(*) as soDonHang,
-        SUM(TongTien) as doanhThu
-      FROM HoaDon
-      WHERE Enable = 1
-        AND NgayLap >= DATEADD(day, -7, GETDATE())
-      GROUP BY CAST(NgayLap AS DATE)
-      ORDER BY CAST(NgayLap AS DATE) DESC
-    `, {
-      type: db.sequelize.QueryTypes.SELECT
-    });
+    let last7DaysStats = [];
+    try {
+      last7DaysStats = await db.sequelize.query(`
+        SELECT 
+          CAST(NgayLap AS DATE) as ngay,
+          COUNT(*) as soDonHang,
+          ISNULL(SUM(TongTien), 0) as doanhThu
+        FROM HoaDon
+        WHERE Enable = 1
+          AND NgayLap >= DATEADD(day, -7, GETDATE())
+        GROUP BY CAST(NgayLap AS DATE)
+        ORDER BY CAST(NgayLap AS DATE) DESC
+      `, {
+        type: db.sequelize.QueryTypes.SELECT
+      });
+    } catch (error) {
+      console.error('⚠️ Lỗi query last7DaysStats:', error.message);
+      last7DaysStats = [];
+    }
 
     // Format dữ liệu trả về
     const statistics = {
       // Tổng quan
-      tongDoanhThu: parseFloat(totalStats.tongDoanhThu || 0),
-      soDonHang: parseInt(totalStats.soDonHang || 0),
-      doanhThuTrungBinh: totalStats.soDonHang > 0 
+      tongDoanhThu: parseFloat(totalStats?.tongDoanhThu || 0),
+      soDonHang: parseInt(totalStats?.soDonHang || 0),
+      doanhThuTrungBinh: (totalStats?.soDonHang && totalStats?.soDonHang > 0)
         ? parseFloat(totalStats.tongDoanhThu) / parseInt(totalStats.soDonHang) 
         : 0,
 
@@ -171,23 +249,23 @@ exports.getStatistics = async (req, res) => {
       // Top khách hàng
       topKhachHang: topCustomers.map(item => ({
         khachHangId: item.KhachHangID,
-        hoTen: item.khachHang?.HoTen,
-        email: item.khachHang?.Email,
-        dienThoai: item.khachHang?.DienThoai,
-        soDonHang: parseInt(item.dataValues.soDonHang),
+        hoTen: item.khachHang?.HoTen || 'Không rõ',
+        email: item.khachHang?.Email || '',
+        dienThoai: item.khachHang?.DienThoai || '',
+        soDonHang: parseInt(item.dataValues.soDonHang || 0),
         tongChiTieu: parseFloat(item.dataValues.tongChiTieu || 0)
       })),
 
       // Top sản phẩm
       topSanPham: topProducts.map(item => ({
         sanPhamId: item.SanPhamID,
-        tenSanPham: item.sanPham?.Ten,
-        hinhAnh: item.sanPham?.HinhAnhURL,
+        tenSanPham: item.sanPham?.Ten || 'Không rõ',
+        hinhAnh: item.sanPham?.HinhAnhURL || null,
         giaBan: parseFloat(item.sanPham?.GiaBan || 0),
-        tonKho: item.sanPham?.Ton,
-        tongSoLuongBan: parseInt(item.dataValues.tongSoLuongBan),
+        tonKho: item.sanPham?.Ton || 0,
+        tongSoLuongBan: parseInt(item.dataValues.tongSoLuongBan || 0),
         tongDoanhThu: parseFloat(item.dataValues.tongDoanhThu || 0),
-        soLanMua: parseInt(item.dataValues.soLanMua)
+        soLanMua: parseInt(item.dataValues.soLanMua || 0)
       })),
 
       // Thống kê 7 ngày gần nhất
@@ -217,6 +295,8 @@ exports.getStatistics = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Lỗi lấy thống kê đơn hàng:', error);
+    console.error('Chi tiết lỗi:', error.message);
+    console.error('Stack trace:', error.stack);
 
     if (error.name === 'SequelizeDatabaseError') {
       return res.status(500).json({

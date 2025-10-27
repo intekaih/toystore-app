@@ -17,18 +17,18 @@ const generalLimiter = rateLimit({
 
 /**
  * Rate limiter cho API đăng nhập
- * 5 requests mỗi 15 phút cho mỗi IP (ngăn chặn brute force)
+ * 50 requests mỗi 15 phút cho mỗi IP (tăng từ 5 lên 50 để dễ test)
  */
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 phút
-  max: 5, // Giới hạn 5 lần đăng nhập
+  max: 50, // Giới hạn 50 lần đăng nhập (tăng từ 5)
   message: {
     success: false,
     message: 'Quá nhiều lần đăng nhập thất bại. Vui lòng thử lại sau 15 phút.'
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: true
+  skipSuccessfulRequests: true // Không đếm request thành công
 });
 
 /**
@@ -37,7 +37,7 @@ const loginLimiter = rateLimit({
  */
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 giờ
-  max: 3, // Giới hạn 3 tài khoản mới
+  max: 30, // Giới hạn 3 tài khoản mới
   message: {
     success: false,
     message: 'Quá nhiều tài khoản được tạo từ IP này. Vui lòng thử lại sau 1 giờ.'
@@ -52,7 +52,7 @@ const registerLimiter = rateLimit({
  */
 const paymentLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 phút
-  max: 10, // Giới hạn 10 payment requests
+  max: 100, // Giới hạn 10 payment requests
   message: {
     success: false,
     message: 'Quá nhiều yêu cầu thanh toán. Vui lòng thử lại sau 10 phút.'
@@ -67,7 +67,7 @@ const paymentLimiter = rateLimit({
  */
 const orderLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 giờ
-  max: 20, // Giới hạn 20 đơn hàng
+  max: 1000, // Giới hạn 20 đơn hàng
   message: {
     success: false,
     message: 'Quá nhiều đơn hàng được tạo. Vui lòng thử lại sau 1 giờ.'
@@ -82,7 +82,7 @@ const orderLimiter = rateLimit({
  */
 const cartLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 phút
-  max: 50, // Giới hạn 50 cart operations
+  max: 1000, // Giới hạn 50 cart operations
   message: {
     success: false,
     message: 'Quá nhiều thao tác với giỏ hàng. Vui lòng thử lại sau 10 phút.'
@@ -97,7 +97,7 @@ const cartLimiter = rateLimit({
  */
 const profileUpdateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 giờ
-  max: 10, // Giới hạn 10 lần update
+  max: 1000, // Giới hạn 10 lần update
   message: {
     success: false,
     message: 'Quá nhiều lần cập nhật thông tin. Vui lòng thử lại sau 1 giờ.'

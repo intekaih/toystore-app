@@ -1,105 +1,241 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProducts } from '../../api/productApi.js';
+import { addToCart } from '../../api/cartApi.js';
+import { Search, X, Filter, Sparkles } from 'lucide-react';
+import MainLayout from '../../layouts/MainLayout';
+import { ProductCard, Loading, Button, Badge } from '../../components/ui';
 import Pagination from '../../components/Pagination.js';
+import ProductFilterBar from '../../components/ProductFilterBar.js';
+import Toast from '../../components/Toast.js';
+import { useAuth } from '../../contexts/AuthContext.js';
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [adding, setAdding] = useState(false);
+  const [toast, setToast] = useState(null);
   const [totalPages, setTotalPages] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [totalProducts, setTotalProducts] = useState(0);
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [filters, setFilters] = useState({
+    page: 1,
+    limit: 12,
+    search: '',
+    filter: 'newest',
+    minPrice: null,
+    maxPrice: null,
+    categoryId: null
+  });
 
   useEffect(() => {
     loadProducts();
-  }, [currentPage, searchTerm]);
+  }, [filters]);
 
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const response = await getProducts(currentPage, searchTerm);
+      console.log('🔍 Loading products with filters:', filters);
+
+      const response = await getProducts(filters);
       
-      // API trả về cấu trúc: response.data.products
-      if (response.data && response.data.products) {
-        setProducts(response.data.products);
+      if (response.success && response.data) {
+        setProducts(response.data.products || []);
         setTotalPages(response.data.pagination?.totalPages || 1);
+        setTotalProducts(response.data.pagination?.totalProducts || 0);
+        
+        console.log('✅ Loaded products:', response.data.products.length);
+        console.log('📊 Filter info:', response.data.filters);
       } else {
         setProducts([]);
       }
     } catch (error) {
-      console.error('Error loading products:', error);
+      console.error('❌ Error loading products:', error);
       setProducts([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleFilterChange = (newFilters) => {
+    console.log('🎯 Filter changed:', newFilters);
+    setFilters(newFilters);
+  };
+
   const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
-    setCurrentPage(1);
+    setFilters({
+      ...filters,
+      search: e.target.value,
+      page: 1
+    });
+  };
+
+  const handlePageChange = (page) => {
+    setFilters({
+      ...filters,
+      page
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleProductClick = (productId) => {
     navigate(`/products/${productId}`);
   };
 
-  if (loading) return <div className="loading">Đang tải...</div>;
+  const showToast = (message, type = 'info', duration = 3000) => {
+    setToast({ message, type, duration });
+  };
 
-  // DEBUG: Hiển thị số lượng sản phẩm
-  console.log('Current products state:', products);
+  const handleAddToCart = async (product) => {
+    if (!user) {
+      showToast('Vui lòng đăng nhập để thêm vào giỏ hàng', 'warning', 3000);
+      setTimeout(() => navigate('/login'), 1500);
+      return;
+    }
+
+    try {
+      setAdding(true);
+      const productId = product.id || product.MaSP || product.maSP;
+      const response = await addToCart(productId, 1);
+
+      if (response.success) {
+        showToast(
+          response.message || `Đã thêm ${product.tenSP || product.TenSP || product.ten} vào giỏ hàng`,
+          'success',
+          3000
+        );
+      }
+    } catch (error) {
+      console.error('❌ Lỗi thêm vào giỏ hàng:', error);
+      showToast(error.message || 'Không thể thêm vào giỏ hàng', 'error', 4000);
+    } finally {
+      setAdding(false);
+    }
+  };
 
   return (
-    <div className="products-page">
-      <h1>Danh sách sản phẩm</h1>
-      <p>Tìm thấy {products.length} sản phẩm</p>
-      
-      <div className="search-box">
-        <input
-          type="text"
-          placeholder="Tìm kiếm sản phẩm..."
-          value={searchTerm}
-          onChange={handleSearch}
-        />
-      </div>
+    <MainLayout>
+      <div className="container-cute py-8">
+        {/* 🌸 Header Section - Dễ thương */}
+        <div className="text-center mb-8 space-y-3 animate-slide-up">
+          <div className="flex items-center justify-center gap-2">
+            <Sparkles className="text-primary-500" size={32} />
+            <h1 className="text-4xl md:text-5xl font-display font-bold text-gray-800">
+              Danh sách sản phẩm
+            </h1>
+            <Sparkles className="text-primary-500" size={32} />
+          </div>
+          <p className="text-lg text-gray-600">
+            Tìm thấy <Badge variant="primary" size="lg">{totalProducts}</Badge> sản phẩm
+          </p>
+        </div>
 
-      <div className="products-grid">
-        {products.length > 0 ? (
-          products.map((product, index) => (
-            <div 
-              key={product.id} 
-              className="product-card"
-              onClick={() => handleProductClick(product.id)}
-            >
-              <div className="product-image-wrapper">
-                <img 
-                  src={product.hinhAnh || '/placeholder.jpg'} 
-                  alt={product.tenSP || 'Product'} 
+        {/* 🔍 Search Bar - Cute */}
+        <div className="mb-6 max-w-2xl mx-auto">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-400" size={20} />
+            <input
+              type="text"
+              placeholder="Tìm kiếm sản phẩm theo tên... 🔍"
+              value={filters.search}
+              onChange={handleSearch}
+              className="input-cute pl-12 pr-12"
+            />
+            {filters.search && (
+              <button 
+                onClick={() => handleFilterChange({ ...filters, search: '', page: 1 })}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-primary-100 rounded-full transition-colors"
+              >
+                <X size={18} className="text-primary-500" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 🎯 Strategy Pattern Filter Bar */}
+        <div className="mb-8">
+          <ProductFilterBar 
+            onFilterChange={handleFilterChange}
+            currentFilters={filters}
+          />
+        </div>
+
+        {/* 🛍️ Products Grid */}
+        {loading ? (
+          <Loading text="Đang tải sản phẩm..." />
+        ) : (
+          <>
+            {products.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+                {products.map((product, index) => (
+                  <div 
+                    key={product.id}
+                    className="animate-fade-in"
+                    style={{ animationDelay: `${index * 0.05}s` }}
+                    onClick={() => handleProductClick(product.id)}
+                  >
+                    <ProductCard 
+                      product={product}
+                      onAddToCart={handleAddToCart}
+                    />
+                    {product.soLuongBan !== undefined && filters.filter === 'bestSeller' && (
+                      <div className="mt-2">
+                        <Badge variant="danger" size="sm">
+                          🔥 Đã bán {product.soLuongBan}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 space-y-4">
+                <div className="text-8xl">🔍</div>
+                <h3 className="text-2xl font-bold text-gray-700">Không tìm thấy sản phẩm</h3>
+                <p className="text-gray-500">Hãy thử thay đổi bộ lọc hoặc từ khóa tìm kiếm</p>
+                <Button 
+                  variant="outline"
+                  onClick={() => handleFilterChange({
+                    page: 1,
+                    limit: 12,
+                    search: '',
+                    filter: 'newest',
+                    minPrice: null,
+                    maxPrice: null,
+                    categoryId: null
+                  })}
+                >
+                  🔄 Đặt lại bộ lọc
+                </Button>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && products.length > 0 && (
+              <div className="mt-8">
+                <Pagination
+                  currentPage={filters.page}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
                 />
               </div>
-              <div className="product-info">
-                <h3>{product.tenSP}</h3>
-                <p className="price">
-                  {product.giaBan?.toLocaleString('vi-VN')} ₫
-                </p>
-                <p className="stock">Còn: {product.soLuongTon}</p>
-                <p className="category">{product.loaiSP?.tenLoai}</p>
-              </div>
-            </div>
-          ))
-        ) : (
-          <p>Không có sản phẩm nào</p>
+            )}
+          </>
+        )}
+
+        {/* Toast Notification */}
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            duration={toast.duration}
+            onClose={() => setToast(null)}
+          />
         )}
       </div>
-
-      {totalPages > 1 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-        />
-      )}
-    </div>
+    </MainLayout>
   );
 };
 

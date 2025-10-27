@@ -49,6 +49,7 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
+    setUser, // Thêm setUser để admin login có thể dùng
     login,
     logout,
     loading,

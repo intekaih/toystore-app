@@ -1,0 +1,267 @@
+.payment-return-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 60px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.payment-return-container {
+  max-width: 600px;
+  width: 100%;
+}
+
+/* Loading */
+.payment-loading {
+  background: white;
+  border-radius: 20px;
+  padding: 60px 40px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.loading-spinner-large {
+  width: 80px;
+  height: 80px;
+  border: 6px solid #f3f4f6;
+  border-top: 6px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 30px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.payment-loading h2 {
+  font-size: 24px;
+  color: #1f2937;
+  margin-bottom: 10px;
+}
+
+.payment-loading p {
+  color: #6b7280;
+  font-size: 16px;
+}
+
+/* Payment Result */
+.payment-result {
+  background: white;
+  border-radius: 20px;
+  padding: 50px 40px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.result-icon {
+  font-size: 80px;
+  margin-bottom: 20px;
+  animation: scaleIn 0.5s ease-out;
+}
+
+@keyframes scaleIn {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.payment-result h2 {
+  font-size: 28px;
+  margin-bottom: 15px;
+  color: #1f2937;
+}
+
+.payment-success h2 {
+  color: #10b981;
+}
+
+.payment-failed h2,
+.payment-error h2 {
+  color: #ef4444;
+}
+
+.result-message {
+  font-size: 16px;
+  color: #6b7280;
+  margin-bottom: 30px;
+  line-height: 1.6;
+}
+
+/* Payment Details */
+.payment-details {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 25px;
+  margin: 30px 0;
+  text-align: left;
+}
+
+.payment-details h3 {
+  font-size: 18px;
+  color: #1f2937;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.detail-value {
+  font-size: 14px;
+  color: #1f2937;
+  font-weight: 600;
+  text-align: right;
+}
+
+.detail-value.amount {
+  color: #10b981;
+  font-size: 18px;
+}
+
+/* Success Info */
+.success-info {
+  background: #ecfdf5;
+  border: 1px solid #10b981;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 25px 0;
+  text-align: left;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.info-item:last-child {
+  margin-bottom: 0;
+}
+
+.info-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.info-item span:last-child {
+  font-size: 14px;
+  color: #065f46;
+  line-height: 1.5;
+}
+
+/* Actions */
+.result-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 30px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.result-actions .btn {
+  flex: 1;
+  min-width: 180px;
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.result-actions .btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.result-actions .btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+}
+
+.result-actions .btn-secondary {
+  background: #f3f4f6;
+  color: #1f2937;
+}
+
+.result-actions .btn-secondary:hover {
+  background: #e5e7eb;
+  transform: translateY(-2px);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .payment-return-page {
+    padding: 40px 15px;
+  }
+
+  .payment-result {
+    padding: 40px 25px;
+  }
+
+  .payment-loading {
+    padding: 50px 30px;
+  }
+
+  .result-icon {
+    font-size: 60px;
+  }
+
+  .payment-result h2 {
+    font-size: 24px;
+  }
+
+  .payment-loading h2 {
+    font-size: 20px;
+  }
+
+  .result-actions {
+    flex-direction: column;
+  }
+
+  .result-actions .btn {
+    min-width: 100%;
+  }
+
+  .detail-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .detail-value {
+    text-align: left;
+  }
+}

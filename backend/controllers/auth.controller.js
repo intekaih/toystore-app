@@ -4,15 +4,23 @@ const db = require('../models');
 const { Op } = require('sequelize');
 const TaiKhoan = db.TaiKhoan;
 
+// Import Singleton utilities
+const Logger = require('../utils/Logger');
+const ConfigService = require('../utils/ConfigService');
+
+const logger = Logger.getInstance();
+const config = ConfigService.getInstance();
+
 // Đăng ký tài khoản mới
 exports.register = async (req, res) => {
   try {
-    console.log('📝 Received register request:', req.body);
+    logger.info('📝 Đăng ký tài khoản mới', { username: req.body.TenDangNhap });
 
     const { TenDangNhap, MatKhau, HoTen, Email, DienThoai } = req.body;
 
     // Validate input - Chỉ TenDangNhap, MatKhau, HoTen là bắt buộc
     if (!TenDangNhap || !MatKhau || !HoTen) {
+      logger.warn('Đăng ký thất bại: Thiếu thông tin bắt buộc');
       return res.status(400).json({
         success: false,
         message: "Tên đăng nhập, mật khẩu và họ tên là bắt buộc"
@@ -21,14 +29,16 @@ exports.register = async (req, res) => {
 
     // Validate độ dài mật khẩu
     if (MatKhau.length < 6) {
+      logger.warn('Đăng ký thất bại: Mật khẩu quá ngắn');
       return res.status(400).json({
         success: false,
         message: "Mật khẩu phải có ít nhất 6 ký tự"
       });
     }
 
-    // Validate email format nếu có (chỉ validate khi Email không rỗng)
+    // Validate email format nếu có
     if (Email && Email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(Email.trim())) {
+      logger.warn('Đăng ký thất bại: Email không hợp lệ');
       return res.status(400).json({
         success: false,
         message: "Định dạng email không hợp lệ"
@@ -42,7 +52,7 @@ exports.register = async (req, res) => {
       ]
     };
 
-    // Chỉ kiểm tra trùng email nếu email được cung cấp và không rỗng
+    // Chỉ kiểm tra trùng email nếu email được cung cấp
     if (Email && Email.trim()) {
       whereCondition[Op.or].push({ Email: Email.trim().toLowerCase() });
     }
@@ -53,12 +63,14 @@ exports.register = async (req, res) => {
 
     if (existingUser) {
       if (existingUser.TenDangNhap === TenDangNhap) {
+        logger.warn(`Đăng ký thất bại: Tên đăng nhập đã tồn tại - ${TenDangNhap}`);
         return res.status(409).json({
           success: false,
           message: "Tên đăng nhập đã tồn tại"
         });
       }
       if (Email && Email.trim() && existingUser.Email === Email.trim().toLowerCase()) {
+        logger.warn(`Đăng ký thất bại: Email đã tồn tại - ${Email}`);
         return res.status(409).json({
           success: false,
           message: "Email đã tồn tại"
@@ -66,11 +78,11 @@ exports.register = async (req, res) => {
       }
     }
 
-    // Mã hóa mật khẩu
-    const saltRounds = 12;
+    // Mã hóa mật khẩu - sử dụng config từ ConfigService
+    const saltRounds = config.getValue('security', 'bcryptSaltRounds');
     const hashedPassword = await bcrypt.hash(MatKhau, saltRounds);
 
-    // Tạo tài khoản mới - Email và DienThoai có thể null
+    // Tạo tài khoản mới
     const newUser = await TaiKhoan.create({
       TenDangNhap: TenDangNhap.trim(),
       MatKhau: hashedPassword,
@@ -79,8 +91,9 @@ exports.register = async (req, res) => {
       DienThoai: (DienThoai && DienThoai.trim()) ? DienThoai.trim() : null,
       VaiTro: 'user',
       Enable: true
-      // Không gửi NgayTao - để SQL Server tự động gán
     });
+
+    logger.success(`✅ Đăng ký thành công: ${newUser.TenDangNhap} (ID: ${newUser.ID})`);
 
     // Trả về thông tin người dùng (không bao gồm mật khẩu)
     const userResponse = {
@@ -101,12 +114,7 @@ exports.register = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Register error:", error);
-    console.error("❌ Error details:", {
-      name: error.name,
-      message: error.message,
-      original: error.original?.message
-    });
+    logger.logError(error, 'Đăng ký tài khoản');
 
     // Xử lý lỗi Sequelize validation
     if (error.name === 'SequelizeValidationError') {
@@ -137,7 +145,7 @@ exports.register = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Lỗi server nội bộ",
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
+      error: config.isDevelopment() ? error.message : 'Internal Server Error'
     });
   }
 };
@@ -145,19 +153,20 @@ exports.register = async (req, res) => {
 // Hàm đăng nhập người dùng
 exports.login = async (req, res) => {
   try {
-    console.log('🔐 Đăng nhập - Dữ liệu nhận được:', req.body);
+    logger.info('🔐 Yêu cầu đăng nhập', { username: req.body.TenDangNhap });
 
     const { TenDangNhap, MatKhau } = req.body;
 
     // Kiểm tra dữ liệu đầu vào
     if (!TenDangNhap || !MatKhau) {
+      logger.warn('Đăng nhập thất bại: Thiếu thông tin');
       return res.status(400).json({
         success: false,
         message: 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu'
       });
     }
 
-    // Tìm người dùng theo tên đăng nhập và kiểm tra trạng thái Enable = true
+    // Tìm người dùng theo tên đăng nhập
     const user = await TaiKhoan.findOne({
       where: {
         TenDangNhap: TenDangNhap,
@@ -166,50 +175,40 @@ exports.login = async (req, res) => {
     });
 
     if (!user) {
+      logger.warn(`Đăng nhập thất bại: User không tồn tại - ${TenDangNhap}`);
       return res.status(401).json({
         success: false,
         message: 'Tên đăng nhập không tồn tại hoặc tài khoản đã bị vô hiệu hóa'
       });
     }
 
-    console.log('👤 Tìm thấy user:', {
-      ID: user.ID,
-      TenDangNhap: user.TenDangNhap,
-      VaiTro: user.VaiTro,
-      Enable: user.Enable
-    });
-
-    // So sánh mật khẩu với bcrypt
+    // So sánh mật khẩu
     const isPasswordValid = await bcrypt.compare(MatKhau, user.MatKhau);
     
     if (!isPasswordValid) {
+      logger.warn(`Đăng nhập thất bại: Sai mật khẩu - ${TenDangNhap}`);
       return res.status(401).json({
         success: false,
         message: 'Mật khẩu không chính xác'
       });
     }
 
-    // Kiểm tra JWT_SECRET có tồn tại
-    if (!process.env.JWT_SECRET) {
-      console.error('❌ JWT_SECRET không được cấu hình trong .env');
-      return res.status(500).json({
-        success: false,
-        message: 'Lỗi cấu hình server'
-      });
-    }
+    // Lấy JWT config từ ConfigService
+    const jwtSecret = config.getValue('jwt', 'secret');
+    const jwtExpires = config.getValue('jwt', 'expiresIn');
 
-    // Tạo JWT token với thời hạn 1 giờ
+    // Tạo JWT token
     const token = jwt.sign(
       {
         userId: user.ID,
         username: user.TenDangNhap,
         role: user.VaiTro || 'user'
       },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      jwtSecret,
+      { expiresIn: jwtExpires }
     );
 
-    console.log('✅ Đăng nhập thành công cho user:', user.TenDangNhap);
+    logger.success(`✅ Đăng nhập thành công: ${user.TenDangNhap} (${user.VaiTro})`);
 
     // Trả về thông tin đăng nhập thành công
     res.status(200).json({
@@ -228,11 +227,11 @@ exports.login = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Lỗi đăng nhập:', error);
+    logger.logError(error, 'Đăng nhập user');
     res.status(500).json({
       success: false,
       message: 'Lỗi server nội bộ',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
+      error: config.isDevelopment() ? error.message : 'Internal Server Error'
     });
   }
 };
@@ -240,70 +239,63 @@ exports.login = async (req, res) => {
 // Hàm đăng nhập admin
 exports.adminLogin = async (req, res) => {
   try {
-    console.log('🔐 Đăng nhập Admin - Dữ liệu nhận được:', req.body);
+    logger.info('🔐 Yêu cầu đăng nhập Admin', { username: req.body.username });
 
     const { username, password } = req.body;
 
     // Kiểm tra dữ liệu đầu vào
     if (!username || !password) {
+      logger.warn('Đăng nhập admin thất bại: Thiếu thông tin');
       return res.status(400).json({
         success: false,
         message: 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu'
       });
     }
 
-    // Tìm người dùng theo tên đăng nhập, kiểm tra Enable = true và VaiTro = 'admin'
+    // Tìm admin
     const user = await TaiKhoan.findOne({
       where: {
         TenDangNhap: username,
         Enable: true,
-        VaiTro: 'admin' // Chỉ cho phép admin
+        VaiTro: 'admin'
       }
     });
 
     if (!user) {
+      logger.warn(`Đăng nhập admin thất bại: Không tìm thấy admin - ${username}`);
       return res.status(401).json({
         success: false,
         message: 'Sai thông tin hoặc không có quyền'
       });
     }
 
-    console.log('👤 Tìm thấy admin:', {
-      ID: user.ID,
-      TenDangNhap: user.TenDangNhap,
-      VaiTro: user.VaiTro
-    });
-
-    // So sánh mật khẩu với bcrypt
+    // So sánh mật khẩu
     const isPasswordValid = await bcrypt.compare(password, user.MatKhau);
     
     if (!isPasswordValid) {
+      logger.warn(`Đăng nhập admin thất bại: Sai mật khẩu - ${username}`);
       return res.status(401).json({
         success: false,
         message: 'Sai thông tin hoặc không có quyền'
       });
     }
 
-    // Kiểm tra JWT_SECRET có tồn tại
-    if (!process.env.JWT_SECRET) {
-      console.error('❌ JWT_SECRET không được cấu hình trong .env');
-      return res.status(500).json({
-        success: false,
-        message: 'Lỗi cấu hình server'
-      });
-    }
+    // Lấy JWT config từ ConfigService
+    const jwtSecret = config.getValue('jwt', 'secret');
+    const jwtExpires = config.getValue('jwt', 'expiresIn');
 
-    // Tạo JWT token với payload { id, role }
+    // Tạo JWT token
     const token = jwt.sign(
       {
-        id: user.ID,
+        userId: user.ID,
+        username: user.TenDangNhap,
         role: user.VaiTro
       },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      jwtSecret,
+      { expiresIn: jwtExpires }
     );
 
-    console.log('✅ Đăng nhập admin thành công:', user.TenDangNhap);
+    logger.success(`✅ Đăng nhập admin thành công: ${user.TenDangNhap}`);
 
     // Trả về thông tin đăng nhập thành công
     res.status(200).json({
@@ -322,11 +314,11 @@ exports.adminLogin = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Lỗi đăng nhập admin:', error);
+    logger.logError(error, 'Đăng nhập admin');
     res.status(500).json({
       success: false,
       message: 'Lỗi server nội bộ',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
+      error: config.isDevelopment() ? error.message : 'Internal Server Error'
     });
   }
 };

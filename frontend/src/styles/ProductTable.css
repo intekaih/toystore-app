@@ -1,0 +1,214 @@
+/* src/styles/ProductTable.css */
+.product-table-container {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.product-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.product-table thead {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.product-table th {
+  padding: 16px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.product-table tbody tr {
+  border-bottom: 1px solid #f0f0f0;
+  transition: all 0.2s ease;
+}
+
+.product-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.product-table tbody tr.disabled-row {
+  opacity: 0.6;
+  background-color: #fafafa;
+}
+
+.product-table td {
+  padding: 12px;
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+/* Column specific styles */
+.id-col {
+  font-weight: 600;
+  color: #667eea;
+  width: 60px;
+}
+
+.image-col {
+  width: 80px;
+}
+
+.product-thumbnail {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid #f0f0f0;
+}
+
+.name-col {
+  min-width: 200px;
+}
+
+.product-name {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.product-desc {
+  font-size: 12px;
+  color: #888;
+  line-height: 1.4;
+}
+
+.category-col {
+  width: 150px;
+}
+
+.category-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background: #e3f2fd;
+  color: #1976d2;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.price-col {
+  width: 130px;
+}
+
+.price {
+  font-weight: 600;
+  color: #e91e63;
+  font-size: 15px;
+}
+
+.stock-col {
+  width: 120px;
+}
+
+.stock-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.stock-badge.in-stock {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.stock-badge.low-stock {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.stock-badge.out-of-stock {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.status-col {
+  width: 120px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge.active {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-badge.inactive {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.date-col {
+  width: 140px;
+  color: #666;
+  font-size: 13px;
+}
+
+.actions-col {
+  width: 100px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.btn-edit,
+.btn-delete {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.btn-edit {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.btn-edit:hover {
+  background: #1976d2;
+  color: white;
+  transform: scale(1.1);
+}
+
+.btn-delete {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.btn-delete:hover {
+  background: #c62828;
+  color: white;
+  transform: scale(1.1);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .product-table-container {
+    overflow-x: auto;
+  }
+
+  .product-table {
+    min-width: 1000px;
+  }
+}
