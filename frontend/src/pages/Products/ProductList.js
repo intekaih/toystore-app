@@ -7,6 +7,7 @@ import MainLayout from '../../layouts/MainLayout';
 import { ProductCard, Loading, Button, Badge } from '../../components/ui';
 import Pagination from '../../components/Pagination.js';
 import ProductFilterBar from '../../components/ProductFilterBar.js';
+import ProductQuickViewModal from '../../components/ProductQuickViewModal.jsx';
 import Toast from '../../components/Toast.js';
 import { useAuth } from '../../contexts/AuthContext.js';
 
@@ -17,6 +18,8 @@ const ProductList = () => {
   const [toast, setToast] = useState(null);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
+  const [quickViewProduct, setQuickViewProduct] = useState(null);
+  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -88,7 +91,7 @@ const ProductList = () => {
     setToast({ message, type, duration });
   };
 
-  const handleAddToCart = async (product) => {
+  const handleAddToCart = async (product, quantity = 1) => {
     if (!user) {
       showToast('Vui lòng đăng nhập để thêm vào giỏ hàng', 'warning', 3000);
       setTimeout(() => navigate('/login'), 1500);
@@ -97,12 +100,13 @@ const ProductList = () => {
 
     try {
       setAdding(true);
-      const productId = product.id || product.MaSP || product.maSP;
-      const response = await addToCart(productId, 1);
+      // ✅ Sửa: ưu tiên ID trước
+      const productId = product.ID || product.id || product.MaSP || product.maSP;
+      const response = await addToCart(productId, quantity);
 
       if (response.success) {
         showToast(
-          response.message || `Đã thêm ${product.tenSP || product.TenSP || product.ten} vào giỏ hàng`,
+          response.message || `Đã thêm ${quantity} ${product.Ten || product.ten || product.tenSP || product.TenSP} vào giỏ hàng`,
           'success',
           3000
         );
@@ -113,6 +117,26 @@ const ProductList = () => {
     } finally {
       setAdding(false);
     }
+  };
+
+  // 👁️ Xử lý xem nhanh sản phẩm
+  const handleQuickView = (product) => {
+    console.log('👁️ Quick view product:', product);
+    setQuickViewProduct(product);
+    setIsQuickViewOpen(true);
+  };
+
+  // ❤️ Xử lý thêm vào yêu thích (tạm thời chỉ hiển thị thông báo)
+  const handleFavorite = (product) => {
+    if (!user) {
+      showToast('Vui lòng đăng nhập để thêm vào yêu thích', 'warning', 3000);
+      setTimeout(() => navigate('/login'), 1500);
+      return;
+    }
+    
+    const productName = product.Ten || product.ten || product.tenSP || product.TenSP;
+    showToast(`❤️ Đã thêm "${productName}" vào danh sách yêu thích!`, 'success', 3000);
+    // TODO: Implement wishlist API call
   };
 
   return (
@@ -171,19 +195,21 @@ const ProductList = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
                 {products.map((product, index) => (
                   <div 
-                    key={product.id}
+                    key={product.ID || product.id}
                     className="animate-fade-in"
                     style={{ animationDelay: `${index * 0.05}s` }}
-                    onClick={() => handleProductClick(product.id)}
+                    onClick={() => handleProductClick(product.ID || product.id)}
                   >
                     <ProductCard 
                       product={product}
                       onAddToCart={handleAddToCart}
+                      onQuickView={handleQuickView}
+                      onFavorite={handleFavorite}
                     />
-                    {product.soLuongBan !== undefined && filters.filter === 'bestSeller' && (
+                    {product.SoLuongBan !== undefined && filters.filter === 'bestSeller' && (
                       <div className="mt-2">
                         <Badge variant="danger" size="sm">
-                          🔥 Đã bán {product.soLuongBan}
+                          🔥 Đã bán {product.SoLuongBan}
                         </Badge>
                       </div>
                     )}
@@ -224,6 +250,15 @@ const ProductList = () => {
             )}
           </>
         )}
+
+        {/* 👁️ Quick View Modal */}
+        <ProductQuickViewModal
+          isOpen={isQuickViewOpen}
+          onClose={() => setIsQuickViewOpen(false)}
+          product={quickViewProduct}
+          onAddToCart={handleAddToCart}
+          onFavorite={handleFavorite}
+        />
 
         {/* Toast Notification */}
         {toast && (

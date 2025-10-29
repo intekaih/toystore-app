@@ -23,10 +23,10 @@ const Footer = () => {
               Chúng tôi mang đến niềm vui và hạnh phúc cho các bé!
             </p>
             <div className="flex gap-3">
-              <a href="#" className="p-2 bg-white rounded-full text-primary-500 hover:bg-primary-500 hover:text-white transition-all shadow-soft hover:shadow-cute">
+              <a href="https://www.facebook.com/inte.kaih.384" className="p-2 bg-white rounded-full text-primary-500 hover:bg-primary-500 hover:text-white transition-all shadow-soft hover:shadow-cute">
                 <Facebook size={20} />
               </a>
-              <a href="#" className="p-2 bg-white rounded-full text-primary-500 hover:bg-primary-500 hover:text-white transition-all shadow-soft hover:shadow-cute">
+              <a href="https://www.instagram.com/inte.kaih_" className="p-2 bg-white rounded-full text-primary-500 hover:bg-primary-500 hover:text-white transition-all shadow-soft hover:shadow-cute">
                 <Instagram size={20} />
               </a>
               <a href="#" className="p-2 bg-white rounded-full text-primary-500 hover:bg-primary-500 hover:text-white transition-all shadow-soft hover:shadow-cute">
@@ -95,15 +95,19 @@ const Footer = () => {
             <ul className="space-y-3">
               <li className="flex items-start gap-3 text-gray-600">
                 <MapPin size={18} className="text-primary-500 mt-1 flex-shrink-0" />
-                <span>123 Đường ABC, Quận XYZ, TP.HCM</span>
+                <span>68, Tran Khanh Du, Tp. Da Lat</span>
               </li>
               <li className="flex items-center gap-3 text-gray-600">
                 <Phone size={18} className="text-primary-500 flex-shrink-0" />
-                <span>0123 456 789</span>
+                <span>+84 916 775 071</span>
               </li>
               <li className="flex items-center gap-3 text-gray-600">
                 <Mail size={18} className="text-primary-500 flex-shrink-0" />
                 <span>contact@toystore.vn</span>
+              </li>
+              <li className="flex items-center gap-3 text-gray-600">
+                <Mail size={18} className="text-primary-500 flex-shrink-0" />
+                <span>toystore.intekaih.id.vn</span>
               </li>
             </ul>
           </div>

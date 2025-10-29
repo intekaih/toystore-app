@@ -15,9 +15,10 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, editingCategory, mode }) => 
   useEffect(() => {
     if (isOpen) {
       if (mode === 'edit' && editingCategory) {
+        // ✅ Đọc PascalCase từ backend
         setFormData({
-          Ten: editingCategory.ten || '',
-          MoTa: editingCategory.moTa || ''
+          Ten: editingCategory.Ten || '',
+          MoTa: editingCategory.MoTa || ''
         });
       } else {
         setFormData({
@@ -144,7 +145,7 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, editingCategory, mode }) => 
             {mode === 'edit' && editingCategory && (
               <div className="info-box">
                 <span className="info-icon">ℹ️</span>
-                <span>Danh mục này có <strong>{editingCategory.soLuongSanPham || 0} sản phẩm</strong></span>
+                <span>Danh mục này có <strong>{editingCategory.SoLuongSanPham || 0} sản phẩm</strong></span>
               </div>
             )}
           </div>

@@ -15,10 +15,10 @@ const ProductCard = ({
   // Backend API URL - có thể config trong .env
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
   
-  // Hỗ trợ cả 2 format: chữ hoa (MaSP, TenSP) và chữ thường (maSP, tenSP)
-  const productId = product.id || product.MaSP || product.maSP;
-  const productName = product.tenSP || product.TenSP || product.ten || 'Sản phẩm';
-  const productPrice = product.giaBan || product.GiaBan || product.donGia || product.DonGia || product.price || 0;
+  // Hỗ trợ cả 2 format: chữ hoa (ID, Ten) và chữ thường (id, ten)
+  const productId = product.ID || product.id || product.MaSP || product.maSP;
+  const productName = product.Ten || product.ten || product.tenSP || product.TenSP || 'Sản phẩm';
+  const productPrice = product.GiaBan || product.giaBan || product.donGia || product.DonGia || product.price || 0;
   
   // Build full image URL
   const buildImageUrl = (imagePath) => {
@@ -42,15 +42,15 @@ const ProductCard = ({
     return '/barbie.jpg'; // Fallback
   };
   
-  const productImageRaw = product.hinhAnh || product.HinhAnh || product.hinhAnhURL || product.HinhAnhURL || product.image;
+  const productImageRaw = product.HinhAnhURL || product.hinhAnhURL || product.hinhAnh || product.HinhAnh || product.image;
   const productImage = buildImageUrl(productImageRaw);
   
-  const productStock = product.soLuongTon !== undefined ? product.soLuongTon : 
-                       product.SoLuongTon !== undefined ? product.SoLuongTon : 
+  const productStock = product.Ton !== undefined ? product.Ton : 
                        product.ton !== undefined ? product.ton :
-                       product.Ton !== undefined ? product.Ton :
+                       product.soLuongTon !== undefined ? product.soLuongTon : 
+                       product.SoLuongTon !== undefined ? product.SoLuongTon : 
                        product.stock !== undefined ? product.stock : 0;
-  const productCategory = product.loaiSP?.tenLoai || product.loaiSP?.Ten || product.TenLoai || product.tenLoai || product.category || '';
+  const productCategory = product.LoaiSP?.Ten || product.loaiSP?.Ten || product.loaiSP?.tenLoai || product.TenLoai || product.tenLoai || product.category || '';
   
   // Format giá tiền
   const formatPrice = (price) => {

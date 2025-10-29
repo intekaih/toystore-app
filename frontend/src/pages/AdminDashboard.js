@@ -1,19 +1,69 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Card } from '../components/ui';
+import AdminLayout from '../layouts/AdminLayout';
+import authService from '../services/authService';
 import { useAuth } from '../contexts/AuthContext';
-import { Button, Card } from '../components/ui';
+import axios from 'axios';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
+  
+  // State cho dữ liệu thống kê
+  const [stats, setStats] = useState({
+    tongSanPham: 0,
+    donHangMoi: 0,
+    nguoiDung: 0,
+    doanhThu: 0
+  });
+  const [loading, setLoading] = useState(true);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/admin/login');
-  };
+  // Fetch thống kê dashboard
+  useEffect(() => {
+    const fetchDashboardStats = async () => {
+      try {
+        setLoading(true);
+        
+        const token = authService.getToken();
+        if (!token) {
+          logout();
+          navigate('/admin/login');
+          return;
+        }
 
-  const handleBackToStore = () => {
-    navigate('/');
+        const response = await axios.get('http://localhost:5000/api/admin/statistics/dashboard', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.data.success) {
+          setStats(response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+        if (error.response?.status === 401) {
+          logout();
+          navigate('/admin/login');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardStats();
+  }, [logout, navigate]);
+
+  // Format số tiền
+  const formatCurrency = (value) => {
+    if (value >= 1000000) {
+      return `${(value / 1000000).toFixed(0)}M`;
+    }
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND'
+    }).format(value);
   };
 
   const adminFeatures = [
@@ -23,15 +73,17 @@ const AdminDashboard = () => {
       icon: '📂',
       route: '/admin/categories',
       color: 'from-orange-50 to-orange-100 border-orange-200',
-      iconBg: 'bg-orange-500'
+      iconBg: 'bg-orange-500',
+      stats: 'Tổng: 12 danh mục'
     },
     {
       title: 'Quản lý sản phẩm',
       description: 'Thêm, sửa, xóa sản phẩm',
-      icon: '📊',
+      icon: '📦',
       route: '/admin/products',
       color: 'from-blue-50 to-blue-100 border-blue-200',
-      iconBg: 'bg-blue-500'
+      iconBg: 'bg-blue-500',
+      stats: `Tổng: ${stats.tongSanPham} sản phẩm`
     },
     {
       title: 'Quản lý đơn hàng',
@@ -39,7 +91,8 @@ const AdminDashboard = () => {
       icon: '🛒',
       route: '/admin/orders',
       color: 'from-green-50 to-green-100 border-green-200',
-      iconBg: 'bg-green-500'
+      iconBg: 'bg-green-500',
+      stats: `Đang xử lý: ${stats.donHangMoi} đơn`
     },
     {
       title: 'Quản lý người dùng',
@@ -47,7 +100,8 @@ const AdminDashboard = () => {
       icon: '👥',
       route: '/admin/users',
       color: 'from-purple-50 to-purple-100 border-purple-200',
-      iconBg: 'bg-purple-500'
+      iconBg: 'bg-purple-500',
+      stats: `Tổng: ${stats.nguoiDung} users`
     },
     {
       title: 'Thống kê báo cáo',
@@ -55,109 +109,102 @@ const AdminDashboard = () => {
       icon: '📈',
       route: '/admin/statistics',
       color: 'from-pink-50 to-pink-100 border-pink-200',
-      iconBg: 'bg-pink-500'
+      iconBg: 'bg-pink-500',
+      stats: 'Doanh thu tháng'
     }
   ];
 
+  if (loading) {
+    return (
+      <AdminLayout>
+        <Card className="text-center p-12">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+            <p className="text-gray-600">Đang tải dữ liệu...</p>
+          </div>
+        </Card>
+      </AdminLayout>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 p-6">
-      {/* Header */}
-      <Card className="mb-6 border-primary-200" padding="md">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={handleBackToStore}
-              icon="🏪"
-            >
-              Quay lại Store
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-primary-400 to-primary-500 rounded-cute text-white">
-                🎮
-              </div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                Admin Dashboard - ToyStore
-              </h1>
+    <AdminLayout>
+      {/* Quick Stats - Siêu Compact */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+          <div className="flex items-center gap-2 p-3">
+            <div className="text-2xl">📦</div>
+            <div>
+              <p className="text-xs text-blue-600">Tổng sản phẩm</p>
+              <p className="text-xl font-bold text-blue-700">{stats.tongSanPham}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Xin chào,</p>
-              <p className="font-semibold text-primary-600">{user?.hoTen || 'Admin'}</p>
+        </Card>
+        
+        <Card className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
+          <div className="flex items-center gap-2 p-3">
+            <div className="text-2xl">🛒</div>
+            <div>
+              <p className="text-xs text-green-600">Đơn hàng mới</p>
+              <p className="text-xl font-bold text-green-700">{stats.donHangMoi}</p>
             </div>
-            <Button
-              variant="danger"
-              onClick={handleLogout}
-              icon="🚪"
-            >
-              Đăng xuất
-            </Button>
           </div>
-        </div>
-      </Card>
-
-      {/* Admin Features Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-        {adminFeatures.map((feature, index) => (
-          <Card
-            key={index}
-            padding="md"
-            className={`bg-gradient-to-r ${feature.color} cursor-pointer transform transition-all duration-300 hover:scale-105`}
-            onClick={() => navigate(feature.route)}
-          >
-            <div className="flex items-center gap-4">
-              <div className={`p-4 ${feature.iconBg} rounded-cute text-white text-3xl shadow-lg`}>
-                {feature.icon}
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-gray-800 mb-1">{feature.title}</h3>
-                <p className="text-gray-600 text-sm">{feature.description}</p>
-              </div>
+        </Card>
+        
+        <Card className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
+          <div className="flex items-center gap-2 p-3">
+            <div className="text-2xl">👥</div>
+            <div>
+              <p className="text-xs text-purple-600">Người dùng</p>
+              <p className="text-xl font-bold text-purple-700">{stats.nguoiDung}</p>
             </div>
-          </Card>
-        ))}
+          </div>
+        </Card>
+        
+        <Card className="bg-gradient-to-r from-orange-50 to-orange-100 border-orange-200">
+          <div className="flex items-center gap-2 p-3">
+            <div className="text-2xl">💰</div>
+            <div>
+              <p className="text-xs text-orange-600">Doanh thu</p>
+              <p className="text-xl font-bold text-orange-700">{formatCurrency(stats.doanhThu)}</p>
+            </div>
+          </div>
+        </Card>
       </div>
 
-      {/* Info Box */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-100 border-blue-200" padding="md">
-        <div className="flex items-start gap-3">
-          <div className="p-2 bg-blue-500 rounded-cute text-white text-xl">
-            ℹ️
-          </div>
-          <div>
-            <h3 className="font-semibold text-blue-800 mb-1">Thông tin hướng dẫn</h3>
-            <p className="text-blue-700">
-              Click vào các thẻ chức năng ở trên để truy cập các trang quản lý tương ứng. 
-              Mỗi trang đều đã được tối ưu với giao diện hiện đại và dễ sử dụng.
-            </p>
-          </div>
-        </div>
-      </Card>
-
-      {/* System Info */}
-      <div className="mt-8 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-cute shadow-soft border border-primary-100">
-          <span className="text-xl">🎯</span>
-          <span className="font-medium text-gray-600">Hệ thống quản trị ToyStore</span>
+      {/* Admin Features - Ưu tiên hiển thị */}
+      <div className="mb-4">
+        <h3 className="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <span>⚡</span>
+          Chức năng quản lý
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {adminFeatures.map((feature, index) => (
+            <Card
+              key={index}
+              className={`bg-gradient-to-r ${feature.color} cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-lg`}
+              onClick={() => navigate(feature.route)}
+            >
+              <div className="p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`p-2 ${feature.iconBg} rounded-cute text-white text-xl shadow-lg`}>
+                    {feature.icon}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-base font-bold text-gray-800 mb-0.5">{feature.title}</h3>
+                    <p className="text-gray-600 text-xs">{feature.description}</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t border-gray-300">
+                  <span className="text-xs font-semibold text-gray-500">{feature.stats}</span>
+                  <span className="text-primary-600 text-sm">→</span>
+                </div>
+              </div>
+            </Card>
+          ))}
         </div>
       </div>
-
-      {/* Footer */}
-      <footer className="mt-6 text-center">
-        <div className="inline-flex items-center gap-4 px-6 py-3 bg-gradient-to-r from-primary-50 to-secondary-50 rounded-cute border border-primary-200">
-          <div className="flex items-center gap-2 text-primary-600">
-            <span className="text-xl">⚡</span>
-            <span className="font-medium">Phiên bản 2.0</span>
-          </div>
-          <div className="w-px h-6 bg-primary-300"></div>
-          <div className="flex items-center gap-2 text-primary-600">
-            <span className="text-xl">🚀</span>
-            <span className="font-medium">Giao diện mới</span>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </AdminLayout>
   );
 };
 

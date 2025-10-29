@@ -5,7 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import RevenueChart from '../components/RevenueChart';
 import PaymentPieChart from '../components/PaymentPieChart';
 import Toast from '../components/Toast';
-import { Button, Card, Loading } from '../components/ui';
+import { Button, Card } from '../components/ui';
+import AdminLayout from '../layouts/AdminLayout';
 import authService from '../services/authService';
 import axios from 'axios';
 
@@ -166,54 +167,27 @@ const StatisticsPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 p-6 flex items-center justify-center">
-        <Card padding="lg" className="text-center">
+      <AdminLayout>
+        <Card className="text-center p-12">
           <div className="flex flex-col items-center gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
             <p className="text-gray-600">Đang tải dữ liệu thống kê...</p>
           </div>
         </Card>
-      </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 p-6">
-      {/* Header */}
-      <Card className="mb-6 border-primary-200" padding="md">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/admin/dashboard')}
-              icon="⬅️"
-            >
-              Dashboard
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-primary-400 to-primary-500 rounded-cute text-white">
-                📊
-              </div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                Thống kê đơn hàng
-              </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Xin chào,</p>
-              <p className="font-semibold text-primary-600">{user?.hoTen || 'Admin'}</p>
-            </div>
-            <Button
-              variant="danger"
-              onClick={handleLogout}
-              icon="🚪"
-            >
-              Đăng xuất
-            </Button>
-          </div>
-        </div>
-      </Card>
+    <AdminLayout>
+      {/* Page Title */}
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+          <span className="text-3xl">📊</span>
+          Thống kê báo cáo
+        </h2>
+        <p className="text-gray-600 mt-1">Xem báo cáo doanh thu và thống kê</p>
+      </div>
 
       {/* Filter Bar */}
       <Card className="mb-6" padding="md">
@@ -262,48 +236,6 @@ const StatisticsPage = () => {
         </div>
       </Card>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card padding="md" className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
-          <div className="flex items-center gap-4">
-            <div className="p-4 bg-green-500 rounded-cute text-white text-3xl">💰</div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-green-700">Tổng doanh thu tháng</h3>
-              <p className="text-2xl font-bold text-green-800">{formatCurrency(statistics?.tongDoanhThu)}</p>
-              <span className="text-sm text-green-600">
-                Tháng {selectedMonth}/{selectedYear}
-              </span>
-            </div>
-          </div>
-        </Card>
-
-        <Card padding="md" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
-          <div className="flex items-center gap-4">
-            <div className="p-4 bg-blue-500 rounded-cute text-white text-3xl">📦</div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-blue-700">Tổng số đơn hàng</h3>
-              <p className="text-2xl font-bold text-blue-800">{statistics?.soDonHang || 0}</p>
-              <span className="text-sm text-blue-600">
-                Đơn hàng trong tháng
-              </span>
-            </div>
-          </div>
-        </Card>
-
-        <Card padding="md" className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
-          <div className="flex items-center gap-4">
-            <div className="p-4 bg-purple-500 rounded-cute text-white text-3xl">📈</div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-purple-700">Doanh thu trung bình</h3>
-              <p className="text-2xl font-bold text-purple-800">{formatCurrency(statistics?.doanhThuTrungBinh)}</p>
-              <span className="text-sm text-purple-600">
-                Trung bình/đơn hàng
-              </span>
-            </div>
-          </div>
-        </Card>
-      </div>
-
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <Card padding="md">
@@ -319,6 +251,51 @@ const StatisticsPage = () => {
             title="Tỷ lệ đơn hàng theo trạng thái"
           />
         </Card>
+      </div>
+
+      {/* Summary Cards - Đưa xuống dưới biểu đồ */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        {/* Tổng doanh thu tháng */}
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-5 border border-green-200 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-green-500 rounded-xl text-white text-2xl flex-shrink-0">💰</div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-green-700 mb-1">Tổng doanh thu tháng</h3>
+              <p className="text-xl font-bold text-green-800 truncate">{formatCurrency(statistics?.tongDoanhThu)}</p>
+              <span className="text-xs text-green-600">
+                Tháng {selectedMonth}/{selectedYear}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Tổng số đơn hàng */}
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-5 border border-blue-200 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-blue-500 rounded-xl text-white text-2xl flex-shrink-0">📦</div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-blue-700 mb-1">Tổng số đơn hàng</h3>
+              <p className="text-xl font-bold text-blue-800">{statistics?.soDonHang || 0}</p>
+              <span className="text-xs text-blue-600">
+                Đơn hàng trong tháng
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Doanh thu trung bình */}
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-5 border border-purple-200 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-purple-500 rounded-xl text-white text-2xl flex-shrink-0">📈</div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-purple-700 mb-1">Doanh thu trung bình</h3>
+              <p className="text-xl font-bold text-purple-800 truncate">{formatCurrency(statistics?.doanhThuTrungBinh)}</p>
+              <span className="text-xs text-purple-600">
+                Trung bình/đơn hàng
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Top Products */}
@@ -412,7 +389,7 @@ const StatisticsPage = () => {
           onClose={() => setToast({ ...toast, show: false })}
         />
       )}
-    </div>
+    </AdminLayout>
   );
 };
 

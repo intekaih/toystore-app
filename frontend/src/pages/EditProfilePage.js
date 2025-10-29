@@ -7,8 +7,11 @@ import MainLayout from '../layouts/MainLayout';
 import { Button, Badge, Loading } from '../components/ui';
 import Toast from '../components/Toast';
 import LogoutButton from '../components/LogoutButton';
+import { useAuth } from '../contexts/AuthContext';
 
 const EditProfilePage = () => {
+  const { refreshUser } = useAuth(); // ✅ Gọi useAuth ở top level
+
   const [formData, setFormData] = useState({
     HoTen: '',
     Email: '',
@@ -41,15 +44,23 @@ const EditProfilePage = () => {
         const response = await userService.getProfile();
         const userData = response.data.user;
 
+        // Format dữ liệu từ backend (PascalCase) sang frontend (PascalCase cho form)
         const profileData = {
-          HoTen: userData.hoTen || '',
-          Email: userData.email || '',
-          DienThoai: userData.dienThoai || ''
+          HoTen: userData.HoTen || userData.hoTen || '',
+          Email: userData.Email || userData.email || '',
+          DienThoai: userData.DienThoai || userData.dienThoai || ''
         };
 
         setFormData(profileData);
         setOriginalData(profileData);
-        setUserInfo(userData);
+        
+        // Format user info để hiển thị
+        setUserInfo({
+          hoTen: userData.HoTen || userData.hoTen,
+          tenDangNhap: userData.TenDangNhap || userData.tenDangNhap,
+          vaiTro: userData.VaiTro || userData.vaiTro,
+          enable: userData.Enable !== undefined ? userData.Enable : userData.enable
+        });
 
       } catch (error) {
         console.error('❌ Lỗi tải profile:', error);
@@ -149,18 +160,10 @@ const EditProfilePage = () => {
 
       const response = await userService.updateProfile(updateData);
 
-      const newUserData = response.data.user;
-      const newProfileData = {
-        HoTen: newUserData.hoTen || '',
-        Email: newUserData.email || '',
-        DienThoai: newUserData.dienThoai || ''
-      };
-
-      setFormData(newProfileData);
-      setOriginalData(newProfileData);
-      setUserInfo(newUserData);
-
       showToast('✅ Cập nhật thông tin thành công!', 'success');
+
+      // Refresh user data từ AuthContext (sẽ tự động cập nhật Navbar)
+      await refreshUser(); // ✅ Sử dụng refreshUser đã được khai báo ở top level
 
       setTimeout(() => {
         navigate('/profile');

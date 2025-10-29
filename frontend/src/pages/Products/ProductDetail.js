@@ -74,7 +74,7 @@ const ProductDetail = () => {
 
   const handleQuantityChange = (e) => {
     const value = parseInt(e.target.value) || 1;
-    const maxQuantity = product?.ton || 1;
+    const maxQuantity = product?.Ton || product?.ton || 1;
     
     if (value < 1) {
       setQuantity(1);
@@ -87,7 +87,7 @@ const ProductDetail = () => {
   };
 
   const handleIncrement = () => {
-    const maxQuantity = product?.ton || 1;
+    const maxQuantity = product?.Ton || product?.ton || 1;
     if (quantity < maxQuantity) {
       setQuantity(quantity + 1);
     } else {
@@ -113,19 +113,22 @@ const ProductDetail = () => {
       return;
     }
 
-    if (quantity > product.ton) {
-      showToast(`Chỉ còn ${product.ton} sản phẩm trong kho`, 'warning');
-      setQuantity(product.ton);
+    const productStock = product.Ton || product.ton || 0;
+    if (quantity > productStock) {
+      showToast(`Chỉ còn ${productStock} sản phẩm trong kho`, 'warning');
+      setQuantity(productStock);
       return;
     }
 
     try {
       setAdding(true);
-      const response = await addToCart(product.id, quantity);
+      const productId = product.ID || product.id;
+      const productName = product.Ten || product.ten;
+      const response = await addToCart(productId, quantity);
 
       if (response.success) {
         showToast(
-          response.message || `Đã thêm ${quantity} ${product.ten} vào giỏ hàng`,
+          response.message || `Đã thêm ${quantity} ${productName} vào giỏ hàng`,
           'success',
           3000
         );
@@ -167,8 +170,17 @@ const ProductDetail = () => {
     );
   }
 
-  const isOutOfStock = product.ton <= 0;
-  const isMaxQuantity = quantity >= product.ton;
+  const isOutOfStock = (product.Ton || product.ton || 0) <= 0;
+  const isMaxQuantity = quantity >= (product.Ton || product.ton || 0);
+  
+  // Helper getters để hỗ trợ cả 2 format
+  const productName = product.Ten || product.ten || '';
+  const productPrice = product.GiaBan || product.giaBan || 0;
+  const productStock = product.Ton || product.ton || 0;
+  const productImage = product.HinhAnhURL || product.hinhAnhURL || '';
+  const productDescription = product.MoTa || product.moTa || 'Không có mô tả';
+  const productCategory = product.LoaiSP || product.loaiSP;
+  const productOriginalPrice = product.GiaBanGoc || product.giaBanGoc;
 
   return (
     <MainLayout>
@@ -188,8 +200,8 @@ const ProductDetail = () => {
           <div className="relative">
             <div className="bg-gradient-to-br from-primary-50 to-rose-50 rounded-bubble overflow-hidden shadow-soft border-2 border-primary-100 sticky top-24">
               <img
-                src={buildImageUrl(product.hinhAnhURL)}
-                alt={product.ten}
+                src={buildImageUrl(productImage)}
+                alt={productName}
                 className="w-full h-auto object-cover transition-transform duration-500 hover:scale-105"
                 onError={handleImageError}
                 loading="lazy"
@@ -215,17 +227,17 @@ const ProductDetail = () => {
           <div className="space-y-6">
             {/* Title */}
             <h1 className="text-4xl lg:text-5xl font-display font-bold text-gray-800 leading-tight">
-              {product.ten}
+              {productName}
             </h1>
 
             {/* Price */}
             <div className="flex items-baseline gap-4 p-6 bg-gradient-to-r from-primary-50 to-rose-50 rounded-cute border-2 border-primary-200">
               <span className="text-4xl font-bold text-gradient-primary">
-                {product.giaBan?.toLocaleString('vi-VN')} ₫
+                {productPrice?.toLocaleString('vi-VN')} ₫
               </span>
-              {product.giaBanGoc && product.giaBanGoc > product.giaBan && (
+              {productOriginalPrice && productOriginalPrice > productPrice && (
                 <span className="text-xl text-gray-400 line-through">
-                  {product.giaBanGoc?.toLocaleString('vi-VN')} ₫
+                  {productOriginalPrice?.toLocaleString('vi-VN')} ₫
                 </span>
               )}
             </div>
@@ -234,19 +246,19 @@ const ProductDetail = () => {
             <div className="flex items-center gap-3">
               <Package size={20} className="text-primary-500" />
               <Badge 
-                variant={isOutOfStock ? 'danger' : product.ton < 10 ? 'warning' : 'success'}
+                variant={isOutOfStock ? 'danger' : productStock < 10 ? 'warning' : 'success'}
                 size="lg"
               >
-                {isOutOfStock ? '🚫 Hết hàng' : `✅ Còn ${product.ton} sản phẩm`}
+                {isOutOfStock ? '🚫 Hết hàng' : `✅ Còn ${productStock} sản phẩm`}
               </Badge>
             </div>
 
             {/* Category */}
-            {product.loaiSP && (
+            {productCategory && (
               <div className="flex items-center gap-3 text-gray-600">
                 <span className="text-lg">🏷️</span>
                 <span className="font-semibold">Danh mục:</span>
-                <Badge variant="primary">{product.loaiSP.ten}</Badge>
+                <Badge variant="primary">{productCategory.Ten || productCategory.ten}</Badge>
               </div>
             )}
 
@@ -257,7 +269,7 @@ const ProductDetail = () => {
                 Mô tả sản phẩm
               </h3>
               <p className="text-gray-600 leading-relaxed">
-                {product.moTa || 'Không có mô tả'}
+                {productDescription}
               </p>
             </div>
 
@@ -281,7 +293,7 @@ const ProductDetail = () => {
                     <input
                       type="number"
                       min="1"
-                      max={product.ton}
+                      max={productStock}
                       value={quantity}
                       onChange={handleQuantityChange}
                       disabled={adding}

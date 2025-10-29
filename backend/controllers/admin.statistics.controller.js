@@ -3,7 +3,81 @@ const HoaDon = db.HoaDon;
 const ChiTietHoaDon = db.ChiTietHoaDon;
 const KhachHang = db.KhachHang;
 const SanPham = db.SanPham;
+const TaiKhoan = db.TaiKhoan;
 const { Op } = require('sequelize');
+
+/**
+ * GET /api/admin/statistics/dashboard
+ * Lấy thống kê tổng quan cho dashboard (Admin only)
+ */
+exports.getDashboardStats = async (req, res) => {
+  try {
+    console.log('📊 Admin - Lấy thống kê dashboard');
+
+    // 1. Tổng số sản phẩm
+    const tongSanPham = await SanPham.count({
+      where: { Enable: true }
+    });
+
+    // 2. Đơn hàng mới (đơn có trạng thái "Chờ xử lý")
+    const donHangMoi = await HoaDon.count({
+      where: { 
+        Enable: true,
+        TrangThai: 'Chờ xử lý'
+      }
+    });
+
+    // 3. Tổng số người dùng
+    const nguoiDung = await TaiKhoan.count({
+      where: { Enable: true }
+    });
+
+    // 4. Tổng doanh thu tháng hiện tại
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+    const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01 00:00:00`;
+    const lastDay = new Date(currentYear, currentMonth, 0).getDate();
+    const endDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')} 23:59:59`;
+
+    const doanhThuResult = await db.sequelize.query(`
+      SELECT ISNULL(SUM(TongTien), 0) AS tongDoanhThu
+      FROM HoaDon
+      WHERE Enable = 1 
+        AND CAST(NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)
+    `, {
+      replacements: { startDate, endDate },
+      type: db.sequelize.QueryTypes.SELECT
+    });
+
+    const doanhThu = doanhThuResult?.[0]?.tongDoanhThu || 0;
+
+    console.log('✅ Dashboard stats:', {
+      tongSanPham,
+      donHangMoi,
+      nguoiDung,
+      doanhThu
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Lấy thống kê dashboard thành công',
+      data: {
+        tongSanPham: parseInt(tongSanPham),
+        donHangMoi: parseInt(donHangMoi),
+        nguoiDung: parseInt(nguoiDung),
+        doanhThu: parseFloat(doanhThu)
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi lấy thống kê dashboard:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
+    });
+  }
+};
 
 /**
  * GET /api/admin/statistics

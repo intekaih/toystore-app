@@ -8,6 +8,10 @@ const Logger = require('./utils/Logger');
 const ConfigService = require('./utils/ConfigService');
 const DBConnection = require('./utils/DBConnection');
 
+// 🔄 KHÔNG SỬ DỤNG Transform Response Middleware NỮA
+// Giữ nguyên PascalCase từ SQL Server - đúng với database convention
+// const transformResponse = require('./middlewares/transformResponse.middleware');
+
 const app = express();
 
 // Khởi tạo các Singleton
@@ -29,6 +33,11 @@ app.use((req, res, next) => {
 // Middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ❌ TẮT Transform Response Middleware
+// Lý do: Dữ liệu từ SQL Server dùng PascalCase là chuẩn
+// Frontend sẽ đọc trực tiếp PascalCase để đồng nhất với database
+// app.use(transformResponse);
 
 // Serve static files từ thư mục uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -70,6 +79,7 @@ app.get('/', (req, res) => {
     documentation: "Truy cập / để xem danh sách đầy đủ các API endpoints",
     endpoints: {
       // ========== AUTHENTICATION ==========
+
       authentication: {
         register: {
           method: "POST",
@@ -95,6 +105,7 @@ app.get('/', (req, res) => {
       },
 
       // ========== USER PROFILE ==========
+
       users: {
         getProfile: {
           method: "GET",
@@ -112,6 +123,7 @@ app.get('/', (req, res) => {
       },
 
       // ========== PRODUCTS (PUBLIC) ==========
+
       products: {
         getAllProducts: {
           method: "GET",
@@ -129,6 +141,7 @@ app.get('/', (req, res) => {
       },
 
       // ========== SHOPPING CART ==========
+
       cart: {
         getCart: {
           method: "GET",
@@ -167,6 +180,7 @@ app.get('/', (req, res) => {
       },
 
       // ========== ORDERS ==========
+
       orders: {
         createOrder: {
           method: "POST",
@@ -206,6 +220,7 @@ app.get('/', (req, res) => {
       },
 
       // ========== PAYMENT - VNPAY ==========
+
       payment: {
         createPaymentUrl: {
           method: "GET",
@@ -232,6 +247,7 @@ app.get('/', (req, res) => {
       },
 
       // ========== ADMIN - USER MANAGEMENT ==========
+
       adminUsers: {
         getAllUsers: {
           method: "GET",
@@ -274,6 +290,7 @@ app.get('/', (req, res) => {
       },
 
       // ========== ADMIN - CATEGORY MANAGEMENT ==========
+
       adminCategories: {
         getAllCategories: {
           method: "GET",
@@ -303,6 +320,7 @@ app.get('/', (req, res) => {
       },
 
       // ========== ADMIN - PRODUCT MANAGEMENT ==========
+
       adminProducts: {
         getAllProducts: {
           method: "GET",
@@ -336,6 +354,7 @@ app.get('/', (req, res) => {
       },
 
       // ========== ADMIN - ORDER MANAGEMENT ==========
+
       adminOrders: {
         getAllOrders: {
           method: "GET",
@@ -361,6 +380,7 @@ app.get('/', (req, res) => {
       },
 
       // ========== ADMIN - STATISTICS ==========
+
       adminStatistics: {
         getStatistics: {
           method: "GET",
@@ -389,6 +409,7 @@ app.get('/', (req, res) => {
     },
 
     // ========== NOTES ==========
+
     notes: {
       authentication: "Sử dụng JWT Bearer Token trong header: Authorization: Bearer <token>",
       rateLimit: "Áp dụng rate limiting để bảo vệ API khỏi abuse",
@@ -399,6 +420,7 @@ app.get('/', (req, res) => {
     },
 
     // ========== STATUS CODES ==========
+
     statusCodes: {
       200: "OK - Thành công",
       201: "Created - Tạo mới thành công",

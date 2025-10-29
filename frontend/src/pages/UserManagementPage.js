@@ -6,12 +6,13 @@ import UserTable from '../components/UserTable';
 import UserModal from '../components/UserModal';
 import Toast from '../components/Toast';
 import Pagination from '../components/Pagination';
-import { Button, Card, Input, Badge } from '../components/ui';
+import { Button, Card, Input } from '../components/ui';
+import AdminLayout from '../layouts/AdminLayout';
 import * as userApi from '../api/userApi';
 
 const UserManagementPage = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -212,125 +213,139 @@ const UserManagementPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 p-6">
-      {/* Header */}
-      <Card className="mb-6 border-primary-200" padding="md">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/admin/dashboard')}
-              icon="⬅️"
-            >
-              Dashboard
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-primary-400 to-primary-500 rounded-cute text-white">
-                👥
-              </div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                Quản lý người dùng
-              </h1>
-            </div>
+    <AdminLayout>
+      {/* Page Title & Statistics */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          {/* Left: Title */}
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+              <span className="text-3xl">👥</span>
+              Quản lý người dùng
+            </h2>
+            <p className="text-gray-600 mt-1">Quản lý tài khoản khách hàng</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Xin chào,</p>
-              <p className="font-semibold text-primary-600">{user?.hoTen || 'Admin'}</p>
+
+          {/* Right: Statistics */}
+          <div className="flex items-center gap-12">
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Tổng số người dùng</p>
+              <p className="text-2xl font-bold text-gray-800">{pagination.totalUsers}</p>
             </div>
-            <Button
-              variant="danger"
-              onClick={handleLogout}
-              icon="🚪"
-            >
-              Đăng xuất
-            </Button>
+            
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Trang hiện tại</p>
+              <p className="text-2xl font-bold text-gray-800">{pagination.currentPage}</p>
+            </div>
+            
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Tổng số trang</p>
+              <p className="text-2xl font-bold text-gray-800">{pagination.totalPages}</p>
+            </div>
           </div>
         </div>
-      </Card>
+      </div>
 
       {/* Filters & Actions */}
-      <Card className="mb-6" padding="md">
-        <form onSubmit={handleSearch} className="mb-4">
-          <Input
-            type="text"
-            name="search"
-            placeholder="🔍 Tìm kiếm theo tên, email, tên đăng nhập..."
-            value={filters.search}
-            onChange={handleFilterChange}
-            icon="🔍"
-          />
-          <Button type="submit" className="mt-2" fullWidth>
+      <div className="mb-6 bg-gradient-to-r from-pink-50 via-rose-50 to-pink-50 rounded-2xl p-5 shadow-sm border border-pink-100">
+        {/* Dòng 1: Tìm kiếm */}
+        <form onSubmit={handleSearch} className="flex gap-3 items-stretch mb-4">
+          {/* 🔍 Ô tìm kiếm */}
+          <div className="flex-1">
+            <input
+              type="text"
+              name="search"
+              placeholder="🔍 Tìm kiếm theo tên, email, tên đăng nhập..."
+              value={filters.search}
+              onChange={handleFilterChange}
+              className="w-full px-4 py-2.5 bg-white border-2 border-pink-200 rounded-xl 
+                       text-gray-700 font-medium text-sm placeholder-gray-400
+                       focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400
+                       hover:border-pink-300 transition-all duration-200 shadow-sm h-[42px]"
+            />
+          </div>
+
+          {/* 🔍 Nút tìm kiếm */}
+          <button
+            type="submit"
+            className="px-6 bg-gradient-to-r from-pink-400 to-rose-400 
+                     text-white font-semibold text-sm rounded-xl
+                     hover:from-pink-500 hover:to-rose-500
+                     focus:outline-none focus:ring-2 focus:ring-pink-300
+                     transition-all duration-200 shadow-md hover:shadow-lg
+                     flex items-center gap-2 whitespace-nowrap h-[42px]"
+          >
+            <span className="text-lg">🔍</span>
             Tìm kiếm
-          </Button>
+          </button>
         </form>
 
+        {/* Dòng 2: Filters & Actions */}
         <div className="flex flex-wrap gap-3 items-center justify-between">
           <div className="flex flex-wrap gap-3">
+            {/* Dropdown Vai trò */}
             <select
               name="role"
               value={filters.role}
               onChange={handleFilterChange}
-              className="input-cute min-w-[150px]"
+              className="px-4 py-2.5 bg-white border-2 border-pink-200 rounded-xl 
+                       text-gray-700 font-medium text-sm
+                       focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400
+                       hover:border-pink-300 transition-all duration-200 shadow-sm
+                       min-w-[150px] h-[42px] cursor-pointer"
             >
               <option value="">Tất cả vai trò</option>
               <option value="admin">👑 Admin</option>
               <option value="user">👤 User</option>
             </select>
 
+            {/* Dropdown Trạng thái */}
             <select
               name="status"
               value={filters.status}
               onChange={handleFilterChange}
-              className="input-cute min-w-[150px]"
+              className="px-4 py-2.5 bg-white border-2 border-pink-200 rounded-xl 
+                       text-gray-700 font-medium text-sm
+                       focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400
+                       hover:border-pink-300 transition-all duration-200 shadow-sm
+                       min-w-[150px] h-[42px] cursor-pointer"
             >
               <option value="">Tất cả trạng thái</option>
               <option value="active">✅ Hoạt động</option>
               <option value="inactive">🔒 Bị khóa</option>
             </select>
 
-            <Button variant="secondary" onClick={handleResetFilters} icon="🔄">
+            {/* Nút Reset */}
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="px-5 bg-white border-2 border-pink-300 
+                       text-pink-600 font-semibold text-sm rounded-xl
+                       hover:bg-pink-50 hover:border-pink-400
+                       focus:outline-none focus:ring-2 focus:ring-pink-300
+                       transition-all duration-200 shadow-sm
+                       flex items-center gap-2 h-[42px]"
+            >
+              <span className="text-lg">🔄</span>
               Reset
-            </Button>
+            </button>
           </div>
 
-          <Button onClick={handleOpenCreateModal} icon="➕">
+          {/* Nút Thêm mới */}
+          <button
+            type="button"
+            onClick={handleOpenCreateModal}
+            className="px-6 bg-gradient-to-r from-pink-400 to-rose-400 
+                     text-white font-semibold text-sm rounded-xl
+                     hover:from-pink-500 hover:to-rose-500
+                     focus:outline-none focus:ring-2 focus:ring-pink-300
+                     transition-all duration-200 shadow-md hover:shadow-lg
+                     flex items-center gap-2 whitespace-nowrap h-[42px]"
+          >
+            <span className="text-lg">➕</span>
             Thêm mới
-          </Button>
+          </button>
         </div>
-      </Card>
-
-      {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card padding="md" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-500 rounded-cute text-white text-xl">📊</div>
-            <div>
-              <p className="text-sm text-blue-600">Tổng số người dùng</p>
-              <p className="text-2xl font-bold text-blue-700">{pagination.totalUsers}</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card padding="md" className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-500 rounded-cute text-white text-xl">📄</div>
-            <div>
-              <p className="text-sm text-green-600">Trang hiện tại</p>
-              <p className="text-2xl font-bold text-green-700">{pagination.currentPage}</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card padding="md" className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-500 rounded-cute text-white text-xl">📚</div>
-            <div>
-              <p className="text-sm text-purple-600">Tổng số trang</p>
-              <p className="text-2xl font-bold text-purple-700">{pagination.totalPages}</p>
-            </div>
-          </div>
-        </Card>
       </div>
 
       {/* Table */}
@@ -373,7 +388,7 @@ const UserManagementPage = () => {
           onClose={() => setToast({ ...toast, show: false })}
         />
       )}
-    </div>
+    </AdminLayout>
   );
 };
 

@@ -7,6 +7,9 @@ const { verifyToken, requireAdmin } = require('../middlewares/auth.middleware');
 router.use(verifyToken);
 router.use(requireAdmin);
 
+// GET /api/admin/statistics/dashboard - Lấy thống kê tổng quan cho dashboard
+router.get('/dashboard', adminStatisticsController.getDashboardStats);
+
 // GET /api/admin/statistics - Lấy thống kê tổng quan
 router.get('/', adminStatisticsController.getStatistics);
 

@@ -5,12 +5,13 @@ import { useAuth } from '../contexts/AuthContext';
 import CategoryTable from '../components/CategoryTable';
 import CategoryModal from '../components/CategoryModal';
 import Toast from '../components/Toast';
-import { Button, Card, Badge } from '../components/ui';
+import { Button, Card } from '../components/ui';
 import * as categoryApi from '../api/categoryApi';
+import AdminLayout from '../layouts/AdminLayout';
 
 const CategoryManagementPage = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +46,6 @@ const CategoryManagementPage = () => {
       if (error.response?.status === 401) {
         showToast('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại', 'error');
         setTimeout(() => {
-          logout();
           navigate('/admin/login');
         }, 2000);
       } else {
@@ -54,7 +54,7 @@ const CategoryManagementPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [logout, navigate]);
+  }, [navigate]);
 
   useEffect(() => {
     fetchCategories();
@@ -101,7 +101,17 @@ const CategoryManagementPage = () => {
 
   const handleUpdateCategory = async (categoryData) => {
     try {
-      const response = await categoryApi.updateCategory(modalState.editingCategory.id, categoryData);
+      // ✅ Backend trả về PascalCase - đọc trực tiếp ID
+      const categoryId = modalState.editingCategory.ID;
+      
+      if (!categoryId) {
+        showToast('Không tìm thấy ID danh mục', 'error');
+        throw new Error('Category ID not found');
+      }
+
+      console.log('🔄 Cập nhật danh mục ID:', categoryId);
+      
+      const response = await categoryApi.updateCategory(categoryId, categoryData);
       
       if (response.success) {
         showToast(response.message || 'Cập nhật danh mục thành công', 'success');
@@ -123,17 +133,18 @@ const CategoryManagementPage = () => {
   };
 
   const handleDeleteCategory = async (category) => {
-    if (category.soLuongSanPham > 0) {
-      showToast(`Không thể xóa danh mục "${category.ten}" vì còn ${category.soLuongSanPham} sản phẩm đang sử dụng`, 'warning');
+    // ✅ Đọc trực tiếp PascalCase từ backend
+    if (category.SoLuongSanPham > 0) {
+      showToast(`Không thể xóa danh mục "${category.Ten}" vì còn ${category.SoLuongSanPham} sản phẩm đang sử dụng`, 'warning');
       return;
     }
 
-    if (!window.confirm(`⚠️ BẠN CÓ CHẮC CHẮN MUỐN XÓA DANH MỤC "${category.ten}"?\n\nHành động này không thể hoàn tác!`)) {
+    if (!window.confirm(`⚠️ BẠN CÓ CHẮC CHẮN MUỐN XÓA DANH MỤC "${category.Ten}"?\n\nHành động này không thể hoàn tác!`)) {
       return;
     }
 
     try {
-      const response = await categoryApi.deleteCategory(category.id);
+      const response = await categoryApi.deleteCategory(category.ID);
       
       if (response.success) {
         showToast(response.message || 'Xóa danh mục thành công', 'success');
@@ -145,102 +156,82 @@ const CategoryManagementPage = () => {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/admin/login');
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 p-6">
-      {/* Header */}
-      <Card className="mb-6 border-primary-200" padding="md">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/admin/dashboard')}
-              icon="⬅️"
-            >
-              Dashboard
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-primary-400 to-primary-500 rounded-cute text-white">
-                📂
-              </div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                Quản lý danh mục sản phẩm
-              </h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Xin chào,</p>
-              <p className="font-semibold text-primary-600">{user?.hoTen || 'Admin'}</p>
-            </div>
-            <Button
-              variant="danger"
-              onClick={handleLogout}
-              icon="🚪"
-            >
-              Đăng xuất
-            </Button>
-          </div>
+    <AdminLayout>
+      {/* Page Header với Title và Action Button */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+            <span className="text-3xl">📂</span>
+            Quản lý danh mục sản phẩm
+          </h2>
+          <p className="text-gray-600 mt-1">Thêm, sửa, xóa danh mục sản phẩm</p>
         </div>
-      </Card>
-
-      {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <Card padding="md" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-500 rounded-cute text-white text-xl">📂</div>
-            <div>
-              <p className="text-sm text-blue-600">Tổng danh mục</p>
-              <p className="text-2xl font-bold text-blue-700">{categories.length}</p>
-            </div>
-          </div>
-        </Card>
-        
-        <Card padding="md" className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-500 rounded-cute text-white text-xl">📦</div>
-            <div>
-              <p className="text-sm text-green-600">Tổng sản phẩm</p>
-              <p className="text-2xl font-bold text-green-700">
-                {categories.reduce((sum, cat) => sum + (cat.soLuongSanPham || 0), 0)}
-              </p>
-            </div>
-          </div>
-        </Card>
+        <Button onClick={handleOpenCreateModal} icon="➕" size="lg">
+          Thêm danh mục mới
+        </Button>
       </div>
 
-      {/* Actions Bar */}
-      <Card className="mb-6" padding="md">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="text-gray-600">
-              <span className="text-lg font-semibold">Danh sách danh mục</span>
+      {/* Statistics - Siêu Compact trong 1 Card */}
+      <Card className="mb-6 bg-gradient-to-r from-blue-50 via-purple-50 to-green-50 border-primary-200">
+        <div className="p-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">📂</div>
+              <div>
+                <p className="text-xs text-gray-600">Tổng danh mục</p>
+                <p className="text-2xl font-bold text-blue-600">{categories.length}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">📦</div>
+              <div>
+                <p className="text-xs text-gray-600">Tổng sản phẩm</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {categories.reduce((sum, cat) => sum + (cat.SoLuongSanPham || 0), 0)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">✅</div>
+              <div>
+                <p className="text-xs text-gray-600">Hoạt động</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {categories.filter(cat => cat.Enable).length}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">🔒</div>
+              <div>
+                <p className="text-xs text-gray-600">Vô hiệu hóa</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {categories.filter(cat => !cat.Enable).length}
+                </p>
+              </div>
             </div>
           </div>
-          <Button onClick={handleOpenCreateModal} icon="➕">
-            Thêm danh mục mới
-          </Button>
         </div>
       </Card>
 
-      {/* Category Table */}
+      {/* Category Table - Hiển thị trực tiếp */}
       {loading ? (
-        <Card padding="lg" className="text-center">
+        <Card className="text-center p-12">
           <div className="flex flex-col items-center gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
             <p className="text-gray-600">Đang tải dữ liệu...</p>
           </div>
         </Card>
       ) : categories.length === 0 ? (
-        <Card padding="lg" className="text-center bg-gradient-to-r from-gray-50 to-gray-100">
+        <Card className="text-center bg-gradient-to-r from-gray-50 to-gray-100 p-12">
           <div className="flex flex-col items-center gap-4">
             <div className="text-6xl opacity-50">📂</div>
             <p className="text-xl font-semibold text-gray-600">Chưa có danh mục nào</p>
-            <Button onClick={handleOpenCreateModal} icon="➕">
+            <p className="text-gray-500 mb-4">Hãy tạo danh mục đầu tiên cho cửa hàng của bạn</p>
+            <Button onClick={handleOpenCreateModal} icon="➕" size="lg">
               Tạo danh mục đầu tiên
             </Button>
           </div>
@@ -274,7 +265,7 @@ const CategoryManagementPage = () => {
           onClose={() => setToast({ ...toast, show: false })}
         />
       )}
-    </div>
+    </AdminLayout>
   );
 };
 

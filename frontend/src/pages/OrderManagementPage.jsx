@@ -6,9 +6,9 @@ import OrderTable from '../components/OrderTable';
 import Pagination from '../components/Pagination';
 import Toast from '../components/Toast';
 import { Button, Card, Input } from '../components/ui';
+import AdminLayout from '../layouts/AdminLayout';
 import authService from '../services/authService';
 import axios from 'axios';
-import '../styles/OrderManagementPage.css';
 
 const OrderManagementPage = () => {
   const navigate = useNavigate();
@@ -17,6 +17,15 @@ const OrderManagementPage = () => {
   // State quản lý danh sách đơn hàng
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // State cho dashboard statistics
+  const [dashboardStats, setDashboardStats] = useState({
+    tongSanPham: 0,
+    donHangMoi: 0,
+    nguoiDung: 0,
+    doanhThu: 0
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
 
   // State cho filter
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -115,9 +124,43 @@ const OrderManagementPage = () => {
     }
   }, [pagination.ordersPerPage, logout, navigate]);
 
+  // Fetch dashboard statistics
+  const fetchDashboardStats = useCallback(async () => {
+    try {
+      setStatsLoading(true);
+      const token = authService.getToken();
+      
+      if (!token) {
+        return;
+      }
+
+      const response = await axios.get('http://localhost:5000/api/admin/statistics/dashboard', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.data.success) {
+        setDashboardStats(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      if (error.response?.status === 401) {
+        showToast('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại', 'error');
+        setTimeout(() => {
+          logout();
+          navigate('/admin/login');
+        }, 2000);
+      }
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [logout, navigate]);
+
   // Load đơn hàng khi component mount
   useEffect(() => {
     fetchOrders(1, selectedStatus, searchTerm);
+    fetchDashboardStats();
   }, []);
 
   // Xử lý thay đổi filter trạng thái
@@ -187,83 +230,46 @@ const OrderManagementPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 p-6">
-      {/* Header */}
-      <Card className="mb-6 border-primary-200" padding="md">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/admin/dashboard')}
-              icon="⬅️"
-            >
-              Dashboard
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-primary-400 to-primary-500 rounded-cute text-white">
-                🛒
-              </div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                Quản lý đơn hàng
-              </h1>
-            </div>
+    <AdminLayout>
+      {/* Page Title & Statistics */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          {/* Left: Title */}
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+              <span className="text-3xl">🛒</span>
+              Quản lý đơn hàng
+            </h2>
+            <p className="text-gray-600 mt-1">Xem và cập nhật trạng thái đơn hàng</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Xin chào,</p>
-              <p className="font-semibold text-primary-600">{user?.hoTen || 'Admin'}</p>
-            </div>
-            <Button
-              variant="danger"
-              onClick={handleLogout}
-              icon="🚪"
-            >
-              Đăng xuất
-            </Button>
-          </div>
-        </div>
-      </Card>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card padding="md" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-500 rounded-cute text-white text-xl">📦</div>
-            <div>
-              <p className="text-sm text-blue-600">Tổng đơn hàng</p>
-              <p className="text-2xl font-bold text-blue-700">{orderStats.total}</p>
+          {/* Right: Statistics */}
+          <div className="flex items-center gap-12">
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Tổng đơn hàng</p>
+              <p className="text-2xl font-bold text-gray-800">{orderStats.total}</p>
             </div>
-          </div>
-        </Card>
-        
-        <Card padding="md" className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-500 rounded-cute text-white text-xl">💰</div>
-            <div>
-              <p className="text-sm text-green-600">Tổng doanh thu</p>
-              <p className="text-xl font-bold text-green-700">
+            
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Tổng doanh thu</p>
+              <p className="text-xl font-bold text-gray-800">
                 {new Intl.NumberFormat('vi-VN', {
                   style: 'currency',
                   currency: 'VND'
                 }).format(orderStats.totalRevenue)}
               </p>
             </div>
-          </div>
-        </Card>
-        
-        <Card padding="md" className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-500 rounded-cute text-white text-xl">📊</div>
-            <div>
-              <p className="text-sm text-purple-600">Sản phẩm đã bán</p>
-              <p className="text-2xl font-bold text-purple-700">{orderStats.totalProducts}</p>
+            
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Sản phẩm đã bán</p>
+              <p className="text-2xl font-bold text-gray-800">{orderStats.totalProducts}</p>
             </div>
           </div>
-        </Card>
+        </div>
       </div>
 
       {/* Filter Section */}
-      <Card className="mb-6" padding="md">
+      <div className="mb-6 bg-gradient-to-r from-pink-50 via-rose-50 to-pink-50 rounded-2xl p-5 shadow-sm border border-pink-100">
         {/* Status Filters */}
         <div className="mb-4">
           <h3 className="text-lg font-semibold text-gray-700 mb-3">Lọc theo trạng thái:</h3>
@@ -282,20 +288,37 @@ const OrderManagementPage = () => {
           </div>
         </div>
 
-        {/* Search */}
-        <form onSubmit={handleSearch}>
-          <Input
-            type="text"
-            placeholder="Tìm kiếm theo mã đơn hàng..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            icon="🔍"
-          />
-          <Button type="submit" className="mt-2" fullWidth>
-            🔍 Tìm kiếm
-          </Button>
+        {/* Search - 1 dòng: ô tìm kiếm | nút tìm */}
+        <form onSubmit={handleSearch} className="flex gap-3 items-stretch">
+          {/* 🔍 Ô tìm kiếm */}
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="🔍 Tìm kiếm theo mã đơn hàng..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-2.5 bg-white border-2 border-pink-200 rounded-xl 
+                       text-gray-700 font-medium text-sm placeholder-gray-400
+                       focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400
+                       hover:border-pink-300 transition-all duration-200 shadow-sm h-[42px]"
+            />
+          </div>
+
+          {/* 🔍 Nút tìm kiếm */}
+          <button
+            type="submit"
+            className="px-6 bg-gradient-to-r from-pink-400 to-rose-400 
+                     text-white font-semibold text-sm rounded-xl
+                     hover:from-pink-500 hover:to-rose-500
+                     focus:outline-none focus:ring-2 focus:ring-pink-300
+                     transition-all duration-200 shadow-md hover:shadow-lg
+                     flex items-center gap-2 whitespace-nowrap h-[42px]"
+          >
+            <span className="text-lg">🔍</span>
+            Tìm kiếm
+          </button>
         </form>
-      </Card>
+      </div>
 
       {/* Order Table */}
       <Card padding="none" className="mb-6">
@@ -326,7 +349,7 @@ const OrderManagementPage = () => {
           onClose={() => setToast({ ...toast, show: false })}
         />
       )}
-    </div>
+    </AdminLayout>
   );
 };
 

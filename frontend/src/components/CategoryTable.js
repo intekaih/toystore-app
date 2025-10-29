@@ -37,17 +37,17 @@ const CategoryTable = ({ categories, onEdit, onDelete, loading }) => {
         </thead>
         <tbody>
           {categories.map((category) => (
-            <tr key={category.id}>
-              <td className="category-id">#{category.id}</td>
-              <td className="category-name">{category.ten}</td>
+            <tr key={category.ID}>
+              <td className="category-id">#{category.ID}</td>
+              <td className="category-name">{category.Ten}</td>
               <td className="category-description">
-                {category.moTa || <span className="no-description">Chưa có mô tả</span>}
+                {category.MoTa || <span className="no-description">Chưa có mô tả</span>}
               </td>
               <td className="product-count">
-                <span className="badge badge-count">{category.soLuongSanPham || 0} sản phẩm</span>
+                <span className="badge badge-count">{category.SoLuongSanPham || 0} sản phẩm</span>
               </td>
               <td>
-                {category.enable ? (
+                {category.Enable ? (
                   <span className="badge badge-active">✅ Hoạt động</span>
                 ) : (
                   <span className="badge badge-inactive">🔒 Vô hiệu</span>
@@ -66,7 +66,7 @@ const CategoryTable = ({ categories, onEdit, onDelete, loading }) => {
                     className="btn-action btn-delete"
                     onClick={() => onDelete(category)}
                     title="Xóa"
-                    disabled={category.soLuongSanPham > 0}
+                    disabled={category.SoLuongSanPham > 0}
                   >
                     🗑️
                   </button>

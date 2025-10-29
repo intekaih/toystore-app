@@ -29,11 +29,19 @@ const Homepage = () => {
   const loadFeaturedProducts = async () => {
     try {
       setLoading(true);
-      const response = await getProducts(1, '', 6);
+      // ✅ Sửa: truyền object params thay vì 3 tham số riêng lẻ
+      const response = await getProducts({ 
+        page: 1, 
+        limit: 6,
+        filter: 'newest'
+      });
       
-      if (response.data && response.data.products) {
+      if (response.success && response.data && response.data.products) {
         setFeaturedProducts(response.data.products.slice(0, 6));
-        setStats(prev => ({ ...prev, totalProducts: response.data.total || 0 }));
+        setStats(prev => ({ 
+          ...prev, 
+          totalProducts: response.data.pagination?.totalProducts || 0 
+        }));
       }
     } catch (error) {
       console.error('Error loading featured products:', error);
@@ -56,12 +64,13 @@ const Homepage = () => {
 
     try {
       setAdding(true);
-      const productId = product.id || product.MaSP || product.maSP;
+      // ✅ Sửa: ưu tiên ID trước, sau đó mới đến các tên cũ
+      const productId = product.ID || product.id || product.MaSP || product.maSP;
       const response = await addToCart(productId, 1);
 
       if (response.success) {
         showToast(
-          response.message || `Đã thêm ${product.tenSP || product.TenSP || product.ten} vào giỏ hàng`,
+          response.message || `Đã thêm ${product.Ten || product.ten || product.tenSP || product.TenSP} vào giỏ hàng`,
           'success',
           3000
         );
@@ -187,7 +196,7 @@ const Homepage = () => {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {featuredProducts.map((product) => (
-                <div key={product.MaSP} onClick={() => navigate(`/products/${product.MaSP}`)}>
+                <div key={product.ID} onClick={() => navigate(`/products/${product.ID}`)}>
                   <ProductCard 
                     product={product}
                     onAddToCart={handleAddToCart}

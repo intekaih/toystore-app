@@ -25,7 +25,7 @@ exports.getAllCategories = async (req, res) => {
             WHERE SanPham.LoaiID = LoaiSP.ID
             AND SanPham.Enable = 1
           )`),
-          'soLuongSanPham'
+          'SoLuongSanPham' // ✅ Đặt alias trực tiếp
         ]
       ],
       order: [['ID', 'ASC']]
@@ -33,17 +33,21 @@ exports.getAllCategories = async (req, res) => {
 
     console.log(`✅ Lấy ${categories.length} danh mục thành công`);
 
+    // ✅ Trả về dữ liệu với PascalCase - middleware sẽ tự động transform
     res.status(200).json({
       success: true,
       message: 'Lấy danh sách danh mục thành công',
       data: {
-        categories: categories.map(cat => ({
-          ID: cat.ID,
-          Ten: cat.Ten,
-          MoTa: cat.MoTa,
-          Enable: cat.Enable,
-          SoLuongSanPham: parseInt(cat.dataValues.soLuongSanPham) || 0
-        })),
+        categories: categories.map(cat => {
+          const categoryData = cat.toJSON(); // Convert to plain object
+          return {
+            ID: categoryData.ID,
+            Ten: categoryData.Ten,
+            MoTa: categoryData.MoTa,
+            Enable: categoryData.Enable,
+            SoLuongSanPham: parseInt(categoryData.SoLuongSanPham) || 0
+          };
+        }),
         total: categories.length
       }
     });
