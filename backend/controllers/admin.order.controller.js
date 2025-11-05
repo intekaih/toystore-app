@@ -140,6 +140,19 @@ exports.getAllOrders = async (req, res) => {
           id: hoaDon.phuongThucThanhToan.ID,
           ten: hoaDon.phuongThucThanhToan.Ten
         },
+        // ✨ THÊM: Chi tiết sản phẩm trong đơn hàng
+        chiTiet: hoaDon.chiTiet.map(item => ({
+          id: item.ID,
+          soLuong: item.SoLuong,
+          donGia: parseFloat(item.DonGia),
+          thanhTien: parseFloat(item.ThanhTien),
+          sanPham: {
+            id: item.sanPham.ID,
+            ten: item.sanPham.Ten,
+            hinhAnhURL: item.sanPham.HinhAnhURL,
+            giaBan: parseFloat(item.sanPham.GiaBan)
+          }
+        })),
         tongSoLuongSanPham: tongSoLuongSanPham,
         soLoaiSanPham: hoaDon.chiTiet.length
       };

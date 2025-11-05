@@ -11,29 +11,34 @@ const ProductTable = ({ products, categories, onEdit, onDelete }) => {
     }).format(price);
   };
 
-  // Format ngày tháng
+  // Format ngày tháng - CHỈ hiển thị ngày/tháng/năm
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString('vi-VN', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      year: 'numeric'
     });
   };
 
   // Lấy tên loại sản phẩm - Ưu tiên từ product.loaiSP, nếu không có thì tìm trong categories
   const getCategoryName = (product) => {
-    // Nếu API trả về loaiSP object, dùng luôn
+    // Nếu API trả về loaiSP object với thuộc tính 'ten', dùng luôn
     if (product.loaiSP && product.loaiSP.ten) {
       return product.loaiSP.ten;
     }
     
-    // Nếu không, tìm trong mảng categories bằng loaiID
-    const loaiID = product.loaiID; // Sửa từ loaiId thành loaiID
-    const category = categories.find(cat => cat.id === loaiID);
-    return category ? category.ten : 'Không xác định';
+    // Nếu không có loaiSP, tìm trong mảng categories bằng loaiID
+    const loaiID = product.loaiID;
+    if (loaiID && categories && categories.length > 0) {
+      const category = categories.find(cat => cat.id === loaiID);
+      if (category) {
+        return category.ten;
+      }
+    }
+    
+    return 'Chưa phân loại';
   };
 
   // Lấy URL ảnh đầy đủ - Sửa từ hinhAnh thành hinhAnhURL
@@ -110,7 +115,7 @@ const ProductTable = ({ products, categories, onEdit, onDelete }) => {
               </td>
               
               <td className="date-col">
-                {formatDate(product.createdAt)}
+                {product.ngayTao ? formatDate(product.ngayTao) : 'Invalid Date'}
               </td>
               
               <td className="actions-col">

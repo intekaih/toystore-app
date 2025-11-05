@@ -11,6 +11,7 @@ const ProductCard = ({
   onQuickView,
   onFavorite,
   className = '',
+  filterType = null, // ✨ THÊM: Để biết đang lọc theo gì (bestSeller, newest, etc.)
 }) => {
   // Backend API URL - có thể config trong .env
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -50,6 +51,10 @@ const ProductCard = ({
                        product.soLuongTon !== undefined ? product.soLuongTon : 
                        product.SoLuongTon !== undefined ? product.SoLuongTon : 
                        product.stock !== undefined ? product.stock : 0;
+  
+  // ✨ THÊM: Số lượng đã bán (dùng khi lọc bán chạy)
+  const productSold = product.SoLuongBan || product.soLuongBan || 0;
+  
   const productCategory = product.LoaiSP?.Ten || product.loaiSP?.Ten || product.loaiSP?.tenLoai || product.TenLoai || product.tenLoai || product.category || '';
   
   // Format giá tiền
@@ -59,10 +64,20 @@ const ProductCard = ({
     return numPrice.toLocaleString('vi-VN') + ' ₫';
   };
 
-  // Xác định trạng thái tồn kho
+  // ✨ CẬP NHẬT: Xác định trạng thái tồn kho HOẶC số lượng đã bán
   const getStockStatus = () => {
+    // 🔥 Nếu đang lọc theo bán chạy → Hiển thị số lượng đã bán
+    if (filterType === 'bestSeller' && productSold > 0) {
+      return { variant: 'danger', text: `Đã bán ${productSold}`, icon: '🔥' };
+    }
+    
+    // ⚠️ Hết hàng
     if (productStock === 0) return { variant: 'danger', text: 'Hết hàng' };
+    
+    // ⚠️ Sắp hết (< 10)
     if (productStock < 10) return { variant: 'warning', text: `Còn ${productStock}` };
+    
+    // ✅ Còn hàng
     return { variant: 'success', text: 'Còn hàng' };
   };
 
@@ -114,6 +129,7 @@ const ProductCard = ({
         {/* Stock Badge */}
         <div className="absolute top-3 right-3">
           <Badge variant={stockStatus.variant} size="sm">
+            {stockStatus.icon && <span className="mr-1">{stockStatus.icon}</span>}
             {stockStatus.text}
           </Badge>
         </div>

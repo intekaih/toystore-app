@@ -205,14 +205,8 @@ const ProductList = () => {
                       onAddToCart={handleAddToCart}
                       onQuickView={handleQuickView}
                       onFavorite={handleFavorite}
+                      filterType={filters.filter} // ✨ THÊM: Truyền loại filter vào ProductCard
                     />
-                    {product.SoLuongBan !== undefined && filters.filter === 'bestSeller' && (
-                      <div className="mt-2">
-                        <Badge variant="danger" size="sm">
-                          🔥 Đã bán {product.SoLuongBan}
-                        </Badge>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>

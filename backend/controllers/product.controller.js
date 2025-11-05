@@ -54,6 +54,11 @@ exports.getAllProducts = async (req, res) => {
       };
     }
 
+    // ✅ Thêm điều kiện lọc theo categoryId nếu có
+    if (categoryId) {
+      whereCondition.LoaiID = categoryId;
+    }
+
     console.log('🔍 Điều kiện tìm kiếm:', whereCondition);
     console.log('🎯 Filter type:', filterType);
 
@@ -101,7 +106,7 @@ exports.getAllProducts = async (req, res) => {
     const queryParams = {
       minPrice,
       maxPrice,
-      categoryId
+      categoryId: null // ✅ Không truyền categoryId vào strategy vì đã lọc ở SQL
     };
 
     // Chuyển đổi Sequelize models sang plain objects

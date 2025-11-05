@@ -32,7 +32,7 @@ exports.getDashboardStats = async (req, res) => {
       where: { Enable: true }
     });
 
-    // 4. Tổng doanh thu tháng hiện tại
+    // ✨ 4. Tổng doanh thu tháng hiện tại - CHỈ TÍNH ĐƠN ĐÃ THANH TOÁN
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
     const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01 00:00:00`;
@@ -43,6 +43,7 @@ exports.getDashboardStats = async (req, res) => {
       SELECT ISNULL(SUM(TongTien), 0) AS tongDoanhThu
       FROM HoaDon
       WHERE Enable = 1 
+        AND TrangThai = N'Đã thanh toán'
         AND CAST(NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)
     `, {
       replacements: { startDate, endDate },
@@ -91,9 +92,10 @@ exports.getStatistics = async (req, res) => {
     // Lấy query parameters để lọc thời gian (optional)
     const { startDate, endDate, year } = req.query;
 
-    // Tạo điều kiện lọc cơ bản
+    // Tạo điều kiện lọc cơ bản - ✨ CHỈ TÍNH ĐƠN ĐÃ THANH TOÁN
     const whereCondition = {
-      Enable: true
+      Enable: true,
+      TrangThai: 'Đã thanh toán' // ✅ THÊM ĐIỀU KIỆN NÀY
     };
 
     // Thêm điều kiện lọc theo khoảng thời gian nếu có
@@ -116,14 +118,13 @@ exports.getStatistics = async (req, res) => {
       }
     }
 
-    // 1. Tính tổng doanh thu và số đơn hàng - SỬA: Xử lý date đúng cách cho SQL Server
+    // ✨ 1. Tính tổng doanh thu và số đơn hàng - CHỈ TÍNH ĐƠN ĐÃ THANH TOÁN
     let totalStats = { tongDoanhThu: 0, soDonHang: 0 };
     try {
-      let whereClause = 'WHERE Enable = 1';
+      let whereClause = "WHERE Enable = 1 AND TrangThai = N'Đã thanh toán'"; // ✅ THÊM ĐIỀU KIỆN
       const params = {};
       
       if (startDate && endDate) {
-        // Convert string date sang DATETIME cho SQL Server
         whereClause += ' AND CAST(NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)';
         params.startDate = startDate;
         params.endDate = endDate;
@@ -179,10 +180,10 @@ exports.getStatistics = async (req, res) => {
       statusStats = [];
     }
 
-    // 3. Thống kê theo tháng - SỬA: Dùng CAST AS DATE
+    // ✨ 3. Thống kê theo tháng - CHỈ TÍNH ĐƠN ĐÃ THANH TOÁN
     let monthlyStats = [];
     try {
-      let whereClause = 'WHERE Enable = 1';
+      let whereClause = "WHERE Enable = 1 AND TrangThai = N'Đã thanh toán'"; // ✅ THÊM ĐIỀU KIỆN
       const params = {};
       
       if (startDate && endDate) {
@@ -212,11 +213,11 @@ exports.getStatistics = async (req, res) => {
       monthlyStats = [];
     }
 
-    // 4. Top 5 khách hàng mua nhiều nhất
+    // 4. Top 5 khách hàng mua nhiều nhất - SỬ DỤNG whereCondition ĐÃ CÓ ĐIỀU KIỆN
     let topCustomers = [];
     try {
       topCustomers = await HoaDon.findAll({
-        where: whereCondition,
+        where: whereCondition, // ✅ ĐÃ CÓ TrangThai: 'Đã thanh toán'
         attributes: [
           'KhachHangID',
           [db.sequelize.fn('COUNT', db.sequelize.col('HoaDon.ID')), 'soDonHang'],
@@ -238,7 +239,7 @@ exports.getStatistics = async (req, res) => {
       topCustomers = [];
     }
 
-    // 5. Top 5 sản phẩm bán chạy nhất
+    // 5. Top 5 sản phẩm bán chạy nhất - SỬ DỤNG whereCondition ĐÃ CÓ ĐIỀU KIỆN
     let topProducts = [];
     try {
       topProducts = await ChiTietHoaDon.findAll({
@@ -259,7 +260,7 @@ exports.getStatistics = async (req, res) => {
             model: HoaDon,
             as: 'hoaDon',
             attributes: [],
-            where: whereCondition,
+            where: whereCondition, // ✅ ĐÃ CÓ TrangThai: 'Đã thanh toán'
             required: true
           }
         ],
@@ -276,7 +277,7 @@ exports.getStatistics = async (req, res) => {
       topProducts = [];
     }
 
-    // 6. Thống kê số đơn hàng theo ngày trong 7 ngày gần nhất
+    // ✨ 6. Thống kê số đơn hàng theo ngày trong 7 ngày gần nhất - CHỈ TÍNH ĐƠN ĐÃ THANH TOÁN
     let last7DaysStats = [];
     try {
       last7DaysStats = await db.sequelize.query(`
@@ -286,6 +287,7 @@ exports.getStatistics = async (req, res) => {
           ISNULL(SUM(TongTien), 0) as doanhThu
         FROM HoaDon
         WHERE Enable = 1
+          AND TrangThai = N'Đã thanh toán'
           AND NgayLap >= DATEADD(day, -7, GETDATE())
         GROUP BY CAST(NgayLap AS DATE)
         ORDER BY CAST(NgayLap AS DATE) DESC
@@ -407,8 +409,11 @@ exports.getRevenueStatistics = async (req, res) => {
       });
     }
 
-    // Tạo điều kiện lọc
-    const whereCondition = { Enable: true };
+    // ✨ Tạo điều kiện lọc - CHỈ TÍNH ĐƠN ĐÃ THANH TOÁN
+    const whereCondition = { 
+      Enable: true,
+      TrangThai: 'Đã thanh toán' // ✅ THÊM ĐIỀU KIỆN NÀY
+    };
     
     if (startDate && endDate) {
       whereCondition.NgayLap = {
@@ -433,6 +438,7 @@ exports.getRevenueStatistics = async (req, res) => {
         break;
     }
 
+    // ✨ Thêm điều kiện TrangThai vào query
     const revenueStats = await db.sequelize.query(`
       SELECT 
         FORMAT(NgayLap, '${groupFormat}') as period,
@@ -443,6 +449,7 @@ exports.getRevenueStatistics = async (req, res) => {
         MAX(TongTien) as donHangCaoNhat
       FROM HoaDon
       WHERE Enable = 1
+        AND TrangThai = N'Đã thanh toán'
         ${startDate && endDate ? `AND NgayLap BETWEEN '${startDate}' AND '${endDate}'` : ''}
       GROUP BY FORMAT(NgayLap, '${groupFormat}')
       ORDER BY FORMAT(NgayLap, '${groupFormat}') DESC
@@ -490,8 +497,11 @@ exports.getProductStatistics = async (req, res) => {
 
     const { startDate, endDate } = req.query;
 
-    // Tạo điều kiện lọc cho hóa đơn
-    const hoaDonCondition = { Enable: true };
+    // ✨ Tạo điều kiện lọc cho hóa đơn - CHỈ TÍNH ĐƠN ĐÃ THANH TOÁN
+    const hoaDonCondition = { 
+      Enable: true,
+      TrangThai: 'Đã thanh toán' // ✅ THÊM ĐIỀU KIỆN NÀY
+    };
     
     if (startDate && endDate) {
       hoaDonCondition.NgayLap = {
@@ -518,7 +528,7 @@ exports.getProductStatistics = async (req, res) => {
           model: HoaDon,
           as: 'hoaDon',
           attributes: [],
-          where: hoaDonCondition
+          where: hoaDonCondition // ✅ ĐÃ CÓ TrangThai: 'Đã thanh toán'
         }
       ],
       where: {

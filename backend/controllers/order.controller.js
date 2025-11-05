@@ -46,7 +46,7 @@ exports.createOrder = async (req, res) => {
       phuongThucThanhToanId = 1, 
       ghiChu = '', 
       diaChiGiaoHang = '',
-      // ✨ NHẬN DỮ LIỆU TỪ DECORATOR PATTERN (Frontend)
+      dienThoai = '', // ✨ THÊM: Nhận số điện thoại từ form checkout
       tongTienSauKhuyenMai,
       apDungVAT,
       tyLeVAT: tyLeVATFromFrontend,
@@ -55,13 +55,10 @@ exports.createOrder = async (req, res) => {
       miemPhiVanChuyen: miemPhiVanChuyenFromFrontend
     } = req.body;
 
-    console.log('📦 Dữ liệu từ Decorator Pattern:', {
-      tongTienSauKhuyenMai,
-      apDungVAT,
-      tyLeVAT: tyLeVATFromFrontend,
-      voucher,
-      phiVanChuyen: phiVanChuyenFromFrontend,
-      miemPhiVanChuyen: miemPhiVanChuyenFromFrontend
+    console.log('📦 Dữ liệu đặt hàng:', {
+      dienThoai, // ✨ Log số điện thoại
+      diaChiGiaoHang,
+      phuongThucThanhToanId
     });
 
     // Validate phương thức thanh toán
@@ -201,6 +198,12 @@ exports.createOrder = async (req, res) => {
     // Lấy thông tin tài khoản để tạo khách hàng
     const taiKhoan = await TaiKhoan.findByPk(taiKhoanId, { transaction });
 
+    // ✨ CẬP NHẬT: Nếu có số điện thoại mới, cập nhật vào TaiKhoan
+    if (dienThoai && dienThoai.trim() !== '' && dienThoai !== taiKhoan.DienThoai) {
+      await taiKhoan.update({ DienThoai: dienThoai.trim() }, { transaction });
+      console.log('📱 Đã cập nhật số điện thoại vào TaiKhoan:', dienThoai);
+    }
+
     // Tạo hoặc lấy khách hàng
     let khachHang = await KhachHang.findOne({
       where: {
@@ -211,21 +214,31 @@ exports.createOrder = async (req, res) => {
     });
 
     if (!khachHang) {
-      // Tạo khách hàng mới
+      // Tạo khách hàng mới - ƯU TIÊN số điện thoại từ form checkout
       khachHang = await KhachHang.create({
         HoTen: taiKhoan.HoTen,
         Email: taiKhoan.Email || null,
-        DienThoai: taiKhoan.DienThoai || null,
+        DienThoai: dienThoai?.trim() || taiKhoan.DienThoai || null, // ✨ Ưu tiên dienThoai từ form
         DiaChi: diaChiGiaoHang || null
       }, { transaction });
       
-      console.log('👤 Đã tạo khách hàng mới:', khachHang.ID);
+      console.log('👤 Đã tạo khách hàng mới:', khachHang.ID, '- Số ĐT:', khachHang.DienThoai);
     } else {
-      // Cập nhật địa chỉ nếu có
+      // ✨ CẬP NHẬT: Cập nhật cả địa chỉ VÀ số điện thoại nếu có
+      const updateData = {};
       if (diaChiGiaoHang) {
-        await khachHang.update({ DiaChi: diaChiGiaoHang }, { transaction });
+        updateData.DiaChi = diaChiGiaoHang;
       }
-      console.log('👤 Sử dụng khách hàng có sẵn:', khachHang.ID);
+      if (dienThoai && dienThoai.trim() !== '') {
+        updateData.DienThoai = dienThoai.trim();
+      }
+      
+      if (Object.keys(updateData).length > 0) {
+        await khachHang.update(updateData, { transaction });
+        console.log('👤 Đã cập nhật thông tin khách hàng:', khachHang.ID, '- Dữ liệu:', updateData);
+      } else {
+        console.log('👤 Sử dụng khách hàng có sẵn:', khachHang.ID);
+      }
     }
 
     // Bước 2: Tạo mã hóa đơn

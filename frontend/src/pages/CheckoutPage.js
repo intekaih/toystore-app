@@ -162,10 +162,13 @@ const CheckoutPage = () => {
       setSubmitting(true);
 
       const orderData = {
+        dienThoai: formData.dienThoai, // ✨ THÊM: Gửi số điện thoại
         diaChiGiaoHang: formData.diaChiGiaoHang,
         phuongThucThanhToanId: parseInt(formData.phuongThucThanhToanId),
         ghiChu: formData.ghiChu
       };
+
+      console.log('📦 Dữ liệu đặt hàng:', orderData); // Debug log
 
       const response = await createOrder(orderData);
 

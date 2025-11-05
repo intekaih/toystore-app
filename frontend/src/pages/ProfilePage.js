@@ -7,17 +7,41 @@ import { Button, Badge, Loading } from '../components/ui';
 import LogoutButton from '../components/LogoutButton';
 
 const ProfilePage = () => {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-    }
-  }, [user, navigate]);
+    const loadUserData = async () => {
+      // Nếu không có user và không đang loading từ AuthContext
+      if (!user && !authLoading && !initialLoadDone) {
+        try {
+          setLoading(true);
+          setError('');
+          console.log('🔄 Đang tải thông tin user từ database...');
+          await refreshUser(); // Load user từ database
+          setInitialLoadDone(true);
+        } catch (error) {
+          console.error('❌ Lỗi load user:', error);
+          setError('Không thể tải thông tin người dùng. Vui lòng đăng nhập lại.');
+          // Redirect về trang login sau 2 giây
+          setTimeout(() => {
+            navigate('/login');
+          }, 2000);
+        } finally {
+          setLoading(false);
+        }
+      } else if (!user && !authLoading && initialLoadDone) {
+        // Đã thử load nhưng vẫn không có user -> redirect login
+        navigate('/login');
+      }
+    };
+
+    loadUserData();
+  }, [user, authLoading, refreshUser, navigate, initialLoadDone]);
 
   const goToEditProfile = () => {
     navigate('/profile/edit');
@@ -26,8 +50,8 @@ const ProfilePage = () => {
   const handleRefreshProfile = async () => {
     try {
       setLoading(true);
-      await refreshUser(); // Gọi API để load lại user từ database
       setError('');
+      await refreshUser(); // Gọi API để load lại user từ database
     } catch (error) {
       console.error('❌ Lỗi refresh profile:', error);
       setError('Không thể tải lại thông tin profile');
@@ -36,7 +60,8 @@ const ProfilePage = () => {
     }
   };
 
-  if (loading) {
+  // Hiển thị loading khi đang tải dữ liệu
+  if (loading || authLoading) {
     return (
       <MainLayout>
         <Loading text="Đang tải thông tin..." fullScreen />
@@ -44,6 +69,7 @@ const ProfilePage = () => {
     );
   }
 
+  // Hiển thị lỗi nếu có
   if (error) {
     return (
       <MainLayout>
@@ -51,16 +77,26 @@ const ProfilePage = () => {
           <div className="text-8xl mb-6">❌</div>
           <h3 className="text-2xl font-bold text-gray-700 mb-4">Có lỗi xảy ra</h3>
           <p className="text-gray-600 mb-6">{error}</p>
-          <Button variant="primary" onClick={handleRefreshProfile}>
-            Thử lại
-          </Button>
+          <div className="flex gap-4 justify-center">
+            <Button variant="primary" onClick={handleRefreshProfile}>
+              Thử lại
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/login')}>
+              Đăng nhập lại
+            </Button>
+          </div>
         </div>
       </MainLayout>
     );
   }
 
+  // Chờ user được load
   if (!user) {
-    return null;
+    return (
+      <MainLayout>
+        <Loading text="Đang tải thông tin..." fullScreen />
+      </MainLayout>
+    );
   }
 
   return (

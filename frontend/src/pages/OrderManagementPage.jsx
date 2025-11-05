@@ -18,6 +18,11 @@ const OrderManagementPage = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // ✨ THÊM: State cho auto-refresh
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastRefreshTime, setLastRefreshTime] = useState(new Date());
+  const [previousOrderCount, setPreviousOrderCount] = useState(0);
+
   // State cho dashboard statistics
   const [dashboardStats, setDashboardStats] = useState({
     tongSanPham: 0,
@@ -62,9 +67,11 @@ const OrderManagementPage = () => {
   };
 
   // Fetch danh sách đơn hàng
-  const fetchOrders = useCallback(async (page = 1, status = '', search = '') => {
+  const fetchOrders = useCallback(async (page = 1, status = '', search = '', silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
 
       // Lấy token từ authService
       const token = authService.getToken();
@@ -99,13 +106,32 @@ const OrderManagementPage = () => {
       });
 
       if (response.data.success) {
-        setOrders(response.data.data.orders);
+        const newOrders = response.data.data.orders;
+        const newOrderCount = response.data.data.pagination.totalOrders;
+        
+        // ✨ THÊM: Kiểm tra có đơn hàng mới không
+        if (!silent && previousOrderCount > 0 && newOrderCount > previousOrderCount) {
+          const newOrdersAdded = newOrderCount - previousOrderCount;
+          showToast(`🎉 Có ${newOrdersAdded} đơn hàng mới!`, 'success');
+          
+          // Phát âm thanh thông báo (optional)
+          if (typeof Audio !== 'undefined') {
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWi77eafTRAMUKfj8LZjHAY4ktfyzHksBSR3x/DdkEAKFF606+uoVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAA==');
+            audio.play().catch(() => {}); // Bỏ qua lỗi nếu không phát được
+          }
+        }
+        
+        setOrders(newOrders);
+        setPreviousOrderCount(newOrderCount);
         setPagination({
           currentPage: response.data.data.pagination.currentPage,
           totalPages: response.data.data.pagination.totalPages,
           totalOrders: response.data.data.pagination.totalOrders,
           ordersPerPage: response.data.data.pagination.ordersPerPage
         });
+        
+        // ✨ THÊM: Cập nhật thời gian refresh
+        setLastRefreshTime(new Date());
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -116,13 +142,15 @@ const OrderManagementPage = () => {
           logout();
           navigate('/admin/login');
         }, 2000);
-      } else {
+      } else if (!silent) {
         showToast(error.response?.data?.message || 'Lỗi khi tải danh sách đơn hàng', 'error');
       }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
-  }, [pagination.ordersPerPage, logout, navigate]);
+  }, [pagination.ordersPerPage, previousOrderCount, logout, navigate]);
 
   // Fetch dashboard statistics
   const fetchDashboardStats = useCallback(async () => {
@@ -162,6 +190,18 @@ const OrderManagementPage = () => {
     fetchOrders(1, selectedStatus, searchTerm);
     fetchDashboardStats();
   }, []);
+
+  // ✨ THÊM: Auto-refresh mỗi 30 giây
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing orders...');
+      fetchOrders(pagination.currentPage, selectedStatus, searchTerm, true); // silent mode
+    }, 30000); // 30 giây
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, pagination.currentPage, selectedStatus, searchTerm, fetchOrders]);
 
   // Xử lý thay đổi filter trạng thái
   const handleStatusChange = (status) => {
@@ -216,6 +256,22 @@ const OrderManagementPage = () => {
     }
   };
 
+  // ✨ THÊM: Hàm format thời gian refresh
+  const formatLastRefreshTime = () => {
+    const now = new Date();
+    const diff = Math.floor((now - lastRefreshTime) / 1000); // seconds
+    
+    if (diff < 60) return `${diff} giây trước`;
+    if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
+    return lastRefreshTime.toLocaleTimeString('vi-VN');
+  };
+
+  // ✨ THÊM: Hàm refresh thủ công
+  const handleManualRefresh = () => {
+    showToast('🔄 Đang làm mới...', 'info');
+    fetchOrders(pagination.currentPage, selectedStatus, searchTerm);
+  };
+
   // Xử lý đăng xuất
   const handleLogout = () => {
     logout();
@@ -266,6 +322,44 @@ const OrderManagementPage = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ✨ THÊM: Auto-refresh Controls */}
+      <div className="mb-4 flex items-center justify-between bg-white rounded-xl p-3 shadow-sm border border-gray-200">
+        <div className="flex items-center gap-4">
+          {/* Toggle Auto-refresh */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+              className="w-4 h-4 text-pink-500 rounded focus:ring-pink-400"
+            />
+            <span className="text-sm font-medium text-gray-700">
+              Tự động làm mới (30s)
+            </span>
+          </label>
+          
+          {/* Last Refresh Time */}
+          <span className="text-xs text-gray-500">
+            Cập nhật lần cuối: {formatLastRefreshTime()}
+          </span>
+        </div>
+        
+        {/* Manual Refresh Button */}
+        <button
+          onClick={handleManualRefresh}
+          disabled={loading}
+          className="px-4 py-2 bg-gradient-to-r from-blue-400 to-blue-500 
+                   text-white text-sm font-semibold rounded-lg
+                   hover:from-blue-500 hover:to-blue-600
+                   disabled:opacity-50 disabled:cursor-not-allowed
+                   transition-all duration-200 shadow-md hover:shadow-lg
+                   flex items-center gap-2"
+        >
+          <span className={loading ? 'animate-spin' : ''}>🔄</span>
+          {loading ? 'Đang tải...' : 'Làm mới'}
+        </button>
       </div>
 
       {/* Filter Section */}

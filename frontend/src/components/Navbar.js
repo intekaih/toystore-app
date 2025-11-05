@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.js';
 import { ShoppingCart, User, Home, Package, LogOut, Settings, Edit, Heart } from 'lucide-react';
 
@@ -9,6 +9,7 @@ import { ShoppingCart, User, Home, Package, LogOut, Settings, Edit, Heart } from
 const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleLogout = () => {
@@ -19,6 +20,14 @@ const Navbar = () => {
 
   const toggleUserMenu = () => {
     setShowUserMenu(!showUserMenu);
+  };
+
+  // Hàm kiểm tra xem link có đang active không
+  const isActive = (path) => {
+    if (path === '/') {
+      return location.pathname === '/';
+    }
+    return location.pathname.startsWith(path);
   };
 
   return (
@@ -35,31 +44,51 @@ const Navbar = () => {
           <div className="hidden md:flex items-center gap-2">
             <Link 
               to="/" 
-              className="flex items-center gap-2 px-4 py-2.5 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold"
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold relative ${
+                isActive('/') ? 'text-primary-600' : ''
+              }`}
             >
               <Home size={18} />
               <span>Trang chủ</span>
+              {isActive('/') && (
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/4 h-0.5 bg-gradient-to-r from-pink-400 to-pink-500 rounded-full"></span>
+              )}
             </Link>
             <Link 
               to="/products" 
-              className="flex items-center gap-2 px-4 py-2.5 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold"
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold relative ${
+                isActive('/products') ? 'text-primary-600' : ''
+              }`}
             >
               <Heart size={18} />
               <span>Sản phẩm</span>
+              {isActive('/products') && (
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/4 h-0.5 bg-gradient-to-r from-pink-400 to-pink-500 rounded-full"></span>
+              )}
             </Link>
             <Link 
               to="/cart" 
-              className="flex items-center gap-2 px-4 py-2.5 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold"
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold relative ${
+                isActive('/cart') ? 'text-primary-600' : ''
+              }`}
             >
               <ShoppingCart size={18} />
               <span>Giỏ hàng</span>
+              {isActive('/cart') && (
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/4 h-0.5 bg-gradient-to-r from-pink-400 to-pink-500 rounded-full"></span>
+              )}
             </Link>
             <Link 
               to="/orders" 
-              className="flex items-center gap-2 px-4 py-2.5 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold"
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold relative ${
+                isActive('/orders') ? 'text-primary-600' : ''
+              }`}
             >
               <Package size={18} />
               <span>Đơn hàng</span>
+              {isActive('/orders') && (
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/4 h-0.5 bg-gradient-to-r from-pink-400 to-pink-500 rounded-full"></span>
+              )}
             </Link>
           </div>
 

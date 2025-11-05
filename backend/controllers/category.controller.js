@@ -23,9 +23,8 @@ exports.getAllCategories = async (req, res) => {
             SELECT COUNT(*)
             FROM SanPham
             WHERE SanPham.LoaiID = LoaiSP.ID
-            AND SanPham.Enable = 1
           )`),
-          'SoLuongSanPham' // ✅ Đặt alias trực tiếp
+          'SoLuongSanPham' // ✅ Đếm TẤT CẢ sản phẩm, không quan tâm Enable
         ]
       ],
       order: [['ID', 'ASC']]
@@ -346,18 +345,18 @@ exports.deleteCategory = async (req, res) => {
       });
     }
 
-    // Kiểm tra danh mục có sản phẩm không
+    // ✅ Kiểm tra danh mục có sản phẩm không - KIỂM TRA TẤT CẢ sản phẩm
     const productCount = await SanPham.count({
       where: {
-        LoaiID: categoryId,
-        Enable: true
+        LoaiID: categoryId
+        // ✅ Bỏ điều kiện Enable: true để kiểm tra TẤT CẢ sản phẩm
       }
     });
 
     if (productCount > 0) {
       return res.status(400).json({
         success: false,
-        message: `Không thể xóa danh mục này vì còn ${productCount} sản phẩm đang sử dụng`,
+        message: `Không thể xóa danh mục này vì còn ${productCount} sản phẩm đang liên quan`,
         data: {
           productCount: productCount
         }

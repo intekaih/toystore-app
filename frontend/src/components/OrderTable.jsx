@@ -169,29 +169,96 @@ const OrderTable = ({ orders, onUpdateStatus, loading }) => {
                 <tr className="order-detail-row">
                   <td colSpan="7">
                     <div className="order-detail">
+                      {/* Thông tin khách hàng */}
                       <div className="detail-section">
-                        <h4>📋 Thông tin chi tiết</h4>
+                        <h4>👤 Thông tin khách hàng</h4>
                         <div className="detail-grid">
+                          <div className="detail-item">
+                            <span className="detail-label">Họ tên:</span>
+                            <span className="detail-value">{order.khachHang.hoTen}</span>
+                          </div>
                           <div className="detail-item">
                             <span className="detail-label">Email:</span>
                             <span className="detail-value">{order.khachHang.email}</span>
                           </div>
                           <div className="detail-item">
-                            <span className="detail-label">Địa chỉ:</span>
-                            <span className="detail-value">{order.khachHang.diaChi}</span>
+                            <span className="detail-label">Số điện thoại:</span>
+                            <span className="detail-value">{order.khachHang.dienThoai}</span>
                           </div>
                           <div className="detail-item">
-                            <span className="detail-label">Số loại sản phẩm:</span>
-                            <span className="detail-value">{order.soLoaiSanPham}</span>
+                            <span className="detail-label">Địa chỉ:</span>
+                            <span className="detail-value">
+                              {order.khachHang.diaChi || 'Chưa cập nhật địa chỉ'}
+                            </span>
                           </div>
-                          {order.ghiChu && (
-                            <div className="detail-item full-width">
-                              <span className="detail-label">Ghi chú:</span>
-                              <span className="detail-value">{order.ghiChu}</span>
-                            </div>
-                          )}
                         </div>
                       </div>
+
+                      {/* Danh sách sản phẩm */}
+                      {order.chiTiet && order.chiTiet.length > 0 && (
+                        <div className="detail-section">
+                          <h4>🛍️ Danh sách sản phẩm ({order.chiTiet.length} loại)</h4>
+                          <div className="products-list">
+                            {order.chiTiet.map((item, index) => (
+                              <div key={index} className="product-item">
+                                <div className="product-image">
+                                  {item.sanPham?.hinhAnhURL ? (
+                                    <img 
+                                      src={`http://localhost:5000${item.sanPham.hinhAnhURL}`}
+                                      alt={item.sanPham?.ten || 'Sản phẩm'}
+                                      onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = 'https://via.placeholder.com/80?text=No+Image';
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="no-image">📦</div>
+                                  )}
+                                </div>
+                                <div className="product-info">
+                                  <div className="product-name">
+                                    {item.sanPham?.ten || 'Sản phẩm không xác định'}
+                                  </div>
+                                  <div className="product-details">
+                                    <span className="product-quantity">
+                                      Số lượng: <strong>{item.soLuong}</strong>
+                                    </span>
+                                    <span className="product-price">
+                                      Đơn giá: <strong>{formatPrice(item.donGia)}</strong>
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="product-total">
+                                  <div className="total-label">Thành tiền:</div>
+                                  <div className="total-value">{formatPrice(item.thanhTien)}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {/* Tổng cộng */}
+                          <div className="order-summary">
+                            <div className="summary-row">
+                              <span>Tổng số lượng:</span>
+                              <strong>{order.tongSoLuongSanPham} sản phẩm</strong>
+                            </div>
+                            <div className="summary-row total">
+                              <span>Tổng tiền:</span>
+                              <strong className="total-amount">{formatPrice(order.tongTien)}</strong>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Ghi chú */}
+                      {order.ghiChu && (
+                        <div className="detail-section">
+                          <h4>📝 Ghi chú</h4>
+                          <div className="order-notes">
+                            {order.ghiChu}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </td>
                 </tr>
