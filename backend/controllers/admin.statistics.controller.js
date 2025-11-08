@@ -32,7 +32,7 @@ exports.getDashboardStats = async (req, res) => {
       where: { Enable: true }
     });
 
-    // ✨ 4. Tổng doanh thu tháng hiện tại - CHỈ TÍNH ĐƠN ĐÃ THANH TOÁN
+    // ✨ 4. Tổng doanh thu tháng hiện tại - TÍNH TẤT CẢ ĐƠN (TRỪ ĐÃ HỦY)
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
     const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01 00:00:00`;
@@ -43,7 +43,7 @@ exports.getDashboardStats = async (req, res) => {
       SELECT ISNULL(SUM(TongTien), 0) AS tongDoanhThu
       FROM HoaDon
       WHERE Enable = 1 
-        AND TrangThai = N'Đã thanh toán'
+        AND TrangThai != N'Đã hủy'
         AND CAST(NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)
     `, {
       replacements: { startDate, endDate },
@@ -90,12 +90,12 @@ exports.getStatistics = async (req, res) => {
     console.log('📝 Query params:', req.query);
 
     // Lấy query parameters để lọc thời gian (optional)
-    const { startDate, endDate, year } = req.query;
+    const { startDate, endDate, year, viewMode = 'month' } = req.query;
 
-    // Tạo điều kiện lọc cơ bản - ✨ CHỈ TÍNH ĐƠN ĐÃ THANH TOÁN
+    // Tạo điều kiện lọc cơ bản - ✨ TÍNH TẤT CẢ ĐƠN (TRỪ ĐÃ HỦY)
     const whereCondition = {
       Enable: true,
-      TrangThai: 'Đã thanh toán' // ✅ THÊM ĐIỀU KIỆN NÀY
+      TrangThai: { [Op.ne]: 'Đã hủy' } // ✅ Loại trừ đơn đã hủy
     };
 
     // Thêm điều kiện lọc theo khoảng thời gian nếu có
@@ -118,10 +118,10 @@ exports.getStatistics = async (req, res) => {
       }
     }
 
-    // ✨ 1. Tính tổng doanh thu và số đơn hàng - CHỈ TÍNH ĐƠN ĐÃ THANH TOÁN
+    // ✨ 1. Tính tổng doanh thu và số đơn hàng - TÍNH TẤT CẢ ĐƠN (TRỪ ĐÃ HỦY)
     let totalStats = { tongDoanhThu: 0, soDonHang: 0 };
     try {
-      let whereClause = "WHERE Enable = 1 AND TrangThai = N'Đã thanh toán'"; // ✅ THÊM ĐIỀU KIỆN
+      let whereClause = "WHERE Enable = 1 AND TrangThai != N'Đã hủy'"; // ✅ Loại trừ đơn đã hủy
       const params = {};
       
       if (startDate && endDate) {
@@ -180,10 +180,10 @@ exports.getStatistics = async (req, res) => {
       statusStats = [];
     }
 
-    // ✨ 3. Thống kê theo tháng - CHỈ TÍNH ĐƠN ĐÃ THANH TOÁN
+    // ✨ 3. Thống kê theo tháng - TÍNH TẤT CẢ ĐƠN (TRỪ ĐÃ HỦY)
     let monthlyStats = [];
     try {
-      let whereClause = "WHERE Enable = 1 AND TrangThai = N'Đã thanh toán'"; // ✅ THÊM ĐIỀU KIỆN
+      let whereClause = "WHERE Enable = 1 AND TrangThai != N'Đã hủy'"; // ✅ Loại trừ đơn đã hủy
       const params = {};
       
       if (startDate && endDate) {
@@ -217,7 +217,7 @@ exports.getStatistics = async (req, res) => {
     let topCustomers = [];
     try {
       topCustomers = await HoaDon.findAll({
-        where: whereCondition, // ✅ ĐÃ CÓ TrangThai: 'Đã thanh toán'
+        where: whereCondition,
         attributes: [
           'KhachHangID',
           [db.sequelize.fn('COUNT', db.sequelize.col('HoaDon.ID')), 'soDonHang'],
@@ -260,7 +260,7 @@ exports.getStatistics = async (req, res) => {
             model: HoaDon,
             as: 'hoaDon',
             attributes: [],
-            where: whereCondition, // ✅ ĐÃ CÓ TrangThai: 'Đã thanh toán'
+            where: whereCondition,
             required: true
           }
         ],
@@ -277,26 +277,73 @@ exports.getStatistics = async (req, res) => {
       topProducts = [];
     }
 
-    // ✨ 6. Thống kê số đơn hàng theo ngày trong 7 ngày gần nhất - CHỈ TÍNH ĐƠN ĐÃ THANH TOÁN
-    let last7DaysStats = [];
+    // ✨ 6. Thống kê biểu đồ theo viewMode (day/month/year)
+    let chartStats = [];
     try {
-      last7DaysStats = await db.sequelize.query(`
-        SELECT 
-          CAST(NgayLap AS DATE) as ngay,
-          COUNT(*) as soDonHang,
-          ISNULL(SUM(TongTien), 0) as doanhThu
-        FROM HoaDon
-        WHERE Enable = 1
-          AND TrangThai = N'Đã thanh toán'
-          AND NgayLap >= DATEADD(day, -7, GETDATE())
-        GROUP BY CAST(NgayLap AS DATE)
-        ORDER BY CAST(NgayLap AS DATE) DESC
-      `, {
-        type: db.sequelize.QueryTypes.SELECT
-      });
+      const params = {};
+      let whereClause = "WHERE Enable = 1 AND TrangThai != N'Đã hủy'";
+      let groupByClause = '';
+      let orderByClause = '';
+      
+      if (startDate && endDate) {
+        whereClause += ' AND CAST(NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)';
+        params.startDate = startDate;
+        params.endDate = endDate;
+      }
+
+      // Xác định group by dựa trên viewMode
+      if (viewMode === 'day') {
+        // Hiển thị theo giờ trong ngày
+        chartStats = await db.sequelize.query(`
+          SELECT 
+            FORMAT(NgayLap, 'HH:00') as label,
+            COUNT(*) as soDonHang,
+            ISNULL(SUM(TongTien), 0) as doanhThu
+          FROM HoaDon
+          ${whereClause}
+          GROUP BY FORMAT(NgayLap, 'HH:00')
+          ORDER BY FORMAT(NgayLap, 'HH:00') ASC
+        `, {
+          replacements: params,
+          type: db.sequelize.QueryTypes.SELECT
+        });
+      } else if (viewMode === 'month') {
+        // Hiển thị theo ngày trong tháng (dd/MM)
+        chartStats = await db.sequelize.query(`
+          SELECT 
+            FORMAT(CAST(NgayLap AS DATE), 'dd/MM') as label,
+            CAST(NgayLap AS DATE) as date,
+            COUNT(*) as soDonHang,
+            ISNULL(SUM(TongTien), 0) as doanhThu
+          FROM HoaDon
+          ${whereClause}
+          GROUP BY CAST(NgayLap AS DATE)
+          ORDER BY CAST(NgayLap AS DATE) ASC
+        `, {
+          replacements: params,
+          type: db.sequelize.QueryTypes.SELECT
+        });
+      } else if (viewMode === 'year') {
+        // Hiển thị theo tháng trong năm (MM/yyyy)
+        chartStats = await db.sequelize.query(`
+          SELECT 
+            FORMAT(NgayLap, 'MM/yyyy') as label,
+            FORMAT(NgayLap, 'yyyy-MM') as month,
+            COUNT(*) as soDonHang,
+            ISNULL(SUM(TongTien), 0) as doanhThu
+          FROM HoaDon
+          ${whereClause}
+          GROUP BY FORMAT(NgayLap, 'yyyy-MM'), FORMAT(NgayLap, 'MM/yyyy')
+          ORDER BY FORMAT(NgayLap, 'yyyy-MM') ASC
+        `, {
+          replacements: params,
+          type: db.sequelize.QueryTypes.SELECT
+        });
+      }
+      
     } catch (error) {
-      console.error('⚠️ Lỗi query last7DaysStats:', error.message);
-      last7DaysStats = [];
+      console.error('⚠️ Lỗi query chartStats:', error.message);
+      chartStats = [];
     }
 
     // Format dữ liệu trả về
@@ -344,17 +391,21 @@ exports.getStatistics = async (req, res) => {
         soLanMua: parseInt(item.dataValues.soLanMua || 0)
       })),
 
-      // Thống kê 7 ngày gần nhất
-      bays7NgayGanNhat: last7DaysStats.map(stat => ({
-        ngay: stat.ngay,
+      // Thống kê biểu đồ theo viewMode
+      chartData: chartStats.map(stat => ({
+        label: stat.label,
         soDonHang: parseInt(stat.soDonHang),
         doanhThu: parseFloat(stat.doanhThu || 0)
-      }))
+      })),
+
+      // Thêm viewMode vào response
+      viewMode: viewMode
     };
 
     console.log('✅ Lấy thống kê thành công');
     console.log(`💰 Tổng doanh thu: ${statistics.tongDoanhThu.toLocaleString('vi-VN')} VNĐ`);
     console.log(`📦 Tổng số đơn: ${statistics.soDonHang}`);
+    console.log(`📊 View mode: ${viewMode}`);
 
     res.status(200).json({
       success: true,
@@ -364,7 +415,8 @@ exports.getStatistics = async (req, res) => {
         filter: {
           startDate: startDate || null,
           endDate: endDate || null,
-          year: year || null
+          year: year || null,
+          viewMode: viewMode
         }
       }
     });

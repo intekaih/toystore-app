@@ -46,8 +46,9 @@ const CheckoutPage = () => {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [orderCreated, setOrderCreated] = useState(false); // ✅ Thêm cờ để track đơn hàng đã tạo
   const [toast, setToast] = useState(null);
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth(); // ✅ Thêm refreshUser
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -67,8 +68,11 @@ const CheckoutPage = () => {
       setTimeout(() => navigate('/login'), 1500);
       return;
     }
-    loadCart();
-  }, [user, navigate]);
+    // ✅ Không load cart nếu đơn hàng đã được tạo thành công
+    if (!orderCreated) {
+      loadCart();
+    }
+  }, [user, navigate, orderCreated]); // ✅ Thêm orderCreated vào dependencies
 
   const loadCart = async () => {
     try {
@@ -79,8 +83,11 @@ const CheckoutPage = () => {
         const items = response.data.items || [];
         
         if (items.length === 0) {
-          showToast('Giỏ hàng của bạn đang trống', 'warning');
-          setTimeout(() => navigate('/cart'), 1500);
+          // ✅ Chỉ hiển thị warning nếu chưa tạo đơn hàng
+          if (!orderCreated) {
+            showToast('Giỏ hàng của bạn đang trống', 'warning');
+            setTimeout(() => navigate('/cart'), 1500);
+          }
           return;
         }
         
@@ -88,7 +95,10 @@ const CheckoutPage = () => {
       }
     } catch (error) {
       console.error('Error loading cart:', error);
-      showToast(error.message || 'Không thể tải giỏ hàng', 'error');
+      // ✅ Chỉ hiển thị lỗi nếu chưa tạo đơn hàng
+      if (!orderCreated) {
+        showToast(error.message || 'Không thể tải giỏ hàng', 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -173,6 +183,9 @@ const CheckoutPage = () => {
       const response = await createOrder(orderData);
 
       if (response.success) {
+        // ✅ Đánh dấu đơn hàng đã tạo thành công
+        setOrderCreated(true);
+        
         const orderId = response.data.hoaDon.id;
         const totalAmount = response.data.hoaDon.tongTien;
 
@@ -202,6 +215,14 @@ const CheckoutPage = () => {
           }
         } else {
           showToast('Đặt hàng thành công! 🎉', 'success', 2000);
+          
+          // ✅ Refresh user data để cập nhật số điện thoại
+          try {
+            await refreshUser();
+            console.log('✅ Đã refresh thông tin user sau khi đặt hàng');
+          } catch (refreshError) {
+            console.warn('⚠️ Không thể refresh user, nhưng đơn hàng đã tạo thành công:', refreshError);
+          }
           
           setTimeout(() => {
             navigate('/orders');

@@ -39,20 +39,33 @@ const RevenueChart = ({ data, title = "Biểu đồ doanh thu" }) => {
     return null;
   };
 
+  // ✨ Kiểm tra nếu không có dữ liệu
+  if (!data || data.length === 0) {
+    return (
+      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <h3 style={{ textAlign: 'center', marginBottom: '20px' }}>{title}</h3>
+        <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+          <p style={{ fontSize: '48px', margin: '0' }}>📊</p>
+          <p style={{ marginTop: '10px' }}>Không có dữ liệu</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <h3 style={{ textAlign: 'center', marginBottom: '20px' }}>{title}</h3>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart
           data={data}
-          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+          margin={{ top: 5, right: 30, left: 20, bottom: 20 }}
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis 
             dataKey="ngay" 
-            angle={-45}
-            textAnchor="end"
-            height={80}
+            angle={0}
+            textAnchor="middle"
+            height={60}
           />
           <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
           <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />

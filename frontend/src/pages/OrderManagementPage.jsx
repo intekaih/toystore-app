@@ -67,7 +67,7 @@ const OrderManagementPage = () => {
   };
 
   // Fetch danh sách đơn hàng
-  const fetchOrders = useCallback(async (page = 1, status = '', search = '', silent = false) => {
+  const fetchOrders = useCallback(async (page = 1, status = '', search = '', silent = false, isRefresh = false) => {
     try {
       if (!silent) {
         setLoading(true);
@@ -109,14 +109,14 @@ const OrderManagementPage = () => {
         const newOrders = response.data.data.orders;
         const newOrderCount = response.data.data.pagination.totalOrders;
         
-        // ✨ THÊM: Kiểm tra có đơn hàng mới không
-        if (!silent && previousOrderCount > 0 && newOrderCount > previousOrderCount) {
+        // ✨ CHỈ hiển thị thông báo khi đang refresh (auto hoặc thủ công), KHÔNG hiển thị khi lọc/tìm kiếm
+        if (isRefresh && !silent && previousOrderCount > 0 && newOrderCount > previousOrderCount) {
           const newOrdersAdded = newOrderCount - previousOrderCount;
           showToast(`🎉 Có ${newOrdersAdded} đơn hàng mới!`, 'success');
           
           // Phát âm thanh thông báo (optional)
           if (typeof Audio !== 'undefined') {
-            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWi77eafTRAMUKfj8LZjHAY4ktfyzHksBSR3x/DdkEAKFF606+uoVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAA==');
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWi77eafTRAMUKfj8LZjHAY4ktfyzHksBSR3x/DdkEAKFF606+uoVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAA==');
             audio.play().catch(() => {}); // Bỏ qua lỗi nếu không phát được
           }
         }
@@ -197,7 +197,7 @@ const OrderManagementPage = () => {
 
     const interval = setInterval(() => {
       console.log('🔄 Auto-refreshing orders...');
-      fetchOrders(pagination.currentPage, selectedStatus, searchTerm, true); // silent mode
+      fetchOrders(pagination.currentPage, selectedStatus, searchTerm, true, true); // silent mode
     }, 30000); // 30 giây
 
     return () => clearInterval(interval);
@@ -269,7 +269,7 @@ const OrderManagementPage = () => {
   // ✨ THÊM: Hàm refresh thủ công
   const handleManualRefresh = () => {
     showToast('🔄 Đang làm mới...', 'info');
-    fetchOrders(pagination.currentPage, selectedStatus, searchTerm);
+    fetchOrders(pagination.currentPage, selectedStatus, searchTerm, false, true);
   };
 
   // Xử lý đăng xuất

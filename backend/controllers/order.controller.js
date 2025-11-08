@@ -46,17 +46,11 @@ exports.createOrder = async (req, res) => {
       phuongThucThanhToanId = 1, 
       ghiChu = '', 
       diaChiGiaoHang = '',
-      dienThoai = '', // ✨ THÊM: Nhận số điện thoại từ form checkout
-      tongTienSauKhuyenMai,
-      apDungVAT,
-      tyLeVAT: tyLeVATFromFrontend,
-      voucher,
-      phiVanChuyen: phiVanChuyenFromFrontend,
-      miemPhiVanChuyen: miemPhiVanChuyenFromFrontend
+      dienThoai = ''
     } = req.body;
 
     console.log('📦 Dữ liệu đặt hàng:', {
-      dienThoai, // ✨ Log số điện thoại
+      dienThoai,
       diaChiGiaoHang,
       phuongThucThanhToanId
     });
@@ -134,77 +128,24 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    // Tính tổng tiền
+    // Tính tổng tiền từ giỏ hàng
     let tongTien = 0;
-    let tienGoc = 0;
-    let tienVAT = 0;
-    let tienGiamGia = 0; // ✅ Mặc định = 0, không để NULL
-    let phiVanChuyen = phiVanChuyenFromFrontend || 30000;
-    let maVoucher = null;
-    let tyLeVAT = 0;
-    let miemPhiVanChuyen = miemPhiVanChuyenFromFrontend || false;
-    
-    // Tính tạm tính (giá gốc từ giỏ hàng)
     gioHang.chiTiet.forEach(item => {
-      tienGoc += parseFloat(item.DonGia) * item.SoLuong;
+      tongTien += parseFloat(item.DonGia) * item.SoLuong;
     });
-    
-    if (tongTienSauKhuyenMai && tongTienSauKhuyenMai > 0) {
-      // ✅ Sử dụng dữ liệu từ Frontend (Decorator Pattern đã tính)
-      tongTien = tongTienSauKhuyenMai;
-      
-      // Lấy chi tiết từ Frontend
-      if (apDungVAT && tyLeVATFromFrontend) {
-        tyLeVAT = tyLeVATFromFrontend;
-        tienVAT = Math.round(tienGoc * tyLeVAT);
-      }
-      
-      // ✅ ĐẢM BẢO tienGiamGia LUÔN LÀ SỐ (0 hoặc > 0), KHÔNG BAO GIỜ NULL
-      if (voucher && voucher.code && voucher.discount) {
-        maVoucher = voucher.code;
-        tienGiamGia = Math.round(voucher.discount); // ✅ Làm tròn để đảm bảo là số nguyên
-      } else {
-        tienGiamGia = 0; // ✅ Không có voucher = 0 (không phải NULL)
-      }
-      
-      phiVanChuyen = miemPhiVanChuyen ? 0 : (phiVanChuyenFromFrontend || 30000);
-      
-      console.log(`💰 Chi tiết giá từ Decorator Pattern:`, {
-        tienGoc,
-        tienVAT,
-        tyLeVAT,
-        maVoucher,
-        tienGiamGia, // ✅ Luôn là số (0 hoặc > 0)
-        phiVanChuyen,
-        miemPhiVanChuyen,
-        tongTien
-      });
-    } else {
-      // ❌ Fallback: Tính từ giá gốc trong DB (nếu Frontend không gửi)
-      tongTien = tienGoc;
-      tienGiamGia = 0; // ✅ Đảm bảo = 0 thay vì NULL
-      console.log(`⚠️ Không nhận được dữ liệu Decorator Pattern, dùng giá gốc: ${tongTien.toLocaleString('vi-VN')} VNĐ`);
-    }
 
     console.log(`💰 Tổng tiền đơn hàng: ${tongTien.toLocaleString('vi-VN')} VNĐ`);
 
-    // ✨ TÍNH TỶ LỆ ÁP DỤNG CHO TỪNG SẢN PHẨM (để lưu vào ChiTietHoaDon)
-    const tyLeApDung = tongTienSauKhuyenMai && tienGoc > 0
-      ? tongTienSauKhuyenMai / tienGoc
-      : 1;
-
-    console.log(`📊 Tỷ lệ áp dụng cho từng sản phẩm: ${(tyLeApDung * 100).toFixed(2)}%`);
-
-    // Lấy thông tin tài khoản để tạo khách hàng
+    // Lấy thông tin tài khoản
     const taiKhoan = await TaiKhoan.findByPk(taiKhoanId, { transaction });
 
-    // ✨ CẬP NHẬT: Nếu có số điện thoại mới, cập nhật vào TaiKhoan
-    if (dienThoai && dienThoai.trim() !== '' && dienThoai !== taiKhoan.DienThoai) {
+    // ✅ QUAN TRỌNG: Cập nhật số điện thoại vào TaiKhoan TRƯỚC
+    if (dienThoai && dienThoai.trim() !== '') {
       await taiKhoan.update({ DienThoai: dienThoai.trim() }, { transaction });
-      console.log('📱 Đã cập nhật số điện thoại vào TaiKhoan:', dienThoai);
+      console.log('📱 Đã cập nhật số điện thoại vào TaiKhoan:', dienThoai.trim());
     }
 
-    // Tạo hoặc lấy khách hàng
+    // Tạo hoặc lấy khách hàng (SỬ DỤNG số điện thoại đã cập nhật)
     let khachHang = await KhachHang.findOne({
       where: {
         Email: taiKhoan.Email || null,
@@ -214,23 +155,26 @@ exports.createOrder = async (req, res) => {
     });
 
     if (!khachHang) {
-      // Tạo khách hàng mới - ƯU TIÊN số điện thoại từ form checkout
+      // Tạo khách hàng mới với số điện thoại từ request hoặc từ TaiKhoan đã cập nhật
+      const phoneToUse = dienThoai?.trim() || taiKhoan.DienThoai || null;
       khachHang = await KhachHang.create({
         HoTen: taiKhoan.HoTen,
         Email: taiKhoan.Email || null,
-        DienThoai: dienThoai?.trim() || taiKhoan.DienThoai || null, // ✨ Ưu tiên dienThoai từ form
+        DienThoai: phoneToUse,
         DiaChi: diaChiGiaoHang || null
       }, { transaction });
       
       console.log('👤 Đã tạo khách hàng mới:', khachHang.ID, '- Số ĐT:', khachHang.DienThoai);
     } else {
-      // ✨ CẬP NHẬT: Cập nhật cả địa chỉ VÀ số điện thoại nếu có
+      // Cập nhật cả địa chỉ VÀ số điện thoại nếu có
       const updateData = {};
       if (diaChiGiaoHang) {
         updateData.DiaChi = diaChiGiaoHang;
       }
-      if (dienThoai && dienThoai.trim() !== '') {
-        updateData.DienThoai = dienThoai.trim();
+      // Ưu tiên số điện thoại từ request, nếu không có thì lấy từ TaiKhoan
+      const phoneToUse = dienThoai?.trim() || taiKhoan.DienThoai;
+      if (phoneToUse) {
+        updateData.DienThoai = phoneToUse;
       }
       
       if (Object.keys(updateData).length > 0) {
@@ -245,61 +189,37 @@ exports.createOrder = async (req, res) => {
     const maHoaDon = await generateOrderCode();
     console.log('📄 Mã hóa đơn:', maHoaDon);
 
-    // ✨ Tạo hóa đơn với TOÀN BỘ các trường mới
+    // Tạo hóa đơn
     const hoaDon = await HoaDon.create({
       MaHD: maHoaDon,
       KhachHangID: khachHang.ID,
       TongTien: tongTien,
-      
-      // ✨ LƯU CHI TIẾT VÀO CÁC TRƯỜNG MỚI (Decorator Pattern data)
-      TienGoc: tienGoc,
-      TienVAT: tienVAT,
-      TyLeVAT: tyLeVAT || 0,
-      MaVoucher: maVoucher,
-      TienGiamGia: tienGiamGia,
-      PhiVanChuyen: phiVanChuyen,
-      MiemPhiVanChuyen: miemPhiVanChuyen,
-      
       PhuongThucThanhToanID: phuongThucThanhToanId,
       TrangThai: 'Chờ xử lý',
       GhiChu: ghiChu || null
     }, { transaction });
 
-    console.log('✅ Đã tạo hóa đơn:', hoaDon.ID, '- Chi tiết:', {
-      TienGoc: tienGoc,
-      TienVAT: tienVAT,
-      MaVoucher: maVoucher,
-      TienGiamGia: tienGiamGia,
-      PhiVanChuyen: phiVanChuyen,
-      TongTien: tongTien
-    });
+    console.log('✅ Đã tạo hóa đơn:', hoaDon.ID);
 
-    // ✨ Bước 3: Thêm chi tiết hóa đơn VỚI GIÁ ĐÃ ÁP DỤNG VAT + VOUCHER
+    // Bước 3: Thêm chi tiết hóa đơn
     const chiTietHoaDonData = [];
     for (const item of gioHang.chiTiet) {
-      // Tính giá đã áp dụng VAT + Voucher cho từng sản phẩm
-      const donGiaGoc = parseFloat(item.DonGia);
-      const donGiaSauKhuyenMai = donGiaGoc * tyLeApDung;
-      const thanhTien = donGiaSauKhuyenMai * item.SoLuong;
+      const donGia = parseFloat(item.DonGia);
+      const thanhTien = donGia * item.SoLuong;
 
-      // Tạo chi tiết hóa đơn với giá đã áp dụng khuyến mãi
+      // Tạo chi tiết hóa đơn
       const chiTiet = await ChiTietHoaDon.create({
         HoaDonID: hoaDon.ID,
         SanPhamID: item.SanPhamID,
         SoLuong: item.SoLuong,
-        DonGia: Math.round(donGiaSauKhuyenMai), // ← Giá đã áp dụng VAT + Voucher
-        GiaBan: Math.round(donGiaSauKhuyenMai), // ← Giá đã áp dụng VAT + Voucher
-        ThanhTien: Math.round(thanhTien)
+        DonGia: donGia,
+        GiaBan: donGia,
+        ThanhTien: thanhTien
       }, { transaction });
 
       chiTietHoaDonData.push(chiTiet);
 
-      console.log(`📦 Sản phẩm "${item.sanPham.Ten}":`, {
-        donGiaGoc: donGiaGoc,
-        donGiaSauKhuyenMai: Math.round(donGiaSauKhuyenMai),
-        soLuong: item.SoLuong,
-        thanhTien: Math.round(thanhTien)
-      });
+      console.log(`📦 Sản phẩm "${item.sanPham.Ten}": ${item.SoLuong} x ${donGia.toLocaleString('vi-VN')} = ${thanhTien.toLocaleString('vi-VN')}`);
 
       // Cập nhật số lượng tồn kho
       await SanPham.update(
