@@ -829,9 +829,12 @@ exports.getOrderHistory = async (req, res) => {
       Enable: true
     };
 
-    // Thêm điều kiện lọc theo trạng thái nếu có
-    if (trangThai) {
-      whereCondition.TrangThai = trangThai;
+    // ✅ Thêm điều kiện lọc theo trạng thái nếu có (và không phải chuỗi rỗng)
+    if (trangThai && trangThai.trim() !== '') {
+      whereCondition.TrangThai = trangThai.trim();
+      console.log('🔍 Lọc theo trạng thái:', trangThai.trim());
+    } else {
+      console.log('🔍 Lấy tất cả trạng thái');
     }
 
     console.log('🔍 Điều kiện tìm kiếm:', whereCondition);

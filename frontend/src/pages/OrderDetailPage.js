@@ -106,7 +106,7 @@ const OrderDetailPage = () => {
       'Chờ xử lý': 'warning',
       'Chờ thanh toán': 'info',
       'Đang xử lý': 'primary',
-      'Đang giao hàng': 'info',
+      'Đang giao': 'info',
       'Đã giao': 'success',
       'Hoàn thành': 'success',
       'Đã hủy': 'danger',

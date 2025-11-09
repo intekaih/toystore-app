@@ -115,7 +115,7 @@ const OrderHistoryPage = () => {
       'Chờ xử lý': { variant: 'warning', icon: '🕐' },
       'Chờ thanh toán': { variant: 'info', icon: '💳' },
       'Đang xử lý': { variant: 'primary', icon: '⚙️' },
-      'Đang giao hàng': { variant: 'info', icon: '🚚' },
+      'Đang giao': { variant: 'info', icon: '🚚' },
       'Đã giao': { variant: 'success', icon: '✅' },
       'Hoàn thành': { variant: 'success', icon: '✅' },
       'Đã hủy': { variant: 'danger', icon: '❌' },
@@ -177,9 +177,9 @@ const OrderHistoryPage = () => {
             Chờ xử lý
           </Button>
           <Button
-            variant={statusFilter === 'Đang giao hàng' ? 'primary' : 'outline'}
+            variant={statusFilter === 'Đang giao' ? 'primary' : 'outline'}
             size="sm"
-            onClick={() => handleFilterChange('Đang giao hàng')}
+            onClick={() => handleFilterChange('Đang giao')}
             icon={<Truck size={16} />}
           >
             Đang giao
