@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # SQL Server Database
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: toystore_sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Password123
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+      - ./db:/docker-entrypoint-initdb.d
+    networks:
+      - toystore_network
+    restart: unless-stopped
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: toystore_backend
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=sqlserver
+      - DB_USER=sa
+      - DB_PASSWORD=YourStrong@Password123
+      - DB_NAME=toystore
+      - DB_PORT=1433
+      - JWT_SECRET=your_jwt_secret_key_change_this
+      - PORT=5000
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+    depends_on:
+      - sqlserver
+    networks:
+      - toystore_network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: toystore_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - toystore_network
+    restart: unless-stopped
+
+volumes:
+  sqlserver_data:
+
+networks:
+  toystore_network:
+    driver: bridge
