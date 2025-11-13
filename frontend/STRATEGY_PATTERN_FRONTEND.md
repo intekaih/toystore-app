@@ -279,6 +279,12 @@ import './ProductFilterBar.css';
 ```
 2. Clear cache và refresh: `Ctrl + Shift + R`
 
+### Frontend không load được sản phẩm
+
+1. Backend server có đang chạy? (`http://localhost:6000`)
+2. CORS đã được config đúng?
+3. API URL có đúng trong frontend config?
+
 ---
 
 ## 📚 CODE EXPLANATION

@@ -120,3 +120,78 @@ exports.requireAuth = (req, res, next) => {
     });
   }
 };
+
+/**
+ * =======================================
+ * MIDDLEWARE: optionalAuth
+ * =======================================
+ * Xác thực token TÙY CHỌN - hỗ trợ cả logged-in user và guest user
+ * - Nếu có token → verify và lưu user info vào req.user
+ * - Nếu không có token → next() (cho phép guest tiếp tục)
+ * 
+ * Use case: Giỏ hàng, wishlist, v.v.
+ */
+exports.optionalAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    // Nếu không có token → cho phép guest user tiếp tục
+    if (!authHeader) {
+      logger.debug('Guest user request - No token provided', { 
+        url: req.url, 
+        ip: req.ip 
+      });
+      return next();
+    }
+
+    // Nếu có token → verify
+    const token = authHeader.split(' ')[1];
+    
+    if (!token) {
+      logger.debug('Invalid token format - treating as guest');
+      return next();
+    }
+
+    try {
+      const jwtSecret = config.getValue('jwt', 'secret');
+      const decoded = jwt.verify(token, jwtSecret);
+      
+      // Kiểm tra user vẫn tồn tại và đang hoạt động
+      const user = await TaiKhoan.findOne({
+        where: {
+          ID: decoded.userId,
+          Enable: true
+        }
+      });
+
+      if (user) {
+        // Lưu thông tin user vào request
+        req.user = {
+          id: user.ID,
+          username: user.TenDangNhap,
+          role: user.VaiTro,
+          hoTen: user.HoTen,
+          email: user.Email
+        };
+        
+        logger.debug(`Logged-in user request: ${user.TenDangNhap}`);
+      } else {
+        logger.debug('Token valid but user not found - treating as guest');
+      }
+      
+      next();
+
+    } catch (tokenError) {
+      // Token không hợp lệ hoặc hết hạn → cho phép guest tiếp tục
+      logger.debug('Token verification failed - treating as guest', {
+        error: tokenError.name
+      });
+      next();
+    }
+
+  } catch (error) {
+    logger.logError(error, 'Middleware optionalAuth');
+    // Vẫn cho phép request tiếp tục (fail-safe)
+    next();
+  }
+};

@@ -20,7 +20,14 @@ export const useAuth = () => {
 const formatUserData = (userData) => {
   if (!userData) return null;
   
-  return {
+  console.log('🔄 Formatting user data:', userData);
+  
+  // Xác định giá trị Enable/enable một cách chính xác
+  const enableValue = userData.Enable !== undefined 
+    ? userData.Enable 
+    : (userData.enable !== undefined ? userData.enable : true);
+  
+  const formatted = {
     id: userData.ID || userData.id,
     tenDangNhap: userData.TenDangNhap || userData.tenDangNhap,
     hoTen: userData.HoTen || userData.hoTen,
@@ -28,10 +35,14 @@ const formatUserData = (userData) => {
     dienThoai: userData.DienThoai || userData.dienThoai,
     vaiTro: userData.VaiTro || userData.vaiTro || userData.role,
     ngayTao: userData.NgayTao || userData.ngayTao,
-    enable: userData.Enable !== undefined ? userData.Enable : userData.enable,
+    enable: enableValue,
     // Giữ lại các trường gốc để tương thích ngược
-    ...userData
+    Enable: enableValue // Đồng bộ cả 2 trường
   };
+  
+  console.log('✅ Formatted user data:', formatted);
+  
+  return formatted;
 };
 
 export const AuthProvider = ({ children }) => {

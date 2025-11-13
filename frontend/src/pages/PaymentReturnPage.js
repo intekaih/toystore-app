@@ -1,71 +1,109 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { restoreGuestCart, getOrCreateSessionId } from '../api/cartApi';
 import './PaymentReturnPage.css';
 
 const PaymentReturnPage = () => {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [paymentResult, setPaymentResult] = useState(null);
+  const [restoring, setRestoring] = useState(false);
+  
+  const hasProcessedRef = useRef(false);
 
   useEffect(() => {
-    processPaymentResult();
+    if (!hasProcessedRef.current) {
+      hasProcessedRef.current = true;
+      processPaymentResult();
+    }
   }, []);
 
-  const processPaymentResult = () => {
+  const processPaymentResult = async () => {
     try {
       setLoading(true);
 
-      // Lấy params từ URL (backend đã redirect với params)
-      const success = searchParams.get('success') === 'true';
-      const orderId = searchParams.get('orderId');
-      const orderCode = searchParams.get('orderCode');
-      const amount = searchParams.get('amount');
-      const transactionNo = searchParams.get('transactionNo');
-      const bankCode = searchParams.get('bankCode');
-      const payDate = searchParams.get('payDate');
-      const responseCode = searchParams.get('responseCode');
-      const message = searchParams.get('message');
-      const txnRef = searchParams.get('txnRef');
-
-      console.log('Payment params:', {
-        success,
-        orderId,
-        orderCode,
-        amount,
-        transactionNo,
-        bankCode,
-        payDate,
-        responseCode,
-        message
-      });
-
-      if (success) {
-        // Thanh toán thành công
-        setPaymentResult({
-          success: true,
-          code: '00',
-          message: 'Thanh toán thành công',
-          data: {
-            orderId,
-            orderCode,
-            amount,
-            transactionNo,
-            bankCode,
-            payDate
-          }
-        });
+      // ✅ ƯU TIÊN: Kiểm tra dữ liệu từ state (COD) trước
+      const stateData = location.state;
+      
+      if (stateData && stateData.success !== undefined) {
+        // 🎯 DỮ LIỆU TỪ STATE (COD)
+        console.log('📦 COD Payment Data:', stateData);
+        
+        if (stateData.success) {
+          setPaymentResult({
+            success: true,
+            code: '00',
+            message: stateData.message || 'Đặt hàng thành công',
+            data: {
+              orderId: stateData.orderId,
+              orderCode: stateData.orderCode,
+              amount: stateData.amount,
+              paymentMethod: stateData.paymentMethod || 'COD'
+            }
+          });
+        } else {
+          setPaymentResult({
+            success: false,
+            code: '99',
+            message: stateData.message || 'Đặt hàng thất bại',
+            data: {
+              orderId: stateData.orderId,
+              orderCode: stateData.orderCode,
+              amount: stateData.amount
+            }
+          });
+        }
       } else {
-        // Thanh toán thất bại
-        setPaymentResult({
-          success: false,
-          code: responseCode || '99',
-          message: message ? decodeURIComponent(message) : 'Thanh toán thất bại',
-          data: {
-            txnRef,
-            amount
+        // 💳 DỮ LIỆU TỪ URL PARAMS (VNPay)
+        const success = searchParams.get('success') === 'true';
+        const orderId = searchParams.get('orderId');
+        const orderCode = searchParams.get('orderCode');
+        const amount = searchParams.get('amount');
+        const transactionNo = searchParams.get('transactionNo');
+        const bankCode = searchParams.get('bankCode');
+        const payDate = searchParams.get('payDate');
+        const responseCode = searchParams.get('responseCode');
+        const message = searchParams.get('message');
+        const txnRef = searchParams.get('txnRef');
+        const cartItemsJson = searchParams.get('cartItems');
+
+        if (success) {
+          setPaymentResult({
+            success: true,
+            code: '00',
+            message: 'Thanh toán thành công',
+            data: {
+              orderId,
+              orderCode,
+              amount,
+              transactionNo,
+              bankCode,
+              payDate,
+              paymentMethod: 'VNPay'
+            }
+          });
+        } else {
+          setPaymentResult({
+            success: false,
+            code: responseCode || '99',
+            message: message ? decodeURIComponent(message) : 'Thanh toán thất bại',
+            data: {
+              txnRef,
+              amount,
+              orderId,
+              orderCode
+            }
+          });
+
+          // Khôi phục giỏ hàng cho guest user
+          if (!user && cartItemsJson) {
+            await handleRestoreGuestCart(cartItemsJson);
           }
-        });
+        }
       }
     } catch (error) {
       console.error('Error processing payment result:', error);
@@ -75,6 +113,43 @@ const PaymentReturnPage = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * Khôi phục giỏ hàng guest sau khi thanh toán thất bại
+   */
+  const handleRestoreGuestCart = async (cartItemsJson) => {
+    try {
+      setRestoring(true);
+
+      // Parse cart items từ JSON string
+      const cartItems = JSON.parse(cartItemsJson);
+      
+      if (!cartItems || cartItems.length === 0) {
+        return;
+      }
+
+      // Lấy session ID
+      const sessionId = getOrCreateSessionId();
+
+      // Gọi API khôi phục giỏ hàng
+      const result = await restoreGuestCart(sessionId, cartItems);
+
+      // Hiển thị thông báo thành công
+      if (result.success && result.data.totalRestored > 0) {
+        console.log(`✅ Đã khôi phục ${result.data.totalRestored}/${cartItems.length} sản phẩm vào giỏ hàng`);
+      }
+
+      if (result.data.totalErrors > 0) {
+        console.warn(`⚠️ Có ${result.data.totalErrors} sản phẩm không thể khôi phục:`, result.data.errors);
+      }
+
+    } catch (error) {
+      console.error('❌ Lỗi khôi phục giỏ hàng:', error);
+      // Không hiển thị lỗi cho user - vì đây là background process
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -125,6 +200,7 @@ const PaymentReturnPage = () => {
 
   // Hiển thị kết quả thanh toán
   const isSuccess = paymentResult?.success && paymentResult?.code === '00';
+  const isCOD = paymentResult?.data?.paymentMethod === 'COD';
 
   return (
     <div className="payment-return-page">
@@ -137,7 +213,7 @@ const PaymentReturnPage = () => {
 
           {/* Title */}
           <h2>
-            {isSuccess ? 'Thanh toán thành công!' : 'Thanh toán thất bại'}
+            {isSuccess ? (isCOD ? 'Đặt hàng thành công!' : 'Thanh toán thành công!') : 'Thanh toán thất bại'}
           </h2>
 
           {/* Message */}
@@ -155,6 +231,12 @@ const PaymentReturnPage = () => {
                   {paymentResult.data.orderCode || paymentResult.data.orderId}
                 </span>
               </div>
+              {paymentResult.data.paymentMethod && (
+                <div className="detail-row">
+                  <span className="detail-label">Phương thức:</span>
+                  <span className="detail-value">{paymentResult.data.paymentMethod}</span>
+                </div>
+              )}
               {paymentResult.data.transactionNo && (
                 <div className="detail-row">
                   <span className="detail-label">Mã giao dịch VNPay:</span>
@@ -171,7 +253,7 @@ const PaymentReturnPage = () => {
                 <div className="detail-row">
                   <span className="detail-label">Ngân hàng:</span>
                   <span className="detail-value">{paymentResult.data.bankCode}</span>
-                </div>
+              </div>
               )}
               {paymentResult.data.payDate && (
                 <div className="detail-row">
@@ -189,15 +271,40 @@ const PaymentReturnPage = () => {
             <div className="success-info">
               <div className="info-item">
                 <span className="info-icon">✅</span>
-                <span>Đơn hàng đã được thanh toán thành công qua VNPay</span>
+                <span>
+                  {isCOD 
+                    ? 'Đơn hàng đã được đặt thành công với hình thức thanh toán COD' 
+                    : 'Đơn hàng đã được thanh toán thành công qua VNPay'
+                  }
+                </span>
               </div>
               <div className="info-item">
                 <span className="info-icon">📦</span>
                 <span>Đơn hàng sẽ được xử lý và giao đến bạn sớm nhất</span>
               </div>
+              {isCOD && (
+                <div className="info-item">
+                  <span className="info-icon">💵</span>
+                  <span>Bạn sẽ thanh toán khi nhận hàng</span>
+                </div>
+              )}
               <div className="info-item">
                 <span className="info-icon">📱</span>
                 <span>Bạn có thể theo dõi đơn hàng trong mục "Đơn hàng của tôi"</span>
+              </div>
+            </div>
+          )}
+
+          {/* ✨ Thông báo khôi phục giỏ hàng khi thất bại */}
+          {!isSuccess && (
+            <div className="success-info" style={{ backgroundColor: '#fef3c7', borderColor: '#f59e0b' }}>
+              <div className="info-item">
+                <span className="info-icon">🛒</span>
+                <span>Sản phẩm đã được khôi phục vào giỏ hàng của bạn</span>
+              </div>
+              <div className="info-item">
+                <span className="info-icon">💡</span>
+                <span>Bạn có thể thử thanh toán lại hoặc chọn phương thức khác</span>
               </div>
             </div>
           )}
@@ -208,9 +315,15 @@ const PaymentReturnPage = () => {
               <>
                 <button 
                   className="btn btn-primary"
-                  onClick={() => navigate('/orders')}
+                  onClick={() => {
+                    if (!user && paymentResult.data.orderCode) {
+                      navigate(`/order/${paymentResult.data.orderCode}`);
+                    } else {
+                      navigate('/orders');
+                    }
+                  }}
                 >
-                  📋 Xem đơn hàng của tôi
+                  📋 Xem đơn hàng
                 </button>
                 <button 
                   className="btn btn-secondary"

@@ -34,6 +34,146 @@ function createSecureHash(data, secretKey) {
 }
 
 /**
+ * ✅ HÀM CHUNG XỬ LÝ THANH TOÁN THÀNH CÔNG
+ * Trừ kho và cập nhật trạng thái đơn hàng
+ * Được gọi bởi cả vnpayReturn và vnpayIPN
+ * 
+ * @param {Object} hoaDon - Đơn hàng cần xử lý
+ * @param {Object} paymentInfo - Thông tin thanh toán {transactionNo, bankCode, source}
+ * @param {Object} transaction - Sequelize transaction
+ * @returns {Object} {success, message, outOfStockItems}
+ */
+async function processPaymentSuccess(hoaDon, paymentInfo, transaction) {
+  const { transactionNo, bankCode, source } = paymentInfo;
+  
+  console.log(`🔄 [${source}] Xử lý thanh toán thành công cho đơn hàng ${hoaDon.MaHD}`);
+
+  // ✅ KIỂM TRA TRẠNG THÁI ĐƠN HÀNG - TRÁNH XỬ LÝ TRÙNG LẶP
+  if (hoaDon.TrangThai === 'Đã thanh toán') {
+    console.log(`⚠️ [${source}] Đơn hàng đã được xử lý thanh toán trước đó, bỏ qua`);
+    return {
+      success: true,
+      message: 'Đơn hàng đã được xử lý trước đó',
+      alreadyProcessed: true
+    };
+  }
+
+  if (hoaDon.TrangThai === 'Đã hủy') {
+    console.log(`⚠️ [${source}] Đơn hàng đã bị hủy, không thể xử lý thanh toán`);
+    return {
+      success: false,
+      message: 'Đơn hàng đã bị hủy',
+      alreadyCancelled: true
+    };
+  }
+
+  // Lấy chi tiết đơn hàng với sản phẩm
+  const chiTietHoaDon = await ChiTietHoaDon.findAll({
+    where: {
+      HoaDonID: hoaDon.ID,
+      Enable: true
+    },
+    include: [{
+      model: db.SanPham,
+      as: 'sanPham',
+      attributes: ['ID', 'Ten', 'Ton']
+    }],
+    transaction
+  });
+
+  console.log(`📦 [${source}] Bắt đầu kiểm tra và trừ kho cho ${chiTietHoaDon.length} sản phẩm`);
+
+  // ✅ KIỂM TRA TỒN KHO TRƯỚC KHI TRỪ - VỚI PESSIMISTIC LOCK
+  const outOfStockItems = [];
+  for (const item of chiTietHoaDon) {
+    // ✅ PESSIMISTIC LOCK - Lock bản ghi sản phẩm để tránh race condition
+    const sanPham = await db.SanPham.findByPk(item.SanPhamID, {
+      lock: transaction.LOCK.UPDATE, // 🔒 LOCK bản ghi này
+      transaction
+    });
+    
+    if (!sanPham) {
+      outOfStockItems.push({
+        name: item.sanPham.Ten,
+        requested: item.SoLuong,
+        available: 0
+      });
+      console.error(`❌ [${source}] Sản phẩm "${item.sanPham.Ten}" không tồn tại`);
+    } else if (sanPham.Ton < item.SoLuong) {
+      outOfStockItems.push({
+        name: sanPham.Ten,
+        requested: item.SoLuong,
+        available: sanPham.Ton
+      });
+      console.error(`❌ [${source}] Sản phẩm "${sanPham.Ten}" không đủ hàng: Cần ${item.SoLuong}, Còn ${sanPham.Ton}`);
+    }
+  }
+
+  // ❌ Nếu có sản phẩm hết hàng → Trả về lỗi
+  if (outOfStockItems.length > 0) {
+    console.error(`❌ [${source}] Không đủ hàng trong kho:`, outOfStockItems);
+    return {
+      success: false,
+      message: 'Không đủ hàng trong kho',
+      outOfStockItems: outOfStockItems
+    };
+  }
+
+  // ✅ TRỪ KHO SAU KHI ĐÃ LOCK VÀ KIỂM TRA
+  for (const item of chiTietHoaDon) {
+    // ✅ ĐÃ LOCK Ở TRÊN rồi, giờ chỉ cần update
+    const sanPham = await db.SanPham.findByPk(item.SanPhamID, { 
+      transaction,
+      lock: transaction.LOCK.UPDATE // 🔒 LOCK lại để đảm bảo an toàn
+    });
+    const tonTruoc = sanPham.Ton;
+    
+    // ✅ TRỪ KHO VỚI ĐIỀU KIỆN AN TOÀN
+    const [affectedRows] = await db.SanPham.update(
+      { Ton: db.sequelize.literal(`Ton - ${item.SoLuong}`) },
+      {
+        where: { 
+          ID: item.SanPhamID,
+          // ✅ KIỂM TRA LẠI TỒN KHO NGAY TRƯỚC KHI TRỪ (double-check)
+          Ton: { [db.Sequelize.Op.gte]: item.SoLuong }
+        },
+        transaction
+      }
+    );
+
+    // ✅ KIỂM TRA affectedRows ĐỂ ĐẢM BẢO TRỪ KHO THÀNH CÔNG
+    if (affectedRows === 0) {
+      console.error(`❌ [${source}] Không thể trừ kho sản phẩm "${item.sanPham.Ten}" - Có thể đã hết hàng`);
+      return {
+        success: false,
+        message: `Không thể trừ kho sản phẩm "${item.sanPham.Ten}"`,
+        outOfStockItems: [{
+          name: item.sanPham.Ten,
+          requested: item.SoLuong,
+          available: sanPham.Ton
+        }]
+      };
+    }
+
+    console.log(`✅ [${source}] Trừ ${item.SoLuong} sản phẩm "${item.sanPham.Ten}" khỏi kho`);
+    console.log(`   📊 Tồn kho: ${tonTruoc} → ${tonTruoc - item.SoLuong}`);
+  }
+
+  // ✅ CẬP NHẬT TRẠNG THÁI ĐƠN HÀNG
+  await hoaDon.update({
+    TrangThai: 'Đã thanh toán',
+    GhiChu: `Thanh toán VNPay - Mã GD: ${transactionNo} - Ngân hàng: ${bankCode} - Nguồn: ${source}`
+  }, { transaction });
+
+  console.log(`✅ [${source}] Cập nhật trạng thái đơn hàng thành công`);
+
+  return {
+    success: true,
+    message: 'Xử lý thanh toán thành công'
+  };
+}
+
+/**
  * Tạo URL thanh toán VNPay
  * GET /api/payment/vnpay/create-payment-url
  */
@@ -42,7 +182,8 @@ exports.createVNPayPaymentUrl = async (req, res) => {
     console.log('💳 Tạo URL thanh toán VNPay - Params:', req.query);
 
     const { orderId, amount, bankCode, language } = req.query;
-    const taiKhoanId = req.user.id;
+    // Không bắt buộc phải có user (hỗ trợ guest checkout)
+    const taiKhoanId = req.user?.id;
 
     // Validate input
     if (!orderId) {
@@ -59,7 +200,7 @@ exports.createVNPayPaymentUrl = async (req, res) => {
       });
     }
 
-    // Kiểm tra đơn hàng có tồn tại và thuộc về user không
+    // Kiểm tra đơn hàng có tồn tại không
     const hoaDon = await HoaDon.findOne({
       where: {
         ID: orderId,
@@ -76,6 +217,44 @@ exports.createVNPayPaymentUrl = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy đơn hàng'
+      });
+    }
+
+    // ✅ VALIDATE AMOUNT - KIỂM TRA SỐ TIỀN KHỚP VỚI ĐƠN HÀNG
+    const requestAmount = parseFloat(amount);
+    const orderAmount = parseFloat(hoaDon.TongTien);
+    
+    console.log('💰 Kiểm tra số tiền:', {
+      requestAmount: requestAmount,
+      orderAmount: orderAmount,
+      match: requestAmount === orderAmount
+    });
+
+    // ✅ SỐ TIỀN PHẢI KHỚP CHÍNH XÁC
+    if (requestAmount !== orderAmount) {
+      console.error(`❌ Số tiền không khớp: Request=${requestAmount}, Order=${orderAmount}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Số tiền thanh toán không khớp với đơn hàng',
+        data: {
+          requestAmount: requestAmount,
+          orderAmount: orderAmount,
+          difference: Math.abs(requestAmount - orderAmount)
+        }
+      });
+    }
+
+    // ✅ KIỂM TRA TRẠNG THÁI ĐƠN HÀNG - CHỈ CHO PHÉP THANH TOÁN "CHỜ THANH TOÁN"
+    const allowedStatuses = ['Chờ thanh toán', 'Chờ xử lý'];
+    if (!allowedStatuses.includes(hoaDon.TrangThai)) {
+      console.error(`❌ Trạng thái đơn hàng không hợp lệ: ${hoaDon.TrangThai}`);
+      return res.status(400).json({
+        success: false,
+        message: `Không thể thanh toán đơn hàng ở trạng thái "${hoaDon.TrangThai}"`,
+        data: {
+          currentStatus: hoaDon.TrangThai,
+          allowedStatuses: allowedStatuses
+        }
       });
     }
 
@@ -103,6 +282,7 @@ exports.createVNPayPaymentUrl = async (req, res) => {
     const vnp_OrderInfo = `Thanh toan don hang ${hoaDon.MaHD}`;
 
     // Build VNPay parameters
+    // ✅ SỬ DỤNG orderAmount (từ DB) THAY VÌ amount (từ request)
     let vnp_Params = {
       vnp_Version: vnpayConfig.vnp_Version,
       vnp_Command: vnpayConfig.vnp_Command,
@@ -112,7 +292,7 @@ exports.createVNPayPaymentUrl = async (req, res) => {
       vnp_TxnRef: vnp_TxnRef,
       vnp_OrderInfo: vnp_OrderInfo,
       vnp_OrderType: vnpayConfig.vnp_OrderType,
-      vnp_Amount: parseInt(amount) * 100, // VNPay yêu cầu amount * 100
+      vnp_Amount: Math.round(orderAmount * 100), // ✅ Dùng orderAmount từ DB, làm tròn để tránh lỗi số thập phân
       vnp_ReturnUrl: vnpayConfig.vnp_ReturnUrl,
       vnp_IpAddr: ipAddr,
       vnp_CreateDate: vnp_CreateDate
@@ -156,7 +336,7 @@ exports.createVNPayPaymentUrl = async (req, res) => {
         paymentUrl: paymentUrl,
         orderId: orderId,
         orderCode: hoaDon.MaHD,
-        amount: parseInt(amount),
+        amount: orderAmount, // ✅ Trả về amount từ DB
         txnRef: vnp_TxnRef
       }
     });
@@ -251,24 +431,73 @@ exports.vnpayReturn = async (req, res) => {
           include: [{
             model: db.SanPham,
             as: 'sanPham',
-            attributes: ['ID', 'Ten', 'Ton']
+            attributes: ['ID', 'Ten', 'Ton', 'HinhAnhURL']
           }]
         }
       ],
       transaction
     });
 
+    if (!hoaDon) {
+      await transaction.rollback();
+      console.error('❌ Return URL - Không tìm thấy đơn hàng');
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/payment/return?success=false&message=Order_not_found`);
+    }
+
+    // ✅ VALIDATE AMOUNT - KIỂM TRA SỐ TIỀN KHỚP VỚI ĐƠN HÀNG
+    const orderAmount = parseFloat(hoaDon.TongTien);
+    if (orderAmount !== vnp_Amount) {
+      await transaction.rollback();
+      console.error(`❌ Return URL - Số tiền không khớp: Order=${orderAmount}, VNPay=${vnp_Amount}`);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/payment/return?success=false&message=Invalid_amount&orderAmount=${orderAmount}&vnpayAmount=${vnp_Amount}`);
+    }
+
     // Kiểm tra kết quả thanh toán
     if (vnp_ResponseCode === '00') {
-      // Thanh toán thành công
+      // ✅ Thanh toán thành công - TRỪ KHO VÀ CẬP NHẬT TRẠNG THÁI
       console.log('✅ Giao dịch thành công');
 
       if (hoaDon) {
-        await hoaDon.update({
-          TrangThai: 'Đã thanh toán',
-          GhiChu: `Thanh toán VNPay - Mã GD: ${vnp_TransactionNo} - Ngân hàng: ${vnp_BankCode}`
-        }, { transaction });
-        console.log('✅ Cập nhật trạng thái đơn hàng thành công');
+        const paymentInfo = {
+          transactionNo: vnp_TransactionNo,
+          bankCode: vnp_BankCode,
+          source: 'Return URL'
+        };
+
+        const result = await processPaymentSuccess(hoaDon, paymentInfo, transaction);
+
+        if (!result.success) {
+          await transaction.rollback();
+          console.error('❌ Lỗi xử lý thanh toán:', result.message);
+
+          // Cập nhật đơn hàng thành "Đã hủy" do hết hàng (transaction mới)
+          const newTransaction = await db.sequelize.transaction();
+          try {
+            await hoaDon.update({
+              TrangThai: 'Đã hủy',
+              GhiChu: `Thanh toán thành công nhưng hết hàng - Sản phẩm: ${result.outOfStockItems.map(i => `${i.name} (cần ${i.requested}, còn ${i.available})`).join(', ')}`
+            }, { transaction: newTransaction });
+            await newTransaction.commit();
+            console.log('✅ Đã hủy đơn hàng do hết hàng');
+          } catch (updateError) {
+            await newTransaction.rollback();
+            console.error('❌ Lỗi cập nhật trạng thái đơn hàng:', updateError);
+          }
+
+          // Redirect về frontend với lỗi hết hàng
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+          const redirectParams = new URLSearchParams({
+            success: 'false',
+            responseCode: 'OUT_OF_STOCK',
+            message: encodeURIComponent('Thanh toán thành công nhưng một số sản phẩm đã hết hàng. Đơn hàng đã được hủy và bạn sẽ được hoàn tiền trong 5-7 ngày làm việc.'),
+            orderId: hoaDon?.ID || '',
+            orderCode: orderCode,
+            outOfStockItems: JSON.stringify(result.outOfStockItems)
+          });
+          return res.redirect(`${frontendUrl}/payment/return?${redirectParams.toString()}`);
+        }
       }
 
       // Commit transaction
@@ -289,92 +518,69 @@ exports.vnpayReturn = async (req, res) => {
       
       return res.redirect(`${frontendUrl}/payment/return?${redirectParams.toString()}`);
     } else {
-      // ✨ Thanh toán thất bại - HOÀN TRẢ SẢN PHẨM VỀ KHO VÀ KHÔI PHỤC GIỎ HÀNG
+      // ❌ Thanh toán thất bại - CHỈ HỦY ĐƠN HÀNG (KHÔNG hoàn trả kho)
       console.log('❌ Giao dịch thất bại - Mã lỗi:', vnp_ResponseCode);
 
       if (hoaDon) {
-        console.log(`🔄 Bắt đầu hoàn trả ${hoaDon.chiTiet.length} sản phẩm về kho`);
-
-        // ✨ Tìm tài khoản từ email khách hàng để khôi phục giỏ hàng
-        const taiKhoan = await db.TaiKhoan.findOne({
-          where: { 
-            Email: hoaDon.khachHang.Email 
-          },
-          transaction
-        });
-
-        // ✨ Khôi phục giỏ hàng nếu tìm thấy tài khoản
-        if (taiKhoan) {
-          console.log('🛒 Bắt đầu khôi phục giỏ hàng cho user:', taiKhoan.ID);
+        // ✅ KIỂM TRA trạng thái đơn hàng để tránh xử lý trùng lặp
+        if (hoaDon.TrangThai === 'Đã hủy') {
+          console.log('⚠️ Đơn hàng đã được xử lý trước đó (IPN), bỏ qua');
+          await transaction.commit();
           
-          // Tìm hoặc tạo giỏ hàng
-          let gioHang = await db.GioHang.findOne({
-            where: { TaiKhoanID: taiKhoan.ID },
-            transaction
+          // Map mã lỗi VNPay
+          const errorMessages = {
+            '07': 'Trừ tiền thành công. Giao dịch bị nghi ngờ (liên quan tới lừa đảo, giao dịch bất thường).',
+            '09': 'Giao dịch không thành công do: Thẻ/Tài khoản của khách hàng chưa đăng ký dịch vụ InternetBanking tại ngân hàng.',
+            '10': 'Giao dịch không thành công do: Khách hàng xác thực thông tin thẻ/tài khoản không đúng quá 3 lần',
+            '11': 'Giao dịch không thành công do: Đã hết hạn chờ thanh toán. Xin quý khách vui lòng thực hiện lại giao dịch.',
+            '12': 'Giao dịch không thành công do: Thẻ/Tài khoản của khách hàng bị khóa.',
+            '13': 'Giao dịch không thành công do Quý khách nhập sai mật khẩu xác thực giao dịch (OTP).',
+            '24': 'Giao dịch không thành công do: Khách hàng hủy giao dịch',
+            '51': 'Giao dịch không thành công do: Tài khoản của quý khách không đủ số dư để thực hiện giao dịch.',
+            '65': 'Giao dịch không thành công do: Tài khoản của Quý khách đã vượt quá hạn mức giao dịch trong ngày.',
+            '75': 'Ngân hàng thanh toán đang bảo trì.',
+            '79': 'Giao dịch không thành công do: KH nhập sai mật khẩu thanh toán quá số lần quy định.',
+            '99': 'Các lỗi khác (lỗi còn lại, không có trong danh sách mã lỗi đã liệt kê)'
+          };
+          const errorMessage = errorMessages[vnp_ResponseCode] || 'Giao dịch không thành công';
+          
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+          const redirectParams = new URLSearchParams({
+            success: 'false',
+            responseCode: vnp_ResponseCode,
+            message: encodeURIComponent(errorMessage),
+            txnRef: vnp_TxnRef,
+            amount: vnp_Amount,
+            orderId: hoaDon?.ID || '',
+            orderCode: orderCode,
+            cartItems: hoaDon ? JSON.stringify(hoaDon.chiTiet.map(item => ({
+              id: item.SanPhamID,
+              name: item.sanPham.Ten,
+              price: item.DonGia,
+              quantity: item.SoLuong,
+              image: item.sanPham.HinhAnhURL || '',
+              stock: item.sanPham.Ton
+            }))) : '[]'
           });
-
-          if (!gioHang) {
-            gioHang = await db.GioHang.create({
-              TaiKhoanID: taiKhoan.ID
-            }, { transaction });
-            console.log('✅ Đã tạo giỏ hàng mới:', gioHang.ID);
-          }
-
-          // Khôi phục từng sản phẩm vào giỏ hàng
-          for (const item of hoaDon.chiTiet) {
-            // Kiểm tra sản phẩm đã có trong giỏ hàng chưa
-            const existingItem = await db.GioHangChiTiet.findOne({
-              where: {
-                GioHangID: gioHang.ID,
-                SanPhamID: item.SanPhamID
-              },
-              transaction
-            });
-
-            if (existingItem) {
-              // Nếu đã có, cộng thêm số lượng
-              await existingItem.update({
-                SoLuong: existingItem.SoLuong + item.SoLuong
-              }, { transaction });
-              console.log(`✅ Cập nhật số lượng sản phẩm "${item.sanPham.Ten}" trong giỏ: ${existingItem.SoLuong} + ${item.SoLuong}`);
-            } else {
-              // Nếu chưa có, thêm mới
-              await db.GioHangChiTiet.create({
-                GioHangID: gioHang.ID,
-                SanPhamID: item.SanPhamID,
-                SoLuong: item.SoLuong,
-                DonGia: item.DonGia
-              }, { transaction });
-              console.log(`✅ Đã thêm sản phẩm "${item.sanPham.Ten}" vào giỏ hàng`);
-            }
-          }
-
-          console.log('✅ Đã khôi phục giỏ hàng thành công');
-        } else {
-          console.log('⚠️ Không tìm thấy tài khoản để khôi phục giỏ hàng');
+          
+          return res.redirect(`${frontendUrl}/payment/return?${redirectParams.toString()}`);
         }
 
-        // Hoàn trả số lượng sản phẩm về kho
-        for (const item of hoaDon.chiTiet) {
-          await db.SanPham.update(
-            { Ton: db.sequelize.literal(`Ton + ${item.SoLuong}`) },
-            {
-              where: { ID: item.SanPhamID },
-              transaction
-            }
-          );
+        console.log(`📝 Hủy đơn hàng - Không cần hoàn trả kho (chưa trừ kho)`);
 
-          console.log(`✅ Hoàn trả ${item.SoLuong} sản phẩm "${item.sanPham.Ten}" về kho`);
-        }
+        // ⚠️ QUAN TRỌNG: KHÔNG hoàn trả kho vì kho chưa bị trừ
+        // Logic: Kho CHỈ bị trừ KHI THANH TOÁN THÀNH CÔNG (vnp_ResponseCode === '00')
+        // Khi thanh toán thất bại, kho vẫn nguyên như ban đầu
+        // Chỉ cần cập nhật trạng thái đơn hàng thành "Đã hủy"
 
         // Cập nhật trạng thái đơn hàng thành "Đã hủy"
-        const cancelNote = `Thanh toán VNPay thất bại - Mã lỗi: ${vnp_ResponseCode} - Đã hoàn trả sản phẩm về kho và giỏ hàng`;
+        const cancelNote = `Thanh toán VNPay thất bại - Mã lỗi: ${vnp_ResponseCode} - Đơn hàng đã hủy (Return URL)`;
         await hoaDon.update({
           TrangThai: 'Đã hủy',
           GhiChu: hoaDon.GhiChu ? `${hoaDon.GhiChu} | ${cancelNote}` : cancelNote
         }, { transaction });
 
-        console.log('✅ Đã hủy đơn hàng, hoàn trả sản phẩm về kho và khôi phục giỏ hàng');
+        console.log('✅ Đã hủy đơn hàng - Kho giữ nguyên');
       }
 
       // Commit transaction
@@ -405,7 +611,17 @@ exports.vnpayReturn = async (req, res) => {
         responseCode: vnp_ResponseCode,
         message: encodeURIComponent(errorMessage),
         txnRef: vnp_TxnRef,
-        amount: vnp_Amount
+        amount: vnp_Amount,
+        orderId: hoaDon?.ID || '',
+        orderCode: orderCode,
+        cartItems: hoaDon ? JSON.stringify(hoaDon.chiTiet.map(item => ({
+          id: item.SanPhamID,
+          name: item.sanPham.Ten,
+          price: item.DonGia,
+          quantity: item.SoLuong,
+          image: item.sanPham.HinhAnhURL || '',
+          stock: item.sanPham.Ton
+        }))) : '[]'
       });
       
       return res.redirect(`${frontendUrl}/payment/return?${redirectParams.toString()}`);
@@ -527,10 +743,22 @@ exports.vnpayIPN = async (req, res) => {
     // Xử lý theo response code
     if (vnp_ResponseCode === '00') {
       // Thanh toán thành công - cập nhật đơn hàng
-      await hoaDon.update({
-        TrangThai: 'Đã thanh toán',
-        GhiChu: `Thanh toán VNPay - Mã GD: ${vnp_TransactionNo} - Ngân hàng: ${vnp_BankCode}`
-      }, { transaction });
+      const paymentInfo = {
+        transactionNo: vnp_TransactionNo,
+        bankCode: vnp_BankCode,
+        source: 'IPN'
+      };
+
+      const result = await processPaymentSuccess(hoaDon, paymentInfo, transaction);
+
+      if (!result.success) {
+        await transaction.rollback();
+        console.error('❌ Lỗi xử lý thanh toán:', result.message);
+        return res.status(200).json({
+          RspCode: '99',
+          Message: result.message
+        });
+      }
 
       await transaction.commit();
       console.log('✅ IPN - Cập nhật đơn hàng thành công');
@@ -540,32 +768,24 @@ exports.vnpayIPN = async (req, res) => {
         Message: 'Success'
       });
     } else {
-      // ✨ Thanh toán thất bại - HOÀN TRẢ SẢN PHẨM VỀ KHO
+      // ❌ Thanh toán thất bại - CHỈ HỦY ĐƠN HÀNG (KHÔNG hoàn trả kho)
       console.log('❌ IPN - Giao dịch thất bại - Mã lỗi:', vnp_ResponseCode);
-      console.log(`🔄 IPN - Bắt đầu hoàn trả ${hoaDon.chiTiet.length} sản phẩm về kho`);
+      console.log(`📝 IPN - Hủy đơn hàng - Không cần hoàn trả kho (chưa trừ kho)`);
 
-      // Hoàn trả số lượng sản phẩm về kho
-      for (const item of hoaDon.chiTiet) {
-        await db.SanPham.update(
-          { Ton: db.sequelize.literal(`Ton + ${item.SoLuong}`) },
-          {
-            where: { ID: item.SanPhamID },
-            transaction
-          }
-        );
-
-        console.log(`✅ IPN - Hoàn trả ${item.SoLuong} sản phẩm "${item.sanPham.Ten}" về kho`);
-      }
+      // ⚠️ QUAN TRỌNG: KHÔNG hoàn trả kho vì kho chưa bị trừ
+      // Logic: Kho CHỈ bị trừ KHI THANH TOÁN THÀNH CÔNG (vnp_ResponseCode === '00')
+      // Khi thanh toán thất bại, kho vẫn nguyên như ban đầu
+      // Chỉ cần cập nhật trạng thái đơn hàng thành "Đã hủy"
 
       // Cập nhật trạng thái đơn hàng thành "Đã hủy"
-      const cancelNote = `Thanh toán VNPay thất bại - Mã lỗi: ${vnp_ResponseCode} - Đã hoàn trả sản phẩm về kho (IPN)`;
+      const cancelNote = `Thanh toán VNPay thất bại - Mã lỗi: ${vnp_ResponseCode} - Đơn hàng đã hủy (IPN)`;
       await hoaDon.update({
         TrangThai: 'Đã hủy',
         GhiChu: hoaDon.GhiChu ? `${hoaDon.GhiChu} | ${cancelNote}` : cancelNote
       }, { transaction });
 
       await transaction.commit();
-      console.log('✅ IPN - Đã hủy đơn hàng và hoàn trả sản phẩm về kho');
+      console.log('✅ IPN - Đã hủy đơn hàng - Kho giữ nguyên');
 
       return res.status(200).json({
         RspCode: '00',

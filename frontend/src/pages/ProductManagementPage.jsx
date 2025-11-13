@@ -1,5 +1,5 @@
 // src/pages/ProductManagementPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ProductTable from '../components/ProductTable';
@@ -8,8 +8,9 @@ import Pagination from '../components/Pagination';
 import Toast from '../components/Toast';
 import { Button, Card, Input, Switch } from '../components/ui';
 import AdminLayout from '../layouts/AdminLayout';
+import config from '../config';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = config.API_URL;
 
 const ProductManagementPage = () => {
   const navigate = useNavigate();

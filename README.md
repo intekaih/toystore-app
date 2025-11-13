@@ -63,7 +63,7 @@ module.exports = {
 
 ```bash
 npm start
-# Backend chạy tại: http://localhost:5000
+# Backend chạy tại: http://localhost:6000
 ```
 
 ---
@@ -185,7 +185,7 @@ taskkill /PID <PID> /F
 ### Frontend không kết nối được Backend:
 Kiểm tra file `frontend/src/api/config.js`:
 ```javascript
-export const API_URL = 'http://localhost:5000/api';
+export const API_URL = 'http://localhost:6000/api';
 ```
 
 ---

@@ -221,7 +221,10 @@ exports.login = async (req, res) => {
           tenDangNhap: user.TenDangNhap,
           vaiTro: user.VaiTro || 'user',
           hoTen: user.HoTen || '',
-          email: user.Email || ''
+          email: user.Email || '',
+          dienThoai: user.DienThoai || '',
+          ngayTao: user.NgayTao,
+          enable: user.Enable
         }
       }
     });
@@ -308,7 +311,10 @@ exports.adminLogin = async (req, res) => {
           username: user.TenDangNhap,
           role: user.VaiTro,
           hoTen: user.HoTen,
-          email: user.Email
+          email: user.Email,
+          dienThoai: user.DienThoai || '',
+          ngayTao: user.NgayTao,
+          enable: user.Enable
         }
       }
     });

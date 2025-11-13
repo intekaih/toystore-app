@@ -5,6 +5,7 @@ import AdminLayout from '../layouts/AdminLayout';
 import authService from '../services/authService';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
+import config from '../config';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -32,7 +33,7 @@ const AdminDashboard = () => {
           return;
         }
 
-        const response = await axios.get('http://localhost:5000/api/admin/statistics/dashboard', {
+        const response = await axios.get(config.endpoints.admin.statistics.dashboard, {
           headers: {
             'Authorization': `Bearer ${token}`
           }

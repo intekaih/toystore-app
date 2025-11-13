@@ -196,7 +196,7 @@ const AdminLayout = ({ children }) => {
       )}
 
       {/* Main Content - Container */}
-      <main className="container-cute py-6">
+      <main className="container-cute py-6 min-h-[calc(100vh-200px)]">
         {children}
       </main>
 

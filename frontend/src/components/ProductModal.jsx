@@ -1,5 +1,6 @@
 // src/components/ProductModal.jsx
 import React, { useState, useEffect, useRef } from 'react';
+import config from '../config';
 import '../styles/ProductModal.css';
 
 const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, mode }) => {
@@ -31,13 +32,12 @@ const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, m
           Enable: editingProduct.enable !== undefined ? editingProduct.enable : true
         });
         
-        // Set preview cho ảnh cũ - Sửa từ hinhAnh thành hinhAnhURL
-        if (editingProduct.hinhAnhURL) {
-          const imageUrl = editingProduct.hinhAnhURL.startsWith('http') 
-            ? editingProduct.hinhAnhURL 
-            : `http://localhost:5000${editingProduct.hinhAnhURL}`;
-          setImagePreview(imageUrl);
-        }
+        // Set preview cho ảnh cũ sử dụng config.getImageUrl()
+        setImagePreview(
+          editingProduct.hinhAnhURL 
+            ? config.getImageUrl(editingProduct.hinhAnhURL)
+            : null
+        );
       } else {
         setFormData({
           Ten: '',

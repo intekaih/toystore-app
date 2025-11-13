@@ -1,39 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getOrderDetail, cancelOrder } from '../api/orderApi';
+import { getOrderDetail, getPublicOrderDetail, cancelOrder } from '../api/orderApi';
 import MainLayout from '../layouts/MainLayout';
 import { Button, Badge, Loading, Modal } from '../components/ui';
 import { ArrowLeft, Package, User, MapPin, Phone, Mail, Calendar, CreditCard, FileText, AlertTriangle } from 'lucide-react';
 import Toast from '../components/Toast';
+import config from '../config';
 
 const OrderDetailPage = () => {
   // Backend API URL
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const API_BASE_URL = config.API_BASE_URL;
   
   // Build full image URL
   const buildImageUrl = (imagePath) => {
     if (!imagePath) return '/barbie.jpg';
-    
-    // Nếu đã là full URL (http/https)
-    if (imagePath.startsWith('http')) {
-      return imagePath;
-    }
-    
-    // Nếu bắt đầu với /uploads/
-    if (imagePath.startsWith('/uploads/')) {
-      return `${API_BASE_URL}${imagePath}`;
-    }
-    
-    // Nếu chỉ là filename
-    if (!imagePath.startsWith('/')) {
-      return `${API_BASE_URL}/uploads/${imagePath}`;
-    }
-    
+    if (imagePath.startsWith('http')) return imagePath;
+    if (imagePath.startsWith('/uploads/')) return `${API_BASE_URL}${imagePath}`;
+    if (!imagePath.startsWith('/')) return `${API_BASE_URL}/uploads/${imagePath}`;
     return '/barbie.jpg';
   };
   
-  // Handle image error
   const handleImageError = (e) => {
     console.warn('❌ Lỗi load ảnh trong chi tiết đơn hàng:', e.target.src);
     if (!e.target.src.includes('barbie.jpg')) {
@@ -48,21 +35,40 @@ const OrderDetailPage = () => {
   const [canceling, setCanceling] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { id } = useParams();
+  const location = useLocation();
+  const { id, orderCode } = useParams();
+
+  // ✅ Xác định loại route: /order/:orderCode (guest) hay /orders/:id (user)
+  const isPublicRoute = location.pathname.startsWith('/order/');
+  const isGuestView = !user && isPublicRoute;
 
   useEffect(() => {
-    if (!user) {
-      showToast('Vui lòng đăng nhập để xem đơn hàng', 'warning');
-      setTimeout(() => navigate('/login'), 1500);
-      return;
-    }
     loadOrderDetail();
-  }, [user, navigate, id]);
+  }, [id, orderCode, user]);
 
   const loadOrderDetail = async () => {
     try {
       setLoading(true);
-      const response = await getOrderDetail(id);
+      
+      let response;
+      
+      // ✅ Phân biệt giữa guest và user đã đăng nhập
+      if (isPublicRoute && orderCode) {
+        // Guest user: Gọi API public bằng orderCode
+        console.log('👤 Guest user - Lấy đơn hàng công khai:', orderCode);
+        response = await getPublicOrderDetail(orderCode);
+      } else if (id) {
+        // Logged-in user: Gọi API cần token bằng ID
+        if (!user) {
+          showToast('Vui lòng đăng nhập để xem đơn hàng', 'warning');
+          setTimeout(() => navigate('/login'), 1500);
+          return;
+        }
+        console.log('🔐 User đã đăng nhập - Lấy đơn hàng:', id);
+        response = await getOrderDetail(id);
+      } else {
+        throw new Error('Thiếu thông tin đơn hàng');
+      }
 
       if (response.success) {
         console.log('📦 Dữ liệu đơn hàng từ backend:', response.data.hoaDon);
@@ -71,7 +77,13 @@ const OrderDetailPage = () => {
     } catch (error) {
       console.error('Error loading order detail:', error);
       showToast(error.message || 'Không thể tải chi tiết đơn hàng', 'error');
-      setTimeout(() => navigate('/orders'), 2000);
+      setTimeout(() => {
+        if (isPublicRoute) {
+          navigate('/');
+        } else {
+          navigate('/orders');
+        }
+      }, 2000);
     } finally {
       setLoading(false);
     }
@@ -148,9 +160,9 @@ const OrderDetailPage = () => {
           <Button 
             variant="primary"
             icon={<ArrowLeft size={20} />}
-            onClick={() => navigate('/orders')}
+            onClick={() => navigate(isPublicRoute ? '/order-lookup' : '/orders')}
           >
-            Quay lại danh sách đơn hàng
+            {isPublicRoute ? 'Tra cứu đơn hàng khác' : 'Quay lại danh sách đơn hàng'}
           </Button>
         </div>
       </MainLayout>
@@ -162,11 +174,11 @@ const OrderDetailPage = () => {
       <div className="container-cute py-8">
         {/* Back Button */}
         <button
-          onClick={() => navigate('/orders')}
+          onClick={() => navigate(isPublicRoute ? '/order-lookup' : '/orders')}
           className="flex items-center gap-2 px-4 py-2 mb-6 text-primary-600 hover:text-primary-700 font-semibold transition-colors"
         >
           <ArrowLeft size={20} />
-          <span>Quay lại danh sách đơn hàng</span>
+          <span>{isPublicRoute ? 'Tra cứu đơn hàng khác' : 'Quay lại danh sách đơn hàng'}</span>
         </button>
 
         {/* Header */}

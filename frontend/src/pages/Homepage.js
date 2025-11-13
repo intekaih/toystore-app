@@ -6,6 +6,7 @@ import { addToCart } from '../api/cartApi.js';
 import { ShoppingBag, Sparkles, TrendingUp, Users, Star, ArrowRight } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import { ProductCard, Loading, Button } from '../components/ui';
+import ProductQuickViewModal from '../components/ProductQuickViewModal.jsx';
 import Toast from '../components/Toast.js';
 
 const Homepage = () => {
@@ -13,6 +14,8 @@ const Homepage = () => {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [toast, setToast] = useState(null);
+  const [quickViewProduct, setQuickViewProduct] = useState(null);
+  const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
   const [stats, setStats] = useState({
     totalProducts: 0,
     categories: 4,
@@ -56,24 +59,35 @@ const Homepage = () => {
   };
 
   const handleAddToCart = async (product) => {
-    if (!user) {
-      showToast('Vui lòng đăng nhập để thêm vào giỏ hàng', 'warning', 3000);
-      setTimeout(() => navigate('/login'), 1500);
-      return;
-    }
-
+    // ✅ BỎ KIỂM TRA ĐĂNG NHẬP - Cho phép guest thêm vào giỏ hàng
+    
     try {
       setAdding(true);
-      // ✅ Sửa: ưu tiên ID trước, sau đó mới đến các tên cũ
       const productId = product.ID || product.id || product.MaSP || product.maSP;
-      const response = await addToCart(productId, 1);
+      
+      // Thông tin sản phẩm cho guest user
+      const productInfo = {
+        name: product.Ten || product.ten || product.tenSP || product.TenSP,
+        price: product.GiaBan || product.giaBan || product.gia || 0,
+        image: product.HinhAnhURL || product.hinhAnhURL || product.image || '',
+        stock: product.Ton || product.ton || product.soLuong || 999
+      };
+      
+      const response = await addToCart(productId, 1, productInfo);
 
       if (response.success) {
         showToast(
-          response.message || `Đã thêm ${product.Ten || product.ten || product.tenSP || product.TenSP} vào giỏ hàng`,
+          `Đã thêm ${productInfo.name} vào giỏ hàng`,
           'success',
           3000
         );
+        
+        // Nếu không đăng nhập, hiển thị thông báo thêm
+        if (!user) {
+          setTimeout(() => {
+            showToast('💡 Bạn có thể thanh toán mà không cần đăng nhập!', 'info', 3000);
+          }, 500);
+        }
       }
     } catch (error) {
       console.error('❌ Lỗi thêm vào giỏ hàng:', error);
@@ -81,6 +95,26 @@ const Homepage = () => {
     } finally {
       setAdding(false);
     }
+  };
+
+  // 👁️ Xử lý xem nhanh sản phẩm
+  const handleQuickView = (product) => {
+    console.log('👁️ Quick view product:', product);
+    setQuickViewProduct(product);
+    setIsQuickViewOpen(true);
+  };
+
+  // ❤️ Xử lý thêm vào yêu thích
+  const handleFavorite = (product) => {
+    if (!user) {
+      showToast('Vui lòng đăng nhập để thêm vào yêu thích', 'warning', 3000);
+      setTimeout(() => navigate('/login'), 1500);
+      return;
+    }
+    
+    const productName = product.Ten || product.ten || product.tenSP || product.TenSP;
+    showToast(`❤️ Đã thêm "${productName}" vào danh sách yêu thích!`, 'success', 3000);
+    // TODO: Implement wishlist API call
   };
 
   return (
@@ -200,6 +234,8 @@ const Homepage = () => {
                   <ProductCard 
                     product={product}
                     onAddToCart={handleAddToCart}
+                    onQuickView={handleQuickView}
+                    onFavorite={handleFavorite}
                   />
                 </div>
               ))}
@@ -278,6 +314,15 @@ const Homepage = () => {
           </div>
         </div>
       </section>
+
+      {/* 👁️ Quick View Modal */}
+      <ProductQuickViewModal
+        isOpen={isQuickViewOpen}
+        onClose={() => setIsQuickViewOpen(false)}
+        product={quickViewProduct}
+        onAddToCart={handleAddToCart}
+        onFavorite={handleFavorite}
+      />
 
       {/* Toast Notification */}
       {toast && (

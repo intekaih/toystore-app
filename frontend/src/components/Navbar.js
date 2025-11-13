@@ -79,14 +79,14 @@ const Navbar = () => {
               )}
             </Link>
             <Link 
-              to="/orders" 
+              to={user ? "/orders" : "/order-lookup"}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold relative ${
-                isActive('/orders') ? 'text-primary-600' : ''
+                isActive('/orders') || isActive('/order-lookup') ? 'text-primary-600' : ''
               }`}
             >
               <Package size={18} />
               <span>Đơn hàng</span>
-              {isActive('/orders') && (
+              {(isActive('/orders') || isActive('/order-lookup')) && (
                 <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/4 h-0.5 bg-gradient-to-r from-pink-400 to-pink-500 rounded-full"></span>
               )}
             </Link>

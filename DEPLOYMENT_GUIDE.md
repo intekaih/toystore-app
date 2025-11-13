@@ -96,7 +96,7 @@ DB_PORT=1433
 JWT_SECRET=your_random_jwt_secret_key_change_this  # ĐỔI KEY NÀY!
 
 # Server Configuration
-PORT=5000
+PORT=6000
 NODE_ENV=production
 ```
 
@@ -162,6 +162,16 @@ sudo certbot --nginx -d toystore.intekaih.id.vn
 ## Bước 10: Kiểm tra và test
 
 Truy cập: http://toystore.intekaih.id.vn hoặc https://toystore.intekaih.id.vn
+
+## ✅ Testing Backend
+
+```bash
+# Test health endpoint
+curl http://localhost:6000/api/health
+
+# Test product endpoint
+curl http://localhost:6000/api/products
+```
 
 ```bash
 # Kiểm tra logs
@@ -266,7 +276,7 @@ docker-compose logs [service_name]
 
 - Kiểm tra API URL trong frontend code
 - Kiểm tra Nginx config
-- Test backend trực tiếp: `curl http://localhost:5000/api/health`
+- Test backend trực tiếp: `curl http://localhost:6000/api/health`
 
 ### 4. Nginx 502 Bad Gateway
 

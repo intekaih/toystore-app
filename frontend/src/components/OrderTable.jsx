@@ -1,5 +1,6 @@
 // src/components/OrderTable.jsx
 import React, { useState } from 'react';
+import config from '../config';
 import '../styles/OrderTable.css';
 
 const OrderTable = ({ orders, onUpdateStatus, loading }) => {
@@ -204,7 +205,7 @@ const OrderTable = ({ orders, onUpdateStatus, loading }) => {
                                 <div className="product-image">
                                   {item.sanPham?.hinhAnhURL ? (
                                     <img 
-                                      src={`http://localhost:5000${item.sanPham.hinhAnhURL}`}
+                                      src={config.getImageUrl(item.sanPham.hinhAnhURL)}
                                       alt={item.sanPham?.ten || 'Sản phẩm'}
                                       onError={(e) => {
                                         e.target.onerror = null;

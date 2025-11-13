@@ -1,6 +1,7 @@
 import axios from 'axios';
+import config from '../config';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
+const API_URL = config.API_URL; // Sửa từ API_BASE_URL thành API_URL
 
 class AuthService {
   constructor() {
@@ -9,7 +10,7 @@ class AuthService {
     
     // Tạo axios instance
     this.api = axios.create({
-      baseURL: API_BASE_URL,
+      baseURL: API_URL, // Sửa từ API_BASE_URL thành API_URL
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
@@ -22,8 +23,6 @@ class AuthService {
    */
   async login(loginData) {
     try {
-      console.log('🔐 Đang gửi request đăng nhập...');
-      
       const response = await this.api.post('/auth/login', loginData);
       
       if (response.data && response.data.success) {
@@ -32,7 +31,6 @@ class AuthService {
         // Lưu vào localStorage
         this.setAuth(token, user);
         
-        console.log('✅ Đăng nhập thành công:', user);
         return { token, user };
       } else {
         throw new Error(response.data.message || 'Đăng nhập thất bại');
@@ -47,11 +45,12 @@ class AuthService {
           case 400:
             throw new Error(data.message || 'Thông tin đăng nhập không hợp lệ');
           case 401:
-            throw new Error('Tên đăng nhập hoặc mật khẩu không đúng');
+            // Backend trả về 401 cho cả "không tìm thấy user" và "sai mật khẩu"
+            throw new Error(data.message || 'Tên đăng nhập hoặc mật khẩu không đúng');
           case 403:
-            throw new Error('Tài khoản đã bị khóa');
-          case 404:
-            throw new Error('Tài khoản không tồn tại');
+            throw new Error(data.message || 'Tài khoản đã bị khóa');
+          case 429:
+            throw new Error(data.message || 'Quá nhiều lần thử. Vui lòng thử lại sau');
           case 500:
             throw new Error('Lỗi máy chủ, vui lòng thử lại sau');
           default:
@@ -70,12 +69,9 @@ class AuthService {
    */
   async register(registerData) {
     try {
-      console.log('📝 Đang gửi request đăng ký...');
-      
       const response = await this.api.post('/auth/register', registerData);
       
       if (response.data && response.data.success) {
-        console.log('✅ Đăng ký thành công');
         return response.data;
       } else {
         throw new Error(response.data.message || 'Đăng ký thất bại');

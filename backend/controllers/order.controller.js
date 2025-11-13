@@ -1,4 +1,12 @@
 const db = require('../models');
+const Decimal = require('decimal.js'); // ✅ Thêm Decimal.js cho tính toán chính xác
+
+// ✅ IMPORT DECORATOR PATTERN
+const { OrderPriceCalculator } = require('../decorators/OrderPriceDecorator');
+const VATDecorator = require('../decorators/VATDecorator');
+const ShippingDecorator = require('../decorators/ShippingDecorator');
+const VoucherDecorator = require('../decorators/VoucherDecorator');
+
 const HoaDon = db.HoaDon;
 const ChiTietHoaDon = db.ChiTietHoaDon;
 const GioHang = db.GioHang;
@@ -8,29 +16,68 @@ const KhachHang = db.KhachHang;
 const PhuongThucThanhToan = db.PhuongThucThanhToan;
 const TaiKhoan = db.TaiKhoan;
 
-// Hàm tạo mã hóa đơn tự động
-const generateOrderCode = async () => {
-  const today = new Date();
-  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, ''); // Format: YYYYMMDD
-  
-  // Tìm hóa đơn cuối cùng trong ngày
-  const lastOrder = await HoaDon.findOne({
-    where: {
-      MaHD: {
-        [db.Sequelize.Op.like]: `HD${dateStr}%`
+/**
+ * ✅ HÀM TẠO MÃ HÓA ĐƠN TỰ ĐỘNG - THREAD SAFE
+ * Sử dụng pessimistic locking để tránh race condition
+ * 
+ * @param {Object} transaction - Sequelize transaction (bắt buộc)
+ * @param {number} maxRetries - Số lần thử lại tối đa (mặc định: 3)
+ * @returns {Promise<string>} Mã hóa đơn unique
+ */
+const generateOrderCode = async (transaction, maxRetries = 3) => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const today = new Date();
+      const dateStr = today.toISOString().slice(0, 10).replace(/-/g, ''); // Format: YYYYMMDD
+      
+      // ✅ PESSIMISTIC LOCKING - Lock bản ghi cuối cùng trong ngày
+      // Điều này ngăn các transaction khác đọc cùng lúc
+      const lastOrder = await HoaDon.findOne({
+        where: {
+          MaHD: {
+            [db.Sequelize.Op.like]: `HD${dateStr}%`
+          }
+        },
+        order: [['ID', 'DESC']],
+        lock: transaction.LOCK.UPDATE, // 🔒 LOCK bản ghi này
+        transaction // Bắt buộc phải có transaction
+      });
+      
+      let sequence = 1;
+      if (lastOrder) {
+        const lastSequence = parseInt(lastOrder.MaHD.slice(-3));
+        sequence = lastSequence + 1;
+        
+        console.log(`📄 [Attempt ${attempt}] Tìm thấy đơn hàng cuối: ${lastOrder.MaHD}, sequence tiếp theo: ${sequence}`);
+      } else {
+        console.log(`📄 [Attempt ${attempt}] Không có đơn hàng trong ngày, bắt đầu từ sequence: 1`);
       }
-    },
-    order: [['ID', 'DESC']]
-  });
-  
-  let sequence = 1;
-  if (lastOrder) {
-    const lastSequence = parseInt(lastOrder.MaHD.slice(-3));
-    sequence = lastSequence + 1;
+      
+      // ✅ KIỂM TRA SEQUENCE KHÔNG VƯỢT QUÁ 999
+      if (sequence > 999) {
+        throw new Error(`Đã vượt quá giới hạn đơn hàng trong ngày (${sequence}/999)`);
+      }
+      
+      const orderCode = `HD${dateStr}${sequence.toString().padStart(3, '0')}`;
+      
+      console.log(`✅ [Attempt ${attempt}] Tạo mã hóa đơn: ${orderCode}`);
+      
+      return orderCode;
+      
+    } catch (error) {
+      console.error(`❌ [Attempt ${attempt}/${maxRetries}] Lỗi tạo mã hóa đơn:`, error.message);
+      
+      // Nếu đã hết số lần thử → throw error
+      if (attempt >= maxRetries) {
+        throw new Error(`Không thể tạo mã hóa đơn sau ${maxRetries} lần thử: ${error.message}`);
+      }
+      
+      // Đợi một khoảng ngẫu nhiên trước khi thử lại (100-300ms)
+      const delay = Math.floor(Math.random() * 200) + 100;
+      console.log(`⏳ Đợi ${delay}ms trước khi thử lại...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
   }
-  
-  const orderCode = `HD${dateStr}${sequence.toString().padStart(3, '0')}`;
-  return orderCode;
 };
 
 // Tạo đơn hàng từ giỏ hàng
@@ -106,21 +153,49 @@ exports.createOrder = async (req, res) => {
 
     console.log(`📦 Tìm thấy ${gioHang.chiTiet.length} sản phẩm trong giỏ hàng`);
 
-    // Validate từng sản phẩm trong giỏ hàng
+    // ✅ PESSIMISTIC LOCKING - LOCK SẢN PHẨM TRONG DB ĐỂ TRÁNH RACE CONDITION
+    console.log('🔒 Bắt đầu kiểm tra và lock tồn kho...');
     const validationErrors = [];
+    const lockedProducts = []; // Lưu sản phẩm đã lock để debug
+
     for (const item of gioHang.chiTiet) {
-      if (!item.sanPham || !item.sanPham.Enable) {
+      // ✅ SELECT FOR UPDATE - Lock bản ghi sản phẩm cho đến khi transaction kết thúc
+      // Điều này ngăn các transaction khác đọc/ghi vào sản phẩm này
+      const sanPham = await SanPham.findByPk(item.SanPhamID, {
+        lock: transaction.LOCK.UPDATE, // 🔒 PESSIMISTIC LOCK
+        transaction
+      });
+
+      if (!sanPham || !sanPham.Enable) {
         validationErrors.push(`Sản phẩm "${item.sanPham?.Ten || 'Unknown'}" không còn tồn tại hoặc đã ngừng kinh doanh`);
+        console.error(`❌ Sản phẩm ID ${item.SanPhamID} không tồn tại hoặc bị vô hiệu hóa`);
         continue;
       }
 
-      if (item.SoLuong > item.sanPham.Ton) {
-        validationErrors.push(`Sản phẩm "${item.sanPham.Ten}" chỉ còn ${item.sanPham.Ton} trong kho`);
+      // ✅ KIỂM TRA TỒN KHO SAU KHI ĐÃ LOCK
+      // Lúc này tồn kho là giá trị CHÍNH XÁC, không bị thay đổi bởi transaction khác
+      if (item.SoLuong > sanPham.Ton) {
+        validationErrors.push(`Sản phẩm "${sanPham.Ten}" chỉ còn ${sanPham.Ton} trong kho (bạn đang yêu cầu ${item.SoLuong})`);
+        console.error(`❌ Sản phẩm "${sanPham.Ten}": Yêu cầu ${item.SoLuong}, Còn ${sanPham.Ton}`);
+        continue;
       }
+
+      // ✅ GHI LOG SẢN PHẨM ĐÃ LOCK THÀNH CÔNG
+      lockedProducts.push({
+        id: sanPham.ID,
+        ten: sanPham.Ten,
+        tonKho: sanPham.Ton,
+        soLuongDat: item.SoLuong,
+        conLai: sanPham.Ton - item.SoLuong
+      });
+      
+      console.log(`🔒 Đã lock sản phẩm "${sanPham.Ten}" - Tồn: ${sanPham.Ton}, Đặt: ${item.SoLuong}`);
     }
 
+    // ❌ Nếu có lỗi validation → Rollback và trả về lỗi
     if (validationErrors.length > 0) {
       await transaction.rollback();
+      console.error('❌ Validation failed:', validationErrors);
       return res.status(400).json({
         success: false,
         message: 'Có lỗi với một số sản phẩm trong giỏ hàng',
@@ -128,13 +203,75 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    // Tính tổng tiền từ giỏ hàng
-    let tongTien = 0;
-    gioHang.chiTiet.forEach(item => {
-      tongTien += parseFloat(item.DonGia) * item.SoLuong;
-    });
+    console.log(`✅ Đã lock và validate ${lockedProducts.length} sản phẩm thành công`);
 
-    console.log(`💰 Tổng tiền đơn hàng: ${tongTien.toLocaleString('vi-VN')} VNĐ`);
+    // ✅ SỬ DỤNG DECORATOR PATTERN ĐỂ TÍNH GIÁ
+    console.log('💰 Bắt đầu tính giá với Decorator Pattern...');
+    
+    // Bước 1: Tạo danh sách items cho calculator
+    const items = gioHang.chiTiet.map(item => ({
+      sanPhamId: item.SanPhamID,
+      ten: item.sanPham.Ten,
+      soLuong: item.SoLuong,
+      donGia: item.DonGia
+    }));
+
+    // Bước 2: Tạo base calculator
+    let priceCalculator = new OrderPriceCalculator(items);
+    console.log(`📊 Tổng tiền sản phẩm: ${priceCalculator.calculate().toFixed(2)} VNĐ`);
+
+    // Bước 3: Thêm VAT 10% (nếu cần)
+    const VAT_RATE = 0.1; // 10% VAT
+    priceCalculator = new VATDecorator(priceCalculator, VAT_RATE);
+    console.log(`📊 Sau khi thêm VAT ${VAT_RATE * 100}%: ${priceCalculator.calculate().toFixed(2)} VNĐ`);
+
+    // Bước 4: Thêm phí ship (nếu có)
+    const SHIPPING_FEE = 30000; // 30k phí ship cố định
+    priceCalculator = new ShippingDecorator(priceCalculator, SHIPPING_FEE, {
+      method: 'Standard',
+      estimatedDays: '3-5'
+    });
+    console.log(`📊 Sau khi thêm phí ship: ${priceCalculator.calculate().toFixed(2)} VNĐ`);
+
+    // Bước 5: Áp dụng voucher (nếu có trong request)
+    // TODO: Implement voucher logic from request body
+    // const { voucherCode } = req.body;
+    // if (voucherCode) {
+    //   const voucher = await Voucher.findOne({ where: { MaVoucher: voucherCode, Enable: true } });
+    //   if (voucher) {
+    //     priceCalculator = new VoucherDecorator(priceCalculator, {
+    //       code: voucher.MaVoucher,
+    //       type: voucher.LoaiGiamGia,
+    //       value: voucher.GiaTriGiam,
+    //       maxDiscount: voucher.GiamToiDa,
+    //       minOrderValue: voucher.GiaTriDonHangToiThieu
+    //     });
+    //   }
+    // }
+
+    // Bước 6: Lấy chi tiết giá và tổng tiền cuối cùng
+    const priceDetails = priceCalculator.getDetails();
+    const tongTienCuoi = priceCalculator.calculate();
+
+    console.log('💰 Chi tiết giá:', JSON.stringify(priceDetails, null, 2));
+    console.log(`💰 Tổng tiền cuối cùng: ${tongTienCuoi.toFixed(2)} VNĐ`);
+
+    // ✅ TRÍCH XUẤT CÁC GIÁ TRỊ TỪ DECORATOR DETAILS
+    const tongTienSanPham = new Decimal(priceDetails.tongTienSanPham || 0);
+    const vatRate = priceDetails.vat ? new Decimal(priceDetails.vat.rate) : new Decimal(0);
+    const tienVAT = priceDetails.vat ? new Decimal(priceDetails.vat.amount) : new Decimal(0);
+    const phiShip = priceDetails.shipping ? new Decimal(priceDetails.shipping.fee) : new Decimal(0);
+    const giamGia = priceDetails.voucher ? new Decimal(priceDetails.voucher.discountAmount) : new Decimal(0);
+    const voucherId = priceDetails.voucher ? priceDetails.voucher.voucherId : null;
+
+    console.log('📊 Breakdown giá:', {
+      tongTienSanPham: tongTienSanPham.toFixed(2),
+      vatRate: vatRate.toFixed(4),
+      tienVAT: tienVAT.toFixed(2),
+      phiShip: phiShip.toFixed(2),
+      giamGia: giamGia.toFixed(2),
+      tongTienCuoi: tongTienCuoi.toFixed(2)
+    });
 
     // Lấy thông tin tài khoản
     const taiKhoan = await TaiKhoan.findByPk(taiKhoanId, { transaction });
@@ -147,17 +284,15 @@ exports.createOrder = async (req, res) => {
 
     // Tạo hoặc lấy khách hàng (SỬ DỤNG số điện thoại đã cập nhật)
     let khachHang = await KhachHang.findOne({
-      where: {
-        Email: taiKhoan.Email || null,
-        HoTen: taiKhoan.HoTen
-      },
+      where: { TaiKhoanID: taiKhoanId },
       transaction
     });
 
     if (!khachHang) {
-      // Tạo khách hàng mới với số điện thoại từ request hoặc từ TaiKhoan đã cập nhật
+      // Tạo khách hàng mới với TaiKhoanID
       const phoneToUse = dienThoai?.trim() || taiKhoan.DienThoai || null;
       khachHang = await KhachHang.create({
+        TaiKhoanID: taiKhoanId,
         HoTen: taiKhoan.HoTen,
         Email: taiKhoan.Email || null,
         DienThoai: phoneToUse,
@@ -185,52 +320,57 @@ exports.createOrder = async (req, res) => {
       }
     }
 
-    // Bước 2: Tạo mã hóa đơn
-    const maHoaDon = await generateOrderCode();
+    // Bước 2: Tạo mã hóa đơn (TRUYỀN transaction vào)
+    const maHoaDon = await generateOrderCode(transaction);
     console.log('📄 Mã hóa đơn:', maHoaDon);
 
-    // Tạo hóa đơn
+    // ✅ TẠO HÓA ĐƠN VỚI CÁC GIÁ TRỊ TỪ DECORATOR PATTERN
     const hoaDon = await HoaDon.create({
       MaHD: maHoaDon,
       KhachHangID: khachHang.ID,
-      TongTien: tongTien,
+      TongTienSanPham: tongTienSanPham.toFixed(2),     // ✅ Tổng tiền sản phẩm
+      VAT: vatRate.toFixed(4),                          // ✅ Tỷ lệ VAT (0.1 = 10%)
+      TienVAT: tienVAT.toFixed(2),                      // ✅ Số tiền VAT
+      PhiShip: phiShip.toFixed(2),                      // ✅ Phí ship
+      VoucherID: voucherId,                             // ✅ ID voucher (nếu có)
+      GiamGia: giamGia.toFixed(2),                      // ✅ Số tiền giảm giá
+      TongTien: tongTienCuoi.toFixed(2),                // ✅ Tổng tiền cuối cùng
       PhuongThucThanhToanID: phuongThucThanhToanId,
       TrangThai: 'Chờ xử lý',
       GhiChu: ghiChu || null
     }, { transaction });
 
     console.log('✅ Đã tạo hóa đơn:', hoaDon.ID);
+    console.log('💰 Breakdown lưu vào DB:', {
+      tongTienSanPham: tongTienSanPham.toFixed(2),
+      vatRate: vatRate.toFixed(4),
+      tienVAT: tienVAT.toFixed(2),
+      phiShip: phiShip.toFixed(2),
+      giamGia: giamGia.toFixed(2),
+      tongTienCuoi: tongTienCuoi.toFixed(2)
+    });
 
     // Bước 3: Thêm chi tiết hóa đơn
     const chiTietHoaDonData = [];
     for (const item of gioHang.chiTiet) {
-      const donGia = parseFloat(item.DonGia);
-      const thanhTien = donGia * item.SoLuong;
+      const donGia = new Decimal(item.DonGia);
+      const thanhTien = donGia.times(item.SoLuong);
 
       // Tạo chi tiết hóa đơn
       const chiTiet = await ChiTietHoaDon.create({
         HoaDonID: hoaDon.ID,
         SanPhamID: item.SanPhamID,
         SoLuong: item.SoLuong,
-        DonGia: donGia,
-        GiaBan: donGia,
-        ThanhTien: thanhTien
+        DonGia: donGia.toFixed(2),
+        GiaBan: donGia.toFixed(2),
+        ThanhTien: thanhTien.toFixed(2)
       }, { transaction });
 
       chiTietHoaDonData.push(chiTiet);
 
-      console.log(`📦 Sản phẩm "${item.sanPham.Ten}": ${item.SoLuong} x ${donGia.toLocaleString('vi-VN')} = ${thanhTien.toLocaleString('vi-VN')}`);
-
-      // Cập nhật số lượng tồn kho
-      await SanPham.update(
-        { Ton: db.Sequelize.literal(`Ton - ${item.SoLuong}`) },
-        {
-          where: { ID: item.SanPhamID },
-          transaction
-        }
-      );
-
-      console.log(`📦 Đã thêm sản phẩm "${item.sanPham.Ten}" vào hóa đơn và cập nhật tồn kho`);
+      console.log(`📦 Sản phẩm "${item.sanPham.Ten}": ${item.SoLuong} x ${donGia.toFixed(2).toLocaleString('vi-VN')} = ${thanhTien.toFixed(2).toLocaleString('vi-VN')}`);
+      
+      console.log(`📦 Đã thêm sản phẩm "${item.sanPham.Ten}" vào hóa đơn`);
     }
 
     // Bước 4: Xóa giỏ hàng sau khi tạo đơn thành công
@@ -284,6 +424,23 @@ exports.createOrder = async (req, res) => {
           tongTien: parseFloat(hoaDonDetail.TongTien),
           trangThai: hoaDonDetail.TrangThai,
           ghiChu: hoaDonDetail.GhiChu,
+          // ✅ THÊM: Breakdown giá chi tiết
+          priceBreakdown: {
+            tongTienSanPham: parseFloat(hoaDonDetail.TongTienSanPham || 0),
+            vat: {
+              rate: parseFloat(hoaDonDetail.VAT || 0),
+              ratePercent: (parseFloat(hoaDonDetail.VAT || 0) * 100).toFixed(2) + '%',
+              amount: parseFloat(hoaDonDetail.TienVAT || 0)
+            },
+            shipping: {
+              fee: parseFloat(hoaDonDetail.PhiShip || 0)
+            },
+            voucher: hoaDonDetail.VoucherID ? {
+              voucherId: hoaDonDetail.VoucherID,
+              discountAmount: parseFloat(hoaDonDetail.GiamGia || 0)
+            } : null,
+            tongTienCuoi: parseFloat(hoaDonDetail.TongTien)
+          },
           khachHang: {
             id: hoaDonDetail.khachHang.ID,
             hoTen: hoaDonDetail.khachHang.HoTen,
@@ -339,6 +496,553 @@ exports.createOrder = async (req, res) => {
   }
 };
 
+// Tạo đơn hàng cho khách vãng lai (không cần đăng nhập)
+exports.createGuestOrder = async (req, res) => {
+  // Bắt đầu transaction
+  const transaction = await db.sequelize.transaction();
+  
+  try {
+    console.log('🛒 Bắt đầu tạo đơn hàng cho khách vãng lai');
+    
+    const { 
+      sessionId, // ✅ Nhận sessionId thay vì cartItems
+      hoTen,
+      email,
+      dienThoai,
+      diaChi,
+      tinhThanh,
+      quanHuyen,
+      phuongXa,
+      phuongThucThanhToanId = 2, // Mặc định VNPay
+      ghiChu = ''
+    } = req.body;
+
+    console.log('📦 Dữ liệu đặt hàng:', {
+      sessionId,
+      hoTen,
+      email,
+      dienThoai,
+      diaChi,
+      phuongThucThanhToanId
+    });
+
+    // Validate dữ liệu đầu vào
+    if (!sessionId || sessionId.trim() === '') {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Session ID không được để trống'
+      });
+    }
+
+    if (!hoTen || !hoTen.trim()) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập họ tên'
+      });
+    }
+
+    if (!email || !email.trim()) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập email'
+      });
+    }
+
+    if (!dienThoai || !dienThoai.trim()) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập số điện thoại'
+      });
+    }
+
+    if (!diaChi || !diaChi.trim()) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập địa chỉ giao hàng'
+      });
+    }
+
+    // ✅ LẤY GIỎ HÀNG TỪ DATABASE
+    const GioHangKhachVangLai = db.GioHangKhachVangLai;
+    const cartItems = await GioHangKhachVangLai.findAll({
+      where: {
+        SessionID: sessionId,
+        Enable: true
+      },
+      include: [{
+        model: SanPham,
+        as: 'sanPham',
+        where: { Enable: true },
+        required: true,
+        attributes: ['ID', 'Ten', 'GiaBan', 'Ton', 'Enable']
+      }],
+      transaction
+    });
+
+    if (!cartItems || cartItems.length === 0) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Giỏ hàng trống. Vui lòng thêm sản phẩm trước khi đặt hàng'
+      });
+    }
+
+    console.log(`📦 Tìm thấy ${cartItems.length} sản phẩm trong giỏ hàng guest`);
+
+    // Kiểm tra phương thức thanh toán (chỉ cho phép VNPay cho guest)
+    if (phuongThucThanhToanId !== 2) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'Khách vãng lai chỉ được thanh toán qua VNPay'
+      });
+    }
+
+    // Kiểm tra phương thức thanh toán có tồn tại không
+    const phuongThucThanhToan = await PhuongThucThanhToan.findOne({
+      where: {
+        ID: phuongThucThanhToanId,
+        Enable: true
+      }
+    });
+
+    if (!phuongThucThanhToan) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'Phương thức thanh toán không hợp lệ'
+      });
+    }
+
+    // Xây dựng địa chỉ đầy đủ
+    const diaChiDayDu = `${diaChi}, ${phuongXa || ''}, ${quanHuyen || ''}, ${tinhThanh || ''}`.replace(/,\s*,/g, ',').trim();
+
+    // ✅ PESSIMISTIC LOCKING - LOCK SẢN PHẨM TRONG DB ĐỂ TRÁNH RACE CONDITION
+    console.log('🔒 Bắt đầu kiểm tra và lock tồn kho (Guest)...');
+    const validationErrors = [];
+    const lockedProducts = [];
+    const validatedItems = [];
+
+    for (const item of cartItems) {
+      // ✅ SELECT FOR UPDATE - Lock bản ghi sản phẩm
+      const sanPham = await SanPham.findByPk(item.SanPhamID, {
+        lock: transaction.LOCK.UPDATE, // 🔒 PESSIMISTIC LOCK
+        transaction
+      });
+
+      // Kiểm tra sản phẩm còn kinh doanh
+      if (!sanPham || !sanPham.Enable) {
+        validationErrors.push(`Sản phẩm "${item.sanPham?.Ten || 'Unknown'}" không tồn tại hoặc đã ngừng kinh doanh`);
+        console.error(`❌ Sản phẩm ID ${item.SanPhamID} không tồn tại hoặc bị vô hiệu hóa`);
+        continue;
+      }
+
+      // ✅ KIỂM TRA TỒN KHO SAU KHI ĐÃ LOCK
+      if (item.SoLuong > sanPham.Ton) {
+        validationErrors.push(`Sản phẩm "${sanPham.Ten}" chỉ còn ${sanPham.Ton} trong kho (bạn đang yêu cầu ${item.SoLuong})`);
+        console.error(`❌ Sản phẩm "${sanPham.Ten}": Yêu cầu ${item.SoLuong}, Còn ${sanPham.Ton}`);
+        continue;
+      }
+
+      const donGia = new Decimal(sanPham.GiaBan);
+      const thanhTien = donGia.times(item.SoLuong);
+
+      validatedItems.push({
+        cartItemId: item.ID,
+        sanPhamId: sanPham.ID,
+        ten: sanPham.Ten,
+        soLuong: item.SoLuong,
+        donGia: donGia.toFixed(2),
+        thanhTien: thanhTien.toFixed(2)
+      });
+
+      // ✅ GHI LOG SẢN PHẨM ĐÃ LOCK THÀNH CÔNG
+      lockedProducts.push({
+        id: sanPham.ID,
+        ten: sanPham.Ten,
+        tonKho: sanPham.Ton,
+        soLuongDat: item.SoLuong,
+        conLai: sanPham.Ton - item.SoLuong
+      });
+
+      console.log(`🔒 Đã lock sản phẩm "${sanPham.Ten}" - Tồn: ${sanPham.Ton}, Đặt: ${item.SoLuong}`);
+      console.log(`📦 Sản phẩm "${sanPham.Ten}": ${item.SoLuong} x ${donGia.toFixed(2).toLocaleString('vi-VN')} = ${thanhTien.toFixed(2).toLocaleString('vi-VN')}`);
+    }
+
+    // ❌ Nếu có lỗi validation → Rollback và trả về lỗi
+    if (validationErrors.length > 0) {
+      await transaction.rollback();
+      console.error('❌ Validation failed:', validationErrors);
+      return res.status(400).json({
+        success: false,
+        message: 'Có lỗi với một số sản phẩm trong giỏ hàng',
+        errors: validationErrors
+      });
+    }
+
+    console.log(`✅ Đã lock và validate ${lockedProducts.length} sản phẩm thành công`);
+
+    // ✅ SỬ DỤNG DECORATOR PATTERN ĐỂ TÍNH GIÁ (GIỐNG createOrder)
+    console.log('💰 Bắt đầu tính giá với Decorator Pattern...');
+    
+    // Bước 1: Tạo danh sách items cho calculator
+    const items = validatedItems.map(item => ({
+      sanPhamId: item.sanPhamId,
+      ten: item.ten,
+      soLuong: item.soLuong,
+      donGia: item.donGia
+    }));
+
+    // Bước 2: Tạo base calculator
+    let priceCalculator = new OrderPriceCalculator(items);
+    console.log(`📊 Tổng tiền sản phẩm: ${priceCalculator.calculate().toFixed(2)} VNĐ`);
+
+    // Bước 3: Thêm VAT 10%
+    const VAT_RATE = 0.1; // 10% VAT
+    priceCalculator = new VATDecorator(priceCalculator, VAT_RATE);
+    console.log(`📊 Sau khi thêm VAT ${VAT_RATE * 100}%: ${priceCalculator.calculate().toFixed(2)} VNĐ`);
+
+    // Bước 4: Thêm phí ship
+    const SHIPPING_FEE = 30000; // 30k phí ship cố định
+    priceCalculator = new ShippingDecorator(priceCalculator, SHIPPING_FEE, {
+      method: 'Standard',
+      estimatedDays: '3-5'
+    });
+    console.log(`📊 Sau khi thêm phí ship: ${priceCalculator.calculate().toFixed(2)} VNĐ`);
+
+    // Bước 5: Lấy chi tiết giá và tổng tiền cuối cùng
+    const priceDetails = priceCalculator.getDetails();
+    const tongTienCuoi = priceCalculator.calculate();
+
+    console.log('💰 Chi tiết giá:', JSON.stringify(priceDetails, null, 2));
+    console.log(`💰 Tổng tiền cuối cùng: ${tongTienCuoi.toFixed(2)} VNĐ`);
+
+    // ✅ TRÍCH XUẤT CÁC GIÁ TRỊ TỪ DECORATOR DETAILS
+    const tongTienSanPham = new Decimal(priceDetails.tongTienSanPham || 0);
+    const vatRate = priceDetails.vat ? new Decimal(priceDetails.vat.rate) : new Decimal(0);
+    const tienVAT = priceDetails.vat ? new Decimal(priceDetails.vat.amount) : new Decimal(0);
+    const phiShip = priceDetails.shipping ? new Decimal(priceDetails.shipping.fee) : new Decimal(0);
+    const giamGia = priceDetails.voucher ? new Decimal(priceDetails.voucher.discountAmount) : new Decimal(0);
+    const voucherId = priceDetails.voucher ? priceDetails.voucher.voucherId : null;
+
+    console.log('📊 Breakdown giá:', {
+      tongTienSanPham: tongTienSanPham.toFixed(2),
+      vatRate: vatRate.toFixed(4),
+      tienVAT: tienVAT.toFixed(2),
+      phiShip: phiShip.toFixed(2),
+      giamGia: giamGia.toFixed(2),
+      tongTienCuoi: tongTienCuoi.toFixed(2)
+    });
+
+    // Tạo hoặc lấy khách hàng (không liên kết với tài khoản)
+    let khachHang = await KhachHang.findOne({
+      where: { 
+        Email: email.trim(),
+        TaiKhoanID: null // Chỉ lấy khách vãng lai
+      },
+      transaction
+    });
+
+    if (!khachHang) {
+      // Tạo khách hàng mới (không có TaiKhoanID)
+      khachHang = await KhachHang.create({
+        TaiKhoanID: null,
+        HoTen: hoTen.trim(),
+        Email: email.trim(),
+        DienThoai: dienThoai.trim(),
+        DiaChi: diaChiDayDu
+      }, { transaction });
+      
+      console.log('👤 Đã tạo khách hàng vãng lai mới:', khachHang.ID);
+    } else {
+      // Cập nhật thông tin khách hàng
+      await khachHang.update({
+        HoTen: hoTen.trim(),
+        DienThoai: dienThoai.trim(),
+        DiaChi: diaChiDayDu
+      }, { transaction });
+      console.log('👤 Đã cập nhật thông tin khách hàng vãng lai:', khachHang.ID);
+    }
+
+    // Tạo mã hóa đơn (TRUYỀN transaction vào)
+    const maHoaDon = await generateOrderCode(transaction);
+    console.log('📄 Mã hóa đơn:', maHoaDon);
+
+    // ✅ TẠO HÓA ĐƠN VỚI CÁC GIÁ TRỊ TỪ DECORATOR PATTERN
+    const hoaDon = await HoaDon.create({
+      MaHD: maHoaDon,
+      KhachHangID: khachHang.ID,
+      TongTienSanPham: tongTienSanPham.toFixed(2),     // ✅ Tổng tiền sản phẩm
+      VAT: vatRate.toFixed(4),                          // ✅ Tỷ lệ VAT (0.1 = 10%)
+      TienVAT: tienVAT.toFixed(2),                      // ✅ Số tiền VAT
+      PhiShip: phiShip.toFixed(2),                      // ✅ Phí ship
+      VoucherID: voucherId,                             // ✅ ID voucher (nếu có)
+      GiamGia: giamGia.toFixed(2),                      // ✅ Số tiền giảm giá
+      TongTien: tongTienCuoi.toFixed(2),                // ✅ Tổng tiền cuối cùng
+      PhuongThucThanhToanID: phuongThucThanhToanId,
+      TrangThai: 'Chờ thanh toán',
+      GhiChu: ghiChu || null
+    }, { transaction });
+
+    console.log('✅ Đã tạo hóa đơn:', hoaDon.ID);
+    console.log('💰 Breakdown lưu vào DB:', {
+      tongTienSanPham: tongTienSanPham.toFixed(2),
+      vatRate: vatRate.toFixed(4),
+      tienVAT: tienVAT.toFixed(2),
+      phiShip: phiShip.toFixed(2),
+      giamGia: giamGia.toFixed(2),
+      tongTienCuoi: tongTienCuoi.toFixed(2)
+    });
+
+    // Thêm chi tiết hóa đơn
+    for (const item of validatedItems) {
+      await ChiTietHoaDon.create({
+        HoaDonID: hoaDon.ID,
+        SanPhamID: item.sanPhamId,
+        SoLuong: item.soLuong,
+        DonGia: item.donGia,
+        GiaBan: item.donGia,
+        ThanhTien: item.thanhTien
+      }, { transaction });
+
+      // ❌ BỎ LOGIC TRỪ KHO TẠI ĐÂY
+      // Lý do: Guest user chỉ thanh toán qua VNPay
+      // Logic trừ kho được xử lý trong payment.controller.js khi thanh toán thành công
+
+      console.log(`📦 Đã thêm sản phẩm "${item.ten}" vào hóa đơn`);
+    }
+
+    // ✅ XÓA GIỎ HÀNG GUEST SAU KHI TẠO ĐƠN THÀNH CÔNG
+    await GioHangKhachVangLai.update(
+      { Enable: false },
+      {
+        where: { SessionID: sessionId },
+        transaction
+      }
+    );
+    console.log('🗑️ Đã xóa giỏ hàng guest');
+
+    // Commit transaction
+    await transaction.commit();
+
+    // Lấy lại thông tin đầy đủ của hóa đơn vừa tạo
+    const hoaDonDetail = await HoaDon.findOne({
+      where: { ID: hoaDon.ID },
+      include: [
+        {
+          model: KhachHang,
+          as: 'khachHang',
+          attributes: ['ID', 'HoTen', 'Email', 'DienThoai', 'DiaChi']
+        },
+        {
+          model: PhuongThucThanhToan,
+          as: 'phuongThucThanhToan',
+          attributes: ['ID', 'Ten', 'MoTa']
+        },
+        {
+          model: ChiTietHoaDon,
+          as: 'chiTiet',
+          include: [{
+            model: SanPham,
+            as: 'sanPham',
+            attributes: ['ID', 'Ten', 'HinhAnhURL']
+          }]
+        }
+      ]
+    });
+
+    console.log('✅ Tạo đơn hàng cho khách vãng lai thành công:', hoaDon.MaHD);
+
+    // Trả về kết quả
+    res.status(201).json({
+      success: true,
+      message: 'Tạo đơn hàng thành công',
+      data: {
+        hoaDon: {
+          id: hoaDonDetail.ID,
+          maHD: hoaDonDetail.MaHD,
+          ngayLap: hoaDonDetail.NgayLap,
+          tongTien: parseFloat(hoaDonDetail.TongTien),
+          trangThai: hoaDonDetail.TrangThai,
+          ghiChu: hoaDonDetail.GhiChu,
+          khachHang: {
+            id: hoaDonDetail.khachHang.ID,
+            hoTen: hoaDonDetail.khachHang.HoTen,
+            email: hoaDonDetail.khachHang.Email,
+            dienThoai: hoaDonDetail.khachHang.DienThoai,
+            diaChi: hoaDonDetail.khachHang.DiaChi
+          },
+          phuongThucThanhToan: {
+            id: hoaDonDetail.phuongThucThanhToan.ID,
+            ten: hoaDonDetail.phuongThucThanhToan.Ten,
+            moTa: hoaDonDetail.phuongThucThanhToan.MoTa
+          },
+          chiTiet: hoaDonDetail.chiTiet.map(item => ({
+            id: item.ID,
+            sanPhamId: item.SanPhamID,
+            tenSanPham: item.sanPham.Ten,
+            hinhAnh: item.sanPham.HinhAnhURL,
+            soLuong: item.SoLuong,
+            donGia: parseFloat(item.DonGia),
+            thanhTien: parseFloat(item.ThanhTien)
+          }))
+        }
+      }
+    });
+
+  } catch (error) {
+    // Rollback transaction nếu có lỗi
+    await transaction.rollback();
+    
+    console.error('❌ Lỗi tạo đơn hàng cho khách vãng lai:', error);
+
+    // Xử lý lỗi cụ thể
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(409).json({
+        success: false,
+        message: 'Mã hóa đơn bị trùng, vui lòng thử lại'
+      });
+    }
+
+    if (error.name === 'SequelizeDatabaseError') {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi cơ sở dữ liệu',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Database Error'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ khi tạo đơn hàng',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
+    });
+  }
+};
+
+/**
+ * Tìm kiếm tất cả đơn hàng theo email hoặc số điện thoại (không cần đăng nhập)
+ * POST /api/orders/guest/search
+ * Body: { email?, phoneNumber? }
+ */
+exports.searchGuestOrders = async (req, res) => {
+  try {
+    console.log('🔍 Tìm kiếm đơn hàng theo contact');
+
+    const { email, phoneNumber } = req.body;
+
+    // Validate input - Phải có ít nhất 1 trong 2
+    if ((!email || !email.trim()) && (!phoneNumber || !phoneNumber.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập email hoặc số điện thoại'
+      });
+    }
+
+    console.log('📋 Tìm kiếm với:', {
+      email: email?.trim() || null,
+      phoneNumber: phoneNumber?.trim() || null
+    });
+
+    // Tìm khách hàng theo email hoặc số điện thoại
+    const whereCondition = {
+      TaiKhoanID: null // Chỉ lấy khách vãng lai
+    };
+
+    if (email && email.trim()) {
+      whereCondition.Email = email.trim().toLowerCase();
+    } else if (phoneNumber && phoneNumber.trim()) {
+      whereCondition.DienThoai = phoneNumber.trim();
+    }
+
+    const khachHang = await KhachHang.findAll({
+      where: whereCondition,
+      attributes: ['ID']
+    });
+
+    if (!khachHang || khachHang.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy đơn hàng nào',
+        data: {
+          orders: []
+        }
+      });
+    }
+
+    const khachHangIds = khachHang.map(kh => kh.ID);
+
+    // Tìm tất cả đơn hàng của khách hàng đó
+    const hoaDons = await HoaDon.findAll({
+      where: {
+        KhachHangID: khachHangIds,
+        Enable: true
+      },
+      include: [
+        {
+          model: ChiTietHoaDon,
+          as: 'chiTiet',
+          where: { Enable: true },
+          required: false
+        }
+      ],
+      order: [['NgayLap', 'DESC']]
+    });
+
+    if (!hoaDons || hoaDons.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy đơn hàng nào',
+        data: {
+          orders: []
+        }
+      });
+    }
+
+    console.log(`✅ Tìm thấy ${hoaDons.length} đơn hàng`);
+
+    // Format dữ liệu trả về
+    const orders = hoaDons.map(hd => ({
+      maHD: hd.MaHD,
+      ngayLap: hd.NgayLap,
+      tongTien: parseFloat(hd.TongTien),
+      trangThai: hd.TrangThai,
+      soSanPham: hd.chiTiet.reduce((sum, item) => sum + item.SoLuong, 0)
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: `Tìm thấy ${orders.length} đơn hàng`,
+      data: {
+        orders: orders,
+        total: orders.length
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi tìm kiếm đơn hàng guest:', error);
+
+    if (error.name === 'SequelizeDatabaseError') {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi cơ sở dữ liệu',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Database Error'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
+    });
+  }
+};
+
 // Lấy danh sách đơn hàng của user
 exports.getMyOrders = async (req, res) => {
   try {
@@ -347,15 +1051,28 @@ exports.getMyOrders = async (req, res) => {
     // Lấy thông tin tài khoản
     const taiKhoan = await TaiKhoan.findByPk(taiKhoanId);
     
-    // Tìm khách hàng dựa trên email hoặc tên
-    const khachHang = await KhachHang.findOne({
-      where: {
-        [db.Sequelize.Op.or]: [
-          { Email: taiKhoan.Email || null },
-          { HoTen: taiKhoan.HoTen }
-        ]
-      }
+    // ✅ SỬA: Tìm khách hàng theo TaiKhoanID trước
+    let khachHang = await KhachHang.findOne({
+      where: { TaiKhoanID: taiKhoanId }
     });
+
+    // Fallback: tìm theo Email/HoTen (cho dữ liệu cũ)
+    if (!khachHang) {
+      khachHang = await KhachHang.findOne({
+        where: {
+          [db.Sequelize.Op.or]: [
+            { Email: taiKhoan.Email || null },
+            { HoTen: taiKhoan.HoTen }
+          ]
+        }
+      });
+
+      // Nếu tìm thấy, cập nhật TaiKhoanID
+      if (khachHang) {
+        await khachHang.update({ TaiKhoanID: taiKhoanId });
+        console.log('✅ Đã liên kết KhachHang với TaiKhoan:', khachHang.ID);
+      }
+    }
 
     if (!khachHang) {
       return res.status(200).json({
@@ -613,14 +1330,19 @@ exports.cancelOrder = async (req, res) => {
       });
     }
 
-    // Kiểm tra trạng thái đơn hàng có thể hủy không
-    const allowedCancelStatuses = ['Chờ xử lý', 'Chờ thanh toán'];
+    // ✅ KIỂM TRA TRẠNG THÁI ĐƠN HÀNG - CÓ THỂ HỦY KHÔNG?
+    const allowedCancelStatuses = ['Chờ xử lý', 'Chờ thanh toán', 'Đã thanh toán'];
+    
+    // Admin có thể hủy thêm đơn "Đang giao hàng"
+    if (isAdmin) {
+      allowedCancelStatuses.push('Đang giao hàng');
+    }
     
     if (!allowedCancelStatuses.includes(hoaDon.TrangThai)) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
-        message: `Không thể hủy đơn hàng ở trạng thái "${hoaDon.TrangThai}". Chỉ có thể hủy đơn hàng "Chờ xử lý" hoặc "Chờ thanh toán"`,
+        message: `Không thể hủy đơn hàng ở trạng thái "${hoaDon.TrangThai}"`,
         data: {
           currentStatus: hoaDon.TrangThai,
           allowedStatuses: allowedCancelStatuses
@@ -637,40 +1359,52 @@ exports.cancelOrder = async (req, res) => {
       });
     }
 
-    console.log(`📦 Bắt đầu hoàn tồn kho cho ${hoaDon.chiTiet.length} sản phẩm`);
+    // ✅ XÁC ĐỊNH CÓ CẦN HOÀN KHO KHÔNG
+    // LOGIC: Chỉ hoàn kho NẾU đơn hàng đã thanh toán (kho đã bị trừ)
+    const shouldRestoreStock = ['Đã thanh toán', 'Đang giao hàng'].includes(hoaDon.TrangThai);
+    
+    console.log(`📋 Trạng thái đơn hàng: "${hoaDon.TrangThai}"`);
+    console.log(`📦 Cần hoàn kho: ${shouldRestoreStock ? 'CÓ (kho đã bị trừ)' : 'KHÔNG (kho chưa bị trừ)'}`);
 
-    // Hoàn tồn kho cho từng sản phẩm
     const restoredProducts = [];
-    for (const item of hoaDon.chiTiet) {
-      // Cập nhật số lượng tồn kho (cộng lại số lượng đã mua)
-      const [affectedRows] = await SanPham.update(
-        { Ton: db.Sequelize.literal(`Ton + ${item.SoLuong}`) },
-        {
-          where: { ID: item.SanPhamID },
-          transaction
+
+    // ✅ CHỈ HOÀN KHO NẾU ĐƠN HÀNG ĐÃ THANH TOÁN
+    if (shouldRestoreStock && hoaDon.chiTiet.length > 0) {
+      console.log(`📦 Bắt đầu hoàn tồn kho cho ${hoaDon.chiTiet.length} sản phẩm`);
+
+      for (const item of hoaDon.chiTiet) {
+        // Cập nhật số lượng tồn kho (cộng lại số lượng đã mua)
+        const [affectedRows] = await SanPham.update(
+          { Ton: db.Sequelize.literal(`Ton + ${item.SoLuong}`) },
+          {
+            where: { ID: item.SanPhamID },
+            transaction
+          }
+        );
+
+        if (affectedRows > 0) {
+          // Lấy lại thông tin sản phẩm đã cập nhật
+          const updatedProduct = await SanPham.findByPk(item.SanPhamID, {
+            attributes: ['ID', 'Ten', 'Ton'],
+            transaction
+          });
+
+          restoredProducts.push({
+            sanPhamId: item.SanPhamID,
+            tenSanPham: item.sanPham.Ten,
+            soLuongHoan: item.SoLuong,
+            tonKhoMoi: updatedProduct.Ton
+          });
+
+          console.log(`✅ Hoàn ${item.SoLuong} sản phẩm "${item.sanPham.Ten}" - Tồn kho mới: ${updatedProduct.Ton}`);
         }
-      );
-
-      if (affectedRows > 0) {
-        // Lấy lại thông tin sản phẩm đã cập nhật
-        const updatedProduct = await SanPham.findByPk(item.SanPhamID, {
-          attributes: ['ID', 'Ten', 'Ton'],
-          transaction
-        });
-
-        restoredProducts.push({
-          sanPhamId: item.SanPhamID,
-          tenSanPham: item.sanPham.Ten,
-          soLuongHoan: item.SoLuong,
-          tonKhoMoi: updatedProduct.Ton
-        });
-
-        console.log(`✅ Hoàn ${item.SoLuong} sản phẩm "${item.sanPham.Ten}" - Tồn kho mới: ${updatedProduct.Ton}`);
       }
+    } else {
+      console.log(`⚠️ Không hoàn kho vì đơn hàng ở trạng thái "${hoaDon.TrangThai}" (kho chưa bị trừ)`);
     }
 
     // Cập nhật trạng thái đơn hàng
-    const cancelNote = `Đơn hàng đã hủy bởi ${isAdmin ? 'Admin' : 'Khách hàng'} lúc ${new Date().toLocaleString('vi-VN')}`;
+    const cancelNote = `Đơn hàng đã hủy bởi ${isAdmin ? 'Admin' : 'Khách hàng'} lúc ${new Date().toLocaleString('vi-VN')}${shouldRestoreStock ? ' - Đã hoàn kho' : ' - Không hoàn kho (chưa trừ kho)'}`;
     
     await hoaDon.update({
       TrangThai: 'Đã hủy',
@@ -693,6 +1427,7 @@ exports.cancelOrder = async (req, res) => {
           tongTien: parseFloat(hoaDon.TongTien),
           ngayLap: hoaDon.NgayLap
         },
+        stockRestored: shouldRestoreStock,
         restoredProducts: restoredProducts,
         totalProductsRestored: restoredProducts.length,
         totalQuantityRestored: restoredProducts.reduce((sum, p) => sum + p.soLuongHoan, 0)
@@ -726,7 +1461,7 @@ exports.cancelOrder = async (req, res) => {
 exports.getOrderHistory = async (req, res) => {
   try {
     console.log('📜 Lấy lịch sử đơn hàng - User ID:', req.user.id);
-     console.log('📜 Query params:', req.query);
+    console.log('📜 Query params:', req.query);
 
     const taiKhoanId = req.user.id;
     
@@ -794,15 +1529,28 @@ exports.getOrderHistory = async (req, res) => {
       });
     }
 
-    // Tìm khách hàng dựa trên email hoặc tên
-    const khachHang = await KhachHang.findOne({
-      where: {
-        [db.Sequelize.Op.or]: [
-          { Email: taiKhoan.Email || null },
-          { HoTen: taiKhoan.HoTen }
-        ]
-      }
+    // ✅ SỬA: Tìm khách hàng theo TaiKhoanID trước
+    let khachHang = await KhachHang.findOne({
+      where: { TaiKhoanID: taiKhoanId }
     });
+
+    // Fallback: tìm theo Email/HoTen (cho dữ liệu cũ)
+    if (!khachHang) {
+      khachHang = await KhachHang.findOne({
+        where: {
+          [db.Sequelize.Op.or]: [
+            { Email: taiKhoan.Email || null },
+            { HoTen: taiKhoan.HoTen }
+          ]
+        }
+      });
+
+      // Nếu tìm thấy, cập nhật TaiKhoanID
+      if (khachHang) {
+        await khachHang.update({ TaiKhoanID: taiKhoanId });
+        console.log('✅ Đã liên kết KhachHang với TaiKhoan:', khachHang.ID);
+      }
+    }
 
     // Nếu không tìm thấy khách hàng, trả về danh sách rỗng
     if (!khachHang) {
@@ -944,6 +1692,327 @@ exports.getOrderHistory = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Lỗi lấy lịch sử đơn hàng:', error);
+
+    // Xử lý lỗi cơ sở dữ liệu
+    if (error.name === 'SequelizeDatabaseError') {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi cơ sở dữ liệu',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Database Error'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
+    });
+  }
+};
+
+/**
+ * Tra cứu đơn hàng cho khách vãng lai (không cần đăng nhập)
+ * POST /api/orders/guest/lookup
+ * Body: { orderCode, email?, phoneNumber? }
+ * Yêu cầu: (orderCode + email) HOẶC (orderCode + phoneNumber)
+ */
+exports.guestOrderLookup = async (req, res) => {
+  try {
+    console.log('🔍 Tra cứu đơn hàng khách vãng lai');
+
+    const { orderCode, email, phoneNumber } = req.body;
+
+    // Validate input - Phải có orderCode
+    if (!orderCode || !orderCode.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập mã đơn hàng'
+      });
+    }
+
+    // Validate - Phải có ít nhất email HOẶC phoneNumber
+    if ((!email || !email.trim()) && (!phoneNumber || !phoneNumber.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập email hoặc số điện thoại để tra cứu'
+      });
+    }
+
+    console.log('📋 Thông tin tra cứu:', {
+      orderCode: orderCode.trim(),
+      email: email?.trim() || null,
+      phoneNumber: phoneNumber?.trim() || null
+    });
+
+    // Bước 1: Tìm đơn hàng theo mã
+    const hoaDon = await HoaDon.findOne({
+      where: {
+        MaHD: orderCode.trim(),
+        Enable: true
+      },
+      include: [
+        {
+          model: KhachHang,
+          as: 'khachHang',
+          attributes: ['ID', 'HoTen', 'Email', 'DienThoai', 'DiaChi', 'TaiKhoanID']
+        },
+        {
+          model: PhuongThucThanhToan,
+          as: 'phuongThucThanhToan',
+          attributes: ['ID', 'Ten', 'MoTa']
+        },
+        {
+          model: ChiTietHoaDon,
+          as: 'chiTiet',
+          where: { Enable: true },
+          required: false,
+          include: [{
+            model: SanPham,
+            as: 'sanPham',
+            attributes: ['ID', 'Ten', 'HinhAnhURL', 'GiaBan']
+          }]
+        }
+      ]
+    });
+
+    if (!hoaDon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy đơn hàng với mã này'
+      });
+    }
+
+    // Bước 2: Kiểm tra quyền truy cập - Khớp email HOẶC số điện thoại
+    let isAuthorized = false;
+    let matchedBy = null;
+
+    // Chuẩn hóa dữ liệu để so sánh
+    const inputEmail = email?.trim().toLowerCase();
+    const inputPhone = phoneNumber?.trim();
+    const orderEmail = hoaDon.khachHang.Email?.toLowerCase();
+    const orderPhone = hoaDon.khachHang.DienThoai?.trim();
+
+    // Kiểm tra khớp email
+    if (inputEmail && orderEmail && inputEmail === orderEmail) {
+      isAuthorized = true;
+      matchedBy = 'email';
+      console.log('✅ Xác thực thành công qua email');
+    }
+
+    // Kiểm tra khớp số điện thoại
+    if (inputPhone && orderPhone && inputPhone === orderPhone) {
+      isAuthorized = true;
+      matchedBy = matchedBy ? 'email_and_phone' : 'phone';
+      console.log('✅ Xác thực thành công qua số điện thoại');
+    }
+
+    // Nếu không khớp thông tin nào
+    if (!isAuthorized) {
+      console.log('❌ Thông tin không khớp:', {
+        inputEmail,
+        orderEmail,
+        inputPhone,
+        orderPhone
+      });
+      return res.status(403).json({
+        success: false,
+        message: 'Thông tin email hoặc số điện thoại không khớp với đơn hàng này'
+      });
+    }
+
+    // ✅ CHỈ CHO PHÉP TRA CỨU ĐƠN HÀNG CỦA KHÁCH VÃNG LAI
+    // (TaiKhoanID = NULL)
+    if (hoaDon.khachHang.TaiKhoanID !== null) {
+      return res.status(403).json({
+        success: false,
+        message: 'Đơn hàng này thuộc về tài khoản đã đăng ký. Vui lòng đăng nhập để xem chi tiết.'
+      });
+    }
+
+    // Bước 3: Trả về thông tin đơn hàng
+    console.log(`✅ Tra cứu thành công đơn hàng ${hoaDon.MaHD} (matched by: ${matchedBy})`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Tìm thấy đơn hàng',
+      data: {
+        hoaDon: {
+          id: hoaDon.ID,
+          maHD: hoaDon.MaHD,
+          ngayLap: hoaDon.NgayLap,
+          tongTien: parseFloat(hoaDon.TongTien),
+          trangThai: hoaDon.TrangThai,
+          ghiChu: hoaDon.GhiChu,
+          khachHang: {
+            hoTen: hoaDon.khachHang.HoTen,
+            // ✅ CHỈ HIỆN 4 KÝ TỰ CUỐI EMAIL ĐỂ BẢO MẬT
+            email: hoaDon.khachHang.Email 
+              ? '***' + hoaDon.khachHang.Email.slice(-10)
+              : null,
+            // ✅ CHỈ HIỆN 4 SỐ CUỐI ĐIỆN THOẠI
+            dienThoai: hoaDon.khachHang.DienThoai
+              ? '***' + hoaDon.khachHang.DienThoai.slice(-4)
+              : null,
+            diaChi: hoaDon.khachHang.DiaChi
+          },
+          phuongThucThanhToan: {
+            id: hoaDon.phuongThucThanhToan.ID,
+            ten: hoaDon.phuongThucThanhToan.Ten
+          },
+          chiTiet: hoaDon.chiTiet.map(item => ({
+            id: item.ID,
+            sanPhamId: item.SanPhamID,
+            tenSanPham: item.sanPham.Ten,
+            hinhAnh: item.sanPham.HinhAnhURL,
+            soLuong: item.SoLuong,
+            donGia: parseFloat(item.DonGia),
+            thanhTien: parseFloat(item.ThanhTien)
+          })),
+          tongSoLuongSanPham: hoaDon.chiTiet.reduce((sum, item) => sum + item.SoLuong, 0),
+          soLoaiSanPham: hoaDon.chiTiet.length
+        },
+        matchedBy: matchedBy // Để frontend biết xác thực bằng email hay phone
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi tra cứu đơn hàng guest:', error);
+
+    // Xử lý lỗi cơ sở dữ liệu
+    if (error.name === 'SequelizeDatabaseError') {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi cơ sở dữ liệu',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Database Error'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
+    });
+  }
+};
+
+/**
+ * Xem chi tiết đơn hàng công khai (không cần đăng nhập)
+ * GET /api/orders/public/:orderCode
+ * Dùng ngay sau khi đặt hàng hoặc thanh toán thành công
+ * CHỈ hiển thị thông tin cơ bản, KHÔNG YÊU CẦU xác thực email/phone
+ */
+exports.getPublicOrderDetail = async (req, res) => {
+  try {
+    console.log('👁️ Xem đơn hàng công khai');
+
+    const { orderCode } = req.params;
+
+    // Validate input
+    if (!orderCode || !orderCode.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp mã đơn hàng'
+      });
+    }
+
+    console.log('📋 Mã đơn hàng:', orderCode.trim());
+
+    // Tìm đơn hàng theo mã
+    const hoaDon = await HoaDon.findOne({
+      where: {
+        MaHD: orderCode.trim(),
+        Enable: true
+      },
+      include: [
+        {
+          model: KhachHang,
+          as: 'khachHang',
+          attributes: ['ID', 'HoTen', 'Email', 'DienThoai', 'DiaChi', 'TaiKhoanID']
+        },
+        {
+          model: PhuongThucThanhToan,
+          as: 'phuongThucThanhToan',
+          attributes: ['ID', 'Ten', 'MoTa']
+        },
+        {
+          model: ChiTietHoaDon,
+          as: 'chiTiet',
+          where: { Enable: true },
+          required: false,
+          include: [{
+            model: SanPham,
+            as: 'sanPham',
+            attributes: ['ID', 'Ten', 'HinhAnhURL', 'GiaBan']
+          }]
+        }
+      ]
+    });
+
+    if (!hoaDon) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy đơn hàng với mã này'
+      });
+    }
+
+    // ✅ CHỈ CHO PHÉP XEM ĐƠN HÀNG CỦA KHÁCH VÃNG LAI
+    // (TaiKhoanID = NULL)
+    // Đơn hàng của user đã đăng ký phải đăng nhập mới xem được
+    if (hoaDon.khachHang.TaiKhoanID !== null) {
+      return res.status(403).json({
+        success: false,
+        message: 'Đơn hàng này yêu cầu đăng nhập để xem chi tiết.'
+      });
+    }
+
+    console.log(`✅ Tìm thấy đơn hàng ${hoaDon.MaHD}`);
+
+    // Trả về thông tin đơn hàng (CHE BỚT thông tin nhạy cảm)
+    res.status(200).json({
+      success: true,
+      message: 'Lấy chi tiết đơn hàng thành công',
+      data: {
+        hoaDon: {
+          id: hoaDon.ID,
+          maHD: hoaDon.MaHD,
+          ngayLap: hoaDon.NgayLap,
+          tongTien: parseFloat(hoaDon.TongTien),
+          trangThai: hoaDon.TrangThai,
+          ghiChu: hoaDon.GhiChu,
+          khachHang: {
+            hoTen: hoaDon.khachHang.HoTen,
+            // ✅ CHE BỚT EMAIL - chỉ hiện phần cuối
+            email: hoaDon.khachHang.Email 
+              ? '***' + hoaDon.khachHang.Email.slice(-10)
+              : null,
+            // ✅ CHE BỚT SĐT - chỉ hiện 4 số cuối
+            dienThoai: hoaDon.khachHang.DienThoai
+              ? '***' + hoaDon.khachHang.DienThoai.slice(-4)
+              : null,
+            diaChi: hoaDon.khachHang.DiaChi
+          },
+          phuongThucThanhToan: {
+            id: hoaDon.phuongThucThanhToan.ID,
+            ten: hoaDon.phuongThucThanhToan.Ten,
+            moTa: hoaDon.phuongThucThanhToan.MoTa
+          },
+          chiTiet: hoaDon.chiTiet.map(item => ({
+            id: item.ID,
+            sanPhamId: item.SanPhamID,
+            tenSanPham: item.sanPham.Ten,
+            hinhAnh: item.sanPham.HinhAnhURL,
+            soLuong: item.SoLuong,
+            donGia: parseFloat(item.DonGia),
+            thanhTien: parseFloat(item.ThanhTien)
+          })),
+          tongSoLuongSanPham: hoaDon.chiTiet.reduce((sum, item) => sum + item.SoLuong, 0),
+          soLoaiSanPham: hoaDon.chiTiet.length
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi xem đơn hàng công khai:', error);
 
     // Xử lý lỗi cơ sở dữ liệu
     if (error.name === 'SequelizeDatabaseError') {

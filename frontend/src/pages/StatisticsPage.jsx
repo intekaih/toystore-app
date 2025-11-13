@@ -8,6 +8,7 @@ import { Button, Card } from '../components/ui';
 import AdminLayout from '../layouts/AdminLayout';
 import authService from '../services/authService';
 import axios from 'axios';
+import config from '../config';
 
 const StatisticsPage = () => {
   const navigate = useNavigate();
@@ -76,13 +77,15 @@ const StatisticsPage = () => {
         endDate
       });
 
-      const response = await axios.get('http://localhost:5000/api/admin/statistics', {
+      // ✅ Sửa từ dashboard sang statistics để khớp với backend route
+      const response = await axios.get(`${config.API_URL}/admin/statistics`, {
         headers: {
           'Authorization': `Bearer ${token}`
         },
         params: {
           startDate,
           endDate,
+          year: year,
           viewMode: mode
         }
       });

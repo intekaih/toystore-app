@@ -35,12 +35,14 @@ class DBConnection {
     }
 
     // Khởi tạo Sequelize với config từ db.config.js
+    // ✅ FIX: SQL Server cần "server" property thay vì "host"
     this.#sequelize = new Sequelize(
       dbConfig.DB,
       dbConfig.USER,
       dbConfig.PASSWORD,
       {
         host: dbConfig.HOST,
+        server: dbConfig.HOST, // ✅ Thêm server property cho SQL Server
         port: dbConfig.port,
         dialect: dbConfig.dialect,
         dialectOptions: dbConfig.dialectOptions,

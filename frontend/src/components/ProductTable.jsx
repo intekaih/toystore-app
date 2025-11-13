@@ -1,6 +1,7 @@
 // src/components/ProductTable.jsx
 import React from 'react';
 import '../styles/ProductTable.css';
+import config from '../config';
 
 const ProductTable = ({ products, categories, onEdit, onDelete }) => {
   // Format giá tiền
@@ -41,12 +42,9 @@ const ProductTable = ({ products, categories, onEdit, onDelete }) => {
     return 'Chưa phân loại';
   };
 
-  // Lấy URL ảnh đầy đủ - Sửa từ hinhAnh thành hinhAnhURL
-  const getImageUrl = (product) => {
-    const hinhAnhURL = product.hinhAnhURL; // Sửa từ hinhAnh thành hinhAnhURL
-    if (!hinhAnhURL) return '/barbie.jpg'; // Ảnh mặc định
-    if (hinhAnhURL.startsWith('http')) return hinhAnhURL;
-    return `http://localhost:5000${hinhAnhURL}`;
+  // Lấy URL ảnh đầy đủ
+  const getImageUrl = (hinhAnhURL) => {
+    return config.getImageUrl(hinhAnhURL);
   };
 
   return (
@@ -72,7 +70,7 @@ const ProductTable = ({ products, categories, onEdit, onDelete }) => {
               
               <td className="image-col">
                 <img
-                  src={getImageUrl(product)}
+                  src={getImageUrl(product.hinhAnhURL)}
                   alt={product.ten}
                   className="product-thumbnail"
                   onError={(e) => {

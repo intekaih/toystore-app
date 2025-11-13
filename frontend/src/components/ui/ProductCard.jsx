@@ -1,6 +1,8 @@
 import React from 'react';
 import { ShoppingCart, Heart, Eye } from 'lucide-react';
 import Badge from './Badge';
+import { Link } from 'react-router-dom';
+import config from '../../config';
 
 /**
  * 🧸 ProductCard Component - Card sản phẩm dễ thương
@@ -14,7 +16,7 @@ const ProductCard = ({
   filterType = null, // ✨ THÊM: Để biết đang lọc theo gì (bestSeller, newest, etc.)
 }) => {
   // Backend API URL - có thể config trong .env
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const API_BASE_URL = config.API_BASE_URL;
   
   // Hỗ trợ cả 2 format: chữ hoa (ID, Ten) và chữ thường (id, ten)
   const productId = product.ID || product.id || product.MaSP || product.maSP;

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import config from '../config';
 import { X, ShoppingCart, Heart, Package, Tag, Star } from 'lucide-react';
 import { Modal, Badge, Button } from './ui';
 
@@ -17,7 +18,7 @@ const ProductQuickViewModal = ({
 
   if (!product) return null;
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const API_BASE_URL = config.API_BASE_URL;
   
   // Hỗ trợ cả 2 format: chữ hoa (ID, Ten) và chữ thường (id, ten)
   const productId = product.ID || product.id || product.MaSP || product.maSP;

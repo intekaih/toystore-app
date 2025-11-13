@@ -7,10 +7,11 @@ import { ArrowLeft, ShoppingCart, Package, Shield, RefreshCw, Truck, Minus, Plus
 import MainLayout from '../../layouts/MainLayout';
 import { Button, Badge, Loading } from '../../components/ui';
 import Toast from '../../components/Toast.js';
+import config from '../../config';
 
 const ProductDetail = () => {
   // Backend API URL
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const API_BASE_URL = config.API_BASE_URL;
   
   // Build full image URL
   const buildImageUrl = (imagePath) => {
@@ -102,12 +103,6 @@ const ProductDetail = () => {
   };
 
   const handleAddToCart = async () => {
-    if (!user) {
-      showToast('Vui lòng đăng nhập để thêm vào giỏ hàng', 'warning', 3000);
-      setTimeout(() => navigate('/login'), 1500);
-      return;
-    }
-
     if (quantity < 1) {
       showToast('Vui lòng chọn số lượng lớn hơn 0', 'warning');
       return;
@@ -124,15 +119,33 @@ const ProductDetail = () => {
       setAdding(true);
       const productId = product.ID || product.id;
       const productName = product.Ten || product.ten;
-      const response = await addToCart(productId, quantity);
+      
+      // Thông tin sản phẩm cho guest user
+      const productInfo = {
+        name: productName,
+        price: productPrice,
+        image: productImage,
+        stock: productStock
+      };
+      
+      const response = await addToCart(productId, quantity, productInfo);
 
       if (response.success) {
         showToast(
-          response.message || `Đã thêm ${quantity} ${productName} vào giỏ hàng`,
+          `Đã thêm ${quantity} ${productName} vào giỏ hàng`,
           'success',
           3000
         );
         setQuantity(1);
+        
+        // Nếu không đăng nhập, hiển thị thông báo thêm
+        if (!user) {
+          showToast(
+            'Bạn có thể thanh toán mà không cần đăng nhập!',
+            'info',
+            4000
+          );
+        }
       }
     } catch (error) {
       console.error('❌ Lỗi thêm vào giỏ hàng:', error);
@@ -323,13 +336,15 @@ const ProductDetail = () => {
                 </div>
 
                 {!user && (
-                  <p className="text-sm text-center text-gray-600">
-                    Vui lòng{' '}
-                    <Link to="/login" className="text-primary-600 font-semibold hover:text-primary-700">
-                      đăng nhập
-                    </Link>
-                    {' '}để sử dụng giỏ hàng
-                  </p>
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-center text-blue-700">
+                      💡 Bạn có thể mua hàng mà không cần đăng nhập!{' '}
+                      <Link to="/login" className="font-semibold hover:underline">
+                        Hoặc đăng nhập
+                      </Link>
+                      {' '}để quản lý đơn hàng dễ dàng hơn.
+                    </p>
+                  </div>
                 )}
               </div>
             )}

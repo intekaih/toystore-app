@@ -21,7 +21,6 @@ const ProfilePage = () => {
         try {
           setLoading(true);
           setError('');
-          console.log('🔄 Đang tải thông tin user từ database...');
           await refreshUser(); // Load user từ database
           setInitialLoadDone(true);
         } catch (error) {
@@ -185,8 +184,15 @@ const ProfilePage = () => {
                   <Shield className="text-primary-500" size={20} />
                   <strong className="text-gray-700">Trạng thái</strong>
                 </div>
-                <p className={`ml-8 font-bold ${user.enable ? 'text-green-600' : 'text-red-600'}`}>
-                  {user.enable ? '🟢 Hoạt động' : '🔴 Bị khóa'}
+                <p className={`ml-8 font-bold ${
+                  (user.enable !== undefined ? user.enable : user.Enable) 
+                    ? 'text-green-600' 
+                    : 'text-red-600'
+                }`}>
+                  {(user.enable !== undefined ? user.enable : user.Enable) 
+                    ? '🟢 Hoạt động' 
+                    : '🔴 Bị khóa'
+                  }
                 </p>
               </div>
             </div>

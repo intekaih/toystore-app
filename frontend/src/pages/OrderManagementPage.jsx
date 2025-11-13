@@ -9,6 +9,7 @@ import { Button, Card, Input } from '../components/ui';
 import AdminLayout from '../layouts/AdminLayout';
 import authService from '../services/authService';
 import axios from 'axios';
+import config from '../config';
 
 const OrderManagementPage = () => {
   const navigate = useNavigate();
@@ -98,7 +99,7 @@ const OrderManagementPage = () => {
         params.search = search.trim();
       }
 
-      const response = await axios.get('http://localhost:5000/api/admin/orders', {
+      const response = await axios.get(config.endpoints.admin.orders, {
         headers: {
           'Authorization': `Bearer ${token}`
         },
@@ -116,7 +117,7 @@ const OrderManagementPage = () => {
           
           // Phát âm thanh thông báo (optional)
           if (typeof Audio !== 'undefined') {
-            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWi77eafTRAMUKfj8LZjHAY4ktfyzHksBSR3x/DdkEAKFF606+uoVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAA==');
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWi77eafTRAMUKfj8LZjHAY4ktfyzHksBSR3x/DdkEAKFF606+uoVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAA==');
             audio.play().catch(() => {}); // Bỏ qua lỗi nếu không phát được
           }
         }
@@ -162,7 +163,7 @@ const OrderManagementPage = () => {
         return;
       }
 
-      const response = await axios.get('http://localhost:5000/api/admin/statistics/dashboard', {
+      const response = await axios.get(config.endpoints.admin.statistics.dashboard, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -236,7 +237,7 @@ const OrderManagementPage = () => {
       }
 
       const response = await axios.patch(
-        `http://localhost:5000/api/admin/orders/${orderId}/status`,
+        `${config.endpoints.admin.orders}/${orderId}/status`,
         { trangThai: newStatus },
         {
           headers: {
@@ -287,66 +288,15 @@ const OrderManagementPage = () => {
 
   return (
     <AdminLayout>
-      {/* Page Title & Statistics */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          {/* Left: Title */}
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-              <span className="text-3xl">🛒</span>
-              Quản lý đơn hàng
-            </h2>
-            <p className="text-gray-600 mt-1">Xem và cập nhật trạng thái đơn hàng</p>
-          </div>
-
-          {/* Right: Statistics */}
-          <div className="flex items-center gap-12">
-            <div className="text-center">
-              <p className="text-sm text-gray-600">Tổng đơn hàng</p>
-              <p className="text-2xl font-bold text-gray-800">{orderStats.total}</p>
-            </div>
-            
-            <div className="text-center">
-              <p className="text-sm text-gray-600">Tổng doanh thu</p>
-              <p className="text-xl font-bold text-gray-800">
-                {new Intl.NumberFormat('vi-VN', {
-                  style: 'currency',
-                  currency: 'VND'
-                }).format(orderStats.totalRevenue)}
-              </p>
-            </div>
-            
-            <div className="text-center">
-              <p className="text-sm text-gray-600">Sản phẩm đã bán</p>
-              <p className="text-2xl font-bold text-gray-800">{orderStats.totalProducts}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ✨ THÊM: Auto-refresh Controls */}
-      <div className="mb-4 flex items-center justify-between bg-white rounded-xl p-3 shadow-sm border border-gray-200">
-        <div className="flex items-center gap-4">
-          {/* Toggle Auto-refresh */}
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="w-4 h-4 text-pink-500 rounded focus:ring-pink-400"
-            />
-            <span className="text-sm font-medium text-gray-700">
-              Tự động làm mới (30s)
-            </span>
-          </label>
-          
-          {/* Last Refresh Time */}
-          <span className="text-xs text-gray-500">
-            Cập nhật lần cuối: {formatLastRefreshTime()}
-          </span>
-        </div>
+      {/* 📋 Simple Header - No Card */}
+      <div className="mb-3 flex items-center justify-between">
+        {/* Left: Title */}
+        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+          <span className="text-xl">🛒</span>
+          Quản lý đơn hàng
+        </h2>
         
-        {/* Manual Refresh Button */}
+        {/* Right: Manual Refresh Button Only */}
         <button
           onClick={handleManualRefresh}
           disabled={loading}
@@ -354,7 +304,7 @@ const OrderManagementPage = () => {
                    text-white text-sm font-semibold rounded-lg
                    hover:from-blue-500 hover:to-blue-600
                    disabled:opacity-50 disabled:cursor-not-allowed
-                   transition-all duration-200 shadow-md hover:shadow-lg
+                   transition-all duration-200 shadow-sm hover:shadow-md
                    flex items-center gap-2"
         >
           <span className={loading ? 'animate-spin' : ''}>🔄</span>
@@ -362,60 +312,63 @@ const OrderManagementPage = () => {
         </button>
       </div>
 
-      {/* Filter Section */}
-      <div className="mb-6 bg-gradient-to-r from-pink-50 via-rose-50 to-pink-50 rounded-2xl p-5 shadow-sm border border-pink-100">
-        {/* Status Filters */}
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold text-gray-700 mb-3">Lọc theo trạng thái:</h3>
+      {/* 🎯 Compact Filter Section */}
+      <div className="mb-4 bg-gradient-to-r from-pink-50 via-rose-50 to-pink-50 rounded-xl p-3 shadow-sm border border-pink-100">
+        {/* Status Filters - Compact */}
+        <div className="mb-3">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Lọc theo trạng thái:</h3>
           <div className="flex flex-wrap gap-2">
             {statusList.map((status) => (
-              <Button
+              <button
                 key={status.value}
-                variant={selectedStatus === status.value ? 'primary' : 'outline'}
-                size="sm"
                 onClick={() => handleStatusChange(status.value)}
-                icon={status.icon}
+                className={`
+                  px-3 py-1.5 text-xs font-semibold rounded-lg
+                  transition-all duration-200 shadow-sm
+                  flex items-center gap-1.5
+                  ${selectedStatus === status.value
+                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
+                    : 'bg-white text-gray-700 border border-gray-200 hover:border-pink-300 hover:shadow-md'
+                  }
+                `}
               >
+                <span className="text-sm">{status.icon}</span>
                 {status.label}
-              </Button>
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Search - 1 dòng: ô tìm kiếm | nút tìm */}
-        <form onSubmit={handleSearch} className="flex gap-3 items-stretch">
-          {/* 🔍 Ô tìm kiếm */}
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="🔍 Tìm kiếm theo mã đơn hàng..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2.5 bg-white border-2 border-pink-200 rounded-xl 
-                       text-gray-700 font-medium text-sm placeholder-gray-400
-                       focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400
-                       hover:border-pink-300 transition-all duration-200 shadow-sm h-[42px]"
-            />
-          </div>
+        {/* Search - Compact */}
+        <form onSubmit={handleSearch} className="flex gap-2 items-stretch">
+          <input
+            type="text"
+            placeholder="🔍 Tìm kiếm theo mã đơn hàng..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-1 px-3 py-2 bg-white border-2 border-pink-200 rounded-lg 
+                     text-gray-700 font-medium text-sm placeholder-gray-400
+                     focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400
+                     hover:border-pink-300 transition-all duration-200 shadow-sm"
+          />
 
-          {/* 🔍 Nút tìm kiếm */}
           <button
             type="submit"
-            className="px-6 bg-gradient-to-r from-pink-400 to-rose-400 
-                     text-white font-semibold text-sm rounded-xl
+            className="px-4 bg-gradient-to-r from-pink-400 to-rose-400 
+                     text-white font-semibold text-sm rounded-lg
                      hover:from-pink-500 hover:to-rose-500
                      focus:outline-none focus:ring-2 focus:ring-pink-300
                      transition-all duration-200 shadow-md hover:shadow-lg
-                     flex items-center gap-2 whitespace-nowrap h-[42px]"
+                     flex items-center gap-2 whitespace-nowrap"
           >
-            <span className="text-lg">🔍</span>
-            Tìm kiếm
+            <span className="text-base">🔍</span>
+            <span className="hidden sm:inline">Tìm kiếm</span>
           </button>
         </form>
       </div>
 
-      {/* Order Table */}
-      <Card padding="none" className="mb-6">
+      {/* 📊 Order Table - Focus Area */}
+      <Card padding="none" className="mb-4">
         <OrderTable
           orders={orders}
           onUpdateStatus={handleUpdateStatus}
@@ -423,7 +376,7 @@ const OrderManagementPage = () => {
         />
       </Card>
 
-      {/* Pagination */}
+      {/* 📄 Pagination */}
       {!loading && orders.length > 0 && (
         <div className="flex justify-center">
           <Pagination

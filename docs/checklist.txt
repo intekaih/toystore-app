@@ -13,12 +13,12 @@ A8	Đặt hàng (Tạo hóa đơn)	Tạo HoaDon, ChiTietHoaDon, xóa giỏ hàng
 A9	Lịch sử đơn hàng	Truy vấn từ HoaDon theo TaiKhoanID	✅
 A10	Thanh toán VNPay demo	Gửi request tới sandbox VNPay, nhận IPN/Return	✅
 B. CHỨC NĂNG QUẢN TRỊ (ADMIN)			
-B1	Đăng nhập admin	Từ bảng TaiKhoan với role = 'admin'	⬜
-B2	Quản lý tài khoản người dùng	CRUD bảng TaiKhoan, khóa/mở tài khoản	⬜
-B3	Quản lý danh mục sản phẩm	CRUD bảng LoaiSP	⬜
-B4	Quản lý sản phẩm	CRUD bảng SanPham, upload ảnh	⬜
-B5	Quản lý đơn hàng	Cập nhật trạng thái HoaDon: Chờ xử lý → Đã giao...	⬜
-B6	Xem thống kê đơn hàng	Tổng doanh thu, số đơn theo ngày/tháng...	⬜
+B1	Đăng nhập admin	Từ bảng TaiKhoan với role = 'admin'	✅
+B2	Quản lý tài khoản người dùng	CRUD bảng TaiKhoan, khóa/mở tài khoản	✅
+B3	Quản lý danh mục sản phẩm	CRUD bảng LoaiSP	✅
+B4	Quản lý sản phẩm	CRUD bảng SanPham, upload ảnh	✅
+B5	Quản lý đơn hàng	Cập nhật trạng thái HoaDon: Chờ xử lý → Đã giao...	✅
+B6	Xem thống kê đơn hàng	Tổng doanh thu, số đơn theo ngày/tháng...	✅
 C. CHỨC NĂNG CHUNG / BỔ SUNG			
 C1	Tìm kiếm sản phẩm theo tên	Truy vấn LIKE tên sản phẩm	✅
 C2	Phân trang / load động	Sử dụng limit/offset hoặc infinite scroll	✅

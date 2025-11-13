@@ -40,7 +40,6 @@ const ProductList = () => {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Loading products with filters:', filters);
 
       const response = await getProducts(filters);
       
@@ -48,9 +47,6 @@ const ProductList = () => {
         setProducts(response.data.products || []);
         setTotalPages(response.data.pagination?.totalPages || 1);
         setTotalProducts(response.data.pagination?.totalProducts || 0);
-        
-        console.log('✅ Loaded products:', response.data.products.length);
-        console.log('📊 Filter info:', response.data.filters);
       } else {
         setProducts([]);
       }
@@ -63,7 +59,6 @@ const ProductList = () => {
   };
 
   const handleFilterChange = (newFilters) => {
-    console.log('🎯 Filter changed:', newFilters);
     setFilters(newFilters);
   };
 
@@ -92,24 +87,35 @@ const ProductList = () => {
   };
 
   const handleAddToCart = async (product, quantity = 1) => {
-    if (!user) {
-      showToast('Vui lòng đăng nhập để thêm vào giỏ hàng', 'warning', 3000);
-      setTimeout(() => navigate('/login'), 1500);
-      return;
-    }
-
+    // ✅ BỎ KIỂM TRA ĐĂNG NHẬP - Cho phép guest thêm vào giỏ hàng
+    
     try {
       setAdding(true);
-      // ✅ Sửa: ưu tiên ID trước
       const productId = product.ID || product.id || product.MaSP || product.maSP;
-      const response = await addToCart(productId, quantity);
+      
+      // Thông tin sản phẩm cho guest user
+      const productInfo = {
+        name: product.Ten || product.ten || product.tenSP || product.TenSP,
+        price: product.GiaBan || product.giaBan || product.gia || 0,
+        image: product.HinhAnhURL || product.hinhAnhURL || product.image || '',
+        stock: product.Ton || product.ton || product.soLuong || 999
+      };
+      
+      const response = await addToCart(productId, quantity, productInfo);
 
       if (response.success) {
         showToast(
-          response.message || `Đã thêm ${quantity} ${product.Ten || product.ten || product.tenSP || product.TenSP} vào giỏ hàng`,
+          `Đã thêm ${quantity} ${productInfo.name} vào giỏ hàng`,
           'success',
           3000
         );
+        
+        // Nếu không đăng nhập, hiển thị thông báo thêm
+        if (!user) {
+          setTimeout(() => {
+            showToast('💡 Bạn có thể thanh toán mà không cần đăng nhập!', 'info', 3000);
+          }, 500);
+        }
       }
     } catch (error) {
       console.error('❌ Lỗi thêm vào giỏ hàng:', error);
@@ -121,7 +127,6 @@ const ProductList = () => {
 
   // 👁️ Xử lý xem nhanh sản phẩm
   const handleQuickView = (product) => {
-    console.log('👁️ Quick view product:', product);
     setQuickViewProduct(product);
     setIsQuickViewOpen(true);
   };

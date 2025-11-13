@@ -1,7 +1,9 @@
-const API_URL = 'http://localhost:5000/api';
+import config from '../config';
+
+const API_URL = config.API_URL;
 
 /**
- * Tạo URL thanh toán VNPay
+ * Tạo URL thanh toán VNPay (hỗ trợ cả guest và logged-in user)
  * @param {number} orderId - ID đơn hàng
  * @param {number} amount - Số tiền thanh toán
  * @param {string} bankCode - Mã ngân hàng (optional)
@@ -10,9 +12,7 @@ const API_URL = 'http://localhost:5000/api';
 export const createVNPayPaymentUrl = async (orderId, amount, bankCode = '', language = 'vn') => {
   try {
     const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('Vui lòng đăng nhập để thanh toán');
-    }
+    // Không bắt buộc token nữa (hỗ trợ guest checkout)
 
     // Validate input
     if (!orderId) {
@@ -35,14 +35,20 @@ export const createVNPayPaymentUrl = async (orderId, amount, bankCode = '', lang
       params.append('bankCode', bankCode);
     }
 
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+
+    // Thêm token nếu user đã đăng nhập
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(
       `${API_URL}/payment/vnpay/create-payment-url?${params.toString()}`,
       {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: headers
       }
     );
 

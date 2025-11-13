@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Lock, User, ArrowRight, Home, Shield, BarChart3, Users, Package, ShoppingCart } from 'lucide-react';
 import { Button } from '../components/ui';
 import Toast from '../components/Toast';
+import config from '../config';
 
 const AdminLoginPage = () => {
   const navigate = useNavigate();
@@ -80,7 +81,7 @@ const AdminLoginPage = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/admin/login', {
+      const response = await fetch(config.endpoints.auth.adminLogin, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

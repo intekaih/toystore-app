@@ -4,7 +4,23 @@ const cartController = require('../controllers/cart.controller');
 const { verifyToken } = require('../middlewares/auth.middleware');
 const { cartLimiter } = require('../middlewares/rateLimiter.middleware');
 
-// Tất cả routes đều yêu cầu authentication
+// =======================================
+// GUEST CART ROUTES (Không cần đăng nhập)
+// =======================================
+router.get('/guest', cartLimiter, cartController.getGuestCart);
+router.post('/guest/add', cartLimiter, cartController.addToGuestCart);
+router.put('/guest/update', cartLimiter, cartController.updateGuestCartItem);
+router.patch('/guest/increment/:productId', cartLimiter, cartController.incrementGuestCartItem);
+router.patch('/guest/decrement/:productId', cartLimiter, cartController.decrementGuestCartItem);
+router.delete('/guest/remove/:productId', cartLimiter, cartController.removeGuestCartItem);
+router.delete('/guest/clear', cartLimiter, cartController.clearGuestCart);
+// ✅ THÊM: Route khôi phục giỏ hàng sau khi thanh toán thất bại
+router.post('/guest/restore', cartLimiter, cartController.restoreGuestCart);
+
+// =======================================
+// AUTHENTICATED CART ROUTES (Cần đăng nhập)
+// =======================================
+// Tất cả routes dưới đây yêu cầu authentication
 router.use(verifyToken);
 
 // Áp dụng rate limiter cho tất cả cart operations (50 lần/10 phút)

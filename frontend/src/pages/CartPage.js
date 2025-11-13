@@ -6,10 +6,10 @@ import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, ArrowLeft, Package, Truc
 import MainLayout from '../layouts/MainLayout';
 import { Button, Badge, Loading, Modal } from '../components/ui';
 import Toast from '../components/Toast';
+import config from '../config';
 
 const CartPage = () => {
-  // Backend API URL
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const API_BASE_URL = config.API_BASE_URL;
   
   // Build full image URL
   const buildImageUrl = (imagePath) => {
@@ -53,13 +53,9 @@ const CartPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!user) {
-      showToast('Vui lòng đăng nhập để xem giỏ hàng', 'warning', 3000);
-      setTimeout(() => navigate('/login'), 1500);
-      return;
-    }
+    // ✅ BỎ KIỂM TRA ĐĂNG NHẬP - Cho phép guest xem giỏ hàng
     loadCart();
-  }, [user, navigate]);
+  }, []);
 
   const loadCart = async () => {
     try {
@@ -67,7 +63,26 @@ const CartPage = () => {
       const response = await getCart();
       
       if (response.success && response.data) {
-        setCartItems(response.data.items || []);
+        // ✅ Normalize data structure từ API
+        const items = response.data.items || [];
+        const normalizedItems = items.map(item => ({
+          // Đảm bảo có cả 2 format: PascalCase và camelCase
+          ID: item.id || item.ID,
+          SanPhamID: item.sanPhamId || item.SanPhamID,
+          SoLuong: item.soLuong || item.SoLuong,
+          DonGia: item.donGia || item.DonGia,
+          sanPham: {
+            ID: item.sanPham?.id || item.sanPham?.ID,
+            Ten: item.sanPham?.ten || item.sanPham?.Ten,
+            GiaBan: item.sanPham?.giaBan || item.sanPham?.GiaBan,
+            Ton: item.sanPham?.ton || item.sanPham?.Ton,
+            HinhAnhURL: item.sanPham?.hinhAnhURL || item.sanPham?.HinhAnhURL
+          }
+        }));
+        
+        setCartItems(normalizedItems);
+        
+        console.log('✅ Đã load giỏ hàng:', normalizedItems);
       }
     } catch (error) {
       console.error('Error loading cart:', error);
@@ -146,7 +161,6 @@ const CartPage = () => {
         setCartItems(prevItems => 
           prevItems.filter(item => item.SanPhamID !== productId)
         );
-
         showToast(`Đã xóa "${productName}" khỏi giỏ hàng`, 'success');
       }
     } catch (error) {

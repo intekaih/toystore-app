@@ -31,7 +31,7 @@ backend/
 ### 1️⃣ **Sắp xếp theo mới nhất** (mặc định)
 
 ```bash
-GET http://localhost:5000/api/products?filter=newest
+GET http://localhost:6000/api/products?filter=newest
 ```
 
 **Kết quả:** Sản phẩm có `NgayTao` mới nhất hiển thị trước
@@ -41,7 +41,7 @@ GET http://localhost:5000/api/products?filter=newest
 ### 2️⃣ **Sắp xếp giá tăng dần** (rẻ → đắt)
 
 ```bash
-GET http://localhost:5000/api/products?filter=priceAsc
+GET http://localhost:6000/api/products?filter=priceAsc
 ```
 
 **Kết quả:** Sản phẩm có `GiaBan` thấp nhất hiển thị trước
@@ -51,7 +51,7 @@ GET http://localhost:5000/api/products?filter=priceAsc
 ### 3️⃣ **Sắp xếp giá giảm dần** (đắt → rẻ)
 
 ```bash
-GET http://localhost:5000/api/products?filter=priceDesc
+GET http://localhost:6000/api/products?filter=priceDesc
 ```
 
 **Kết quả:** Sản phẩm có `GiaBan` cao nhất hiển thị trước
@@ -61,7 +61,7 @@ GET http://localhost:5000/api/products?filter=priceDesc
 ### 4️⃣ **Sắp xếp theo bán chạy nhất**
 
 ```bash
-GET http://localhost:5000/api/products?filter=bestSeller
+GET http://localhost:6000/api/products?filter=bestSeller
 ```
 
 **Kết quả:** Sản phẩm có tổng `SoLuong` bán ra nhiều nhất hiển thị trước
@@ -90,17 +90,17 @@ GET http://localhost:5000/api/products?filter=bestSeller
 
 #### Lọc theo giá + sắp xếp:
 ```bash
-GET http://localhost:5000/api/products?filter=priceAsc&minPrice=100000&maxPrice=500000
+GET http://localhost:6000/api/products?filter=priceAsc&minPrice=100000&maxPrice=500000
 ```
 
 #### Lọc theo danh mục + sắp xếp:
 ```bash
-GET http://localhost:5000/api/products?filter=bestSeller&categoryId=2
+GET http://localhost:6000/api/products?filter=bestSeller&categoryId=2
 ```
 
 #### Tìm kiếm + lọc + sắp xếp + phân trang:
 ```bash
-GET http://localhost:5000/api/products?filter=priceDesc&search=lego&minPrice=200000&categoryId=1&page=1&limit=10
+GET http://localhost:6000/api/products?filter=priceDesc&search=lego&minPrice=200000&categoryId=1&page=1&limit=10
 ```
 
 ---
@@ -121,7 +121,7 @@ Mọi request đều trả về format chuẩn theo Database Schema (PascalCase)
         "MoTa": "Búp bê xinh đẹp cho bé gái",
         "GiaBan": 250000,
         "Ton": 50,
-        "HinhAnhURL": "http://localhost:5000/uploads/barbie.jpg",
+        "HinhAnhURL": "http://localhost:6000/uploads/barbie.jpg",
         "LoaiID": 2,
         "NgayTao": "2024-10-27T10:30:00.000Z",
         "Enable": true,
@@ -172,22 +172,22 @@ npm start
 
 #### Test 1: Sản phẩm mới nhất
 ```bash
-curl "http://localhost:5000/api/products?filter=newest&limit=5"
+curl "http://localhost:6000/api/products?filter=newest&limit=5"
 ```
 
 #### Test 2: Giá tăng dần
 ```bash
-curl "http://localhost:5000/api/products?filter=priceAsc&limit=5"
+curl "http://localhost:6000/api/products?filter=priceAsc&limit=5"
 ```
 
 #### Test 3: Bán chạy nhất
 ```bash
-curl "http://localhost:5000/api/products?filter=bestSeller&limit=5"
+curl "http://localhost:6000/api/products?filter=bestSeller&limit=5"
 ```
 
 #### Test 4: Kết hợp filters
 ```bash
-curl "http://localhost:5000/api/products?filter=priceDesc&minPrice=100000&maxPrice=500000&categoryId=1"
+curl "http://localhost:6000/api/products?filter=priceDesc&minPrice=100000&maxPrice=500000&categoryId=1"
 ```
 
 ---
@@ -254,7 +254,7 @@ this.strategies = {
 **Bước 3:** Sử dụng ngay!
 
 ```bash
-GET http://localhost:5000/api/products?filter=discount
+GET http://localhost:6000/api/products?filter=discount
 ```
 
 **✅ Không cần sửa:**

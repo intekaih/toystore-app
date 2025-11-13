@@ -16,10 +16,15 @@ db.SanPham = require('./SanPham')(sequelize, Sequelize);
 db.LoaiSP = require('./LoaiSP')(sequelize, Sequelize);
 db.GioHang = require('./GioHang')(sequelize, Sequelize);
 db.GioHangChiTiet = require('./GioHangChiTiet')(sequelize, Sequelize);
+db.GioHangKhachVangLai = require('./GioHangKhachVangLai')(sequelize, Sequelize);
 db.HoaDon = require('./HoaDon')(sequelize, Sequelize);
 db.ChiTietHoaDon = require('./ChiTietHoaDon')(sequelize, Sequelize);
 db.KhachHang = require('./KhachHang')(sequelize, Sequelize);
 db.PhuongThucThanhToan = require('./PhuongThucThanhToan')(sequelize, Sequelize);
+// ✅ THÊM MODELS MỚI
+db.Voucher = require('./Voucher')(sequelize);
+db.PhiShip = require('./PhiShip')(sequelize);
+db.LichSuSuDungVoucher = require('./LichSuSuDungVoucher')(sequelize);
 
 // Định nghĩa quan hệ giữa các bảng
 // SanPham thuộc về một LoaiSP
@@ -42,6 +47,18 @@ db.TaiKhoan.hasOne(db.GioHang, {
 
 // GioHang thuộc về một TaiKhoan
 db.GioHang.belongsTo(db.TaiKhoan, {
+  foreignKey: 'TaiKhoanID',
+  as: 'taiKhoan'
+});
+
+// TaiKhoan có một KhachHang
+db.TaiKhoan.hasOne(db.KhachHang, {
+  foreignKey: 'TaiKhoanID',
+  as: 'khachHang'
+});
+
+// KhachHang thuộc về một TaiKhoan
+db.KhachHang.belongsTo(db.TaiKhoan, {
   foreignKey: 'TaiKhoanID',
   as: 'taiKhoan'
 });
@@ -117,6 +134,73 @@ db.ChiTietHoaDon.belongsTo(db.SanPham, {
 db.SanPham.hasMany(db.ChiTietHoaDon, {
   foreignKey: 'SanPhamID',
   as: 'chiTietHoaDons'
+});
+
+// === Quan hệ cho GioHangKhachVangLai (Guest Cart) ===
+// GioHangKhachVangLai thuộc về một SanPham
+db.GioHangKhachVangLai.belongsTo(db.SanPham, {
+  foreignKey: 'SanPhamID',
+  as: 'sanPham'
+});
+
+// SanPham có nhiều GioHangKhachVangLai
+db.SanPham.hasMany(db.GioHangKhachVangLai, {
+  foreignKey: 'SanPhamID',
+  as: 'gioHangKhachVangLai'
+});
+
+// ============================================
+// ✅ QUAN HỆ CHO VOUCHER, PHÍ SHIP, LỊCH SỬ
+// ============================================
+
+// === Voucher ===
+// HoaDon thuộc về một Voucher (optional)
+db.HoaDon.belongsTo(db.Voucher, {
+  foreignKey: 'VoucherID',
+  as: 'voucher'
+});
+
+// Voucher có nhiều HoaDon
+db.Voucher.hasMany(db.HoaDon, {
+  foreignKey: 'VoucherID',
+  as: 'hoaDons'
+});
+
+// === Lịch sử sử dụng Voucher ===
+// LichSuSuDungVoucher thuộc về một Voucher
+db.LichSuSuDungVoucher.belongsTo(db.Voucher, {
+  foreignKey: 'VoucherID',
+  as: 'voucher'
+});
+
+// Voucher có nhiều LichSuSuDungVoucher
+db.Voucher.hasMany(db.LichSuSuDungVoucher, {
+  foreignKey: 'VoucherID',
+  as: 'lichSuSuDung'
+});
+
+// LichSuSuDungVoucher thuộc về một HoaDon
+db.LichSuSuDungVoucher.belongsTo(db.HoaDon, {
+  foreignKey: 'HoaDonID',
+  as: 'hoaDon'
+});
+
+// HoaDon có nhiều LichSuSuDungVoucher
+db.HoaDon.hasMany(db.LichSuSuDungVoucher, {
+  foreignKey: 'HoaDonID',
+  as: 'lichSuVoucher'
+});
+
+// LichSuSuDungVoucher thuộc về một TaiKhoan (optional - NULL nếu khách vãng lai)
+db.LichSuSuDungVoucher.belongsTo(db.TaiKhoan, {
+  foreignKey: 'TaiKhoanID',
+  as: 'taiKhoan'
+});
+
+// TaiKhoan có nhiều LichSuSuDungVoucher
+db.TaiKhoan.hasMany(db.LichSuSuDungVoucher, {
+  foreignKey: 'TaiKhoanID',
+  as: 'lichSuVoucher'
 });
 
 module.exports = db;

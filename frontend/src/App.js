@@ -1,13 +1,16 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext.js';
+import ErrorBoundary from './components/ErrorBoundary.js';
 import Homepage from './pages/Homepage.js';
 import ProductList from './pages/Products/ProductList.js';
 import ProductDetail from './pages/Products/ProductDetail.js';
 import CartPage from './pages/CartPage.js';
 import CheckoutPage from './pages/CheckoutPage.js';
+import PaymentMethodPage from './pages/PaymentMethodPage.js';
 import OrderHistoryPage from './pages/OrderHistoryPage.js';
 import OrderDetailPage from './pages/OrderDetailPage.js';
+import OrderLookupPage from './pages/OrderLookupPage.js';
 import PaymentReturnPage from './pages/PaymentReturnPage.js';
 import Login from './pages/LoginPage.js';
 import Register from './pages/RegisterPage.js';
@@ -27,127 +30,124 @@ import './App.css';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <div className="App">
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<Homepage />} />
-            <Route path="/products" element={<ProductList />} />
-            <Route path="/products/:id" element={<ProductDetail />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            
-            {/* Payment return route (public - VNPay redirect) */}
-            <Route path="/payment/return" element={<PaymentReturnPage />} />
-            
-            {/* Admin routes */}
-            <Route path="/admin/login" element={<AdminLoginPage />} />
-            <Route 
-              path="/admin/dashboard" 
-              element={
-                <AdminRoute>
-                  <AdminDashboard />
-                </AdminRoute>
-              } 
-            />
-            <Route 
-              path="/admin/users" 
-              element={
-                <AdminRoute>
-                  <UserManagementPage />
-                </AdminRoute>
-              } 
-            />
-            <Route 
-              path="/admin/categories" 
-              element={
-                <AdminRoute>
-                  <CategoryManagementPage />
-                </AdminRoute>
-              } 
-            />
-            <Route 
-              path="/admin/products" 
-              element={
-                <AdminRoute>
-                  <ProductManagementPage />
-                </AdminRoute>
-              } 
-            />
-            <Route 
-              path="/admin/orders" 
-              element={
-                <AdminRoute>
-                  <OrderManagementPage />
-                </AdminRoute>
-              } 
-            />
-            <Route 
-              path="/admin/statistics" 
-              element={
-                <AdminRoute>
-                  <StatisticsPage />
-                </AdminRoute>
-              } 
-            />
-            
-            {/* Protected routes (User) */}
-            <Route 
-              path="/cart" 
-              element={
-                <ProtectedRoute>
-                  <CartPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/checkout" 
-              element={
-                <ProtectedRoute>
-                  <CheckoutPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/orders" 
-              element={
-                <ProtectedRoute>
-                  <OrderHistoryPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/orders/:id" 
-              element={
-                <ProtectedRoute>
-                  <OrderDetailPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/profile" 
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/profile/edit" 
-              element={
-                <ProtectedRoute>
-                  <EditProfilePage />
-                </ProtectedRoute>
-              } 
-            />
-            
-            {/* Catch all route - 404 */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </div>
-      </Router>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <Router>
+          <div className="App">
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<Homepage />} />
+              <Route path="/products" element={<ProductList />} />
+              <Route path="/products/:id" element={<ProductDetail />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              
+              {/* Payment return route (public - VNPay redirect) */}
+              <Route path="/payment/return" element={<PaymentReturnPage />} />
+              
+              {/* ✅ Guest order detail - Public route (không cần đăng nhập) */}
+              <Route path="/order/:orderCode" element={<OrderDetailPage />} />
+              
+              {/* ✅ Guest order lookup - Public route (tra cứu đơn hàng) */}
+              <Route path="/order-lookup" element={<OrderLookupPage />} />
+              
+              {/* ✅ PUBLIC ROUTES - Không cần đăng nhập */}
+              <Route path="/cart" element={<CartPage />} />
+              <Route path="/checkout" element={<CheckoutPage />} />
+              <Route path="/payment-method" element={<PaymentMethodPage />} />
+              
+              {/* Admin routes */}
+              <Route path="/admin/login" element={<AdminLoginPage />} />
+              <Route 
+                path="/admin/dashboard" 
+                element={
+                  <AdminRoute>
+                    <AdminDashboard />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/admin/users" 
+                element={
+                  <AdminRoute>
+                    <UserManagementPage />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/admin/categories" 
+                element={
+                  <AdminRoute>
+                    <CategoryManagementPage />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/admin/products" 
+                element={
+                  <AdminRoute>
+                    <ProductManagementPage />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/admin/orders" 
+                element={
+                  <AdminRoute>
+                    <OrderManagementPage />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/admin/statistics" 
+                element={
+                  <AdminRoute>
+                    <StatisticsPage />
+                  </AdminRoute>
+                } 
+              />
+              
+              {/* Protected routes (User) */}
+              <Route 
+                path="/orders" 
+                element={
+                  <ProtectedRoute>
+                    <OrderHistoryPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/orders/:id" 
+                element={
+                  <ProtectedRoute>
+                    <OrderDetailPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/profile" 
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/profile/edit" 
+                element={
+                  <ProtectedRoute>
+                    <EditProfilePage />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Catch all route - 404 */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </div>
+        </Router>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

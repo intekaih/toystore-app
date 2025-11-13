@@ -1,7 +1,8 @@
 // Service xử lý các API liên quan đến thông tin người dùng
 import authService from './authService';
+import config from '../config';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = config.API_URL; // Sửa từ API_BASE_URL thành API_URL để có /api prefix
 
 class UserService {
   /**
@@ -16,9 +17,7 @@ class UserService {
         throw new Error('Không tìm thấy token đăng nhập');
       }
 
-      console.log('📤 Gửi yêu cầu lấy profile...');
-
-      const response = await fetch(`${API_BASE_URL}/users/profile`, {
+      const response = await fetch(`${API_URL}/users/profile`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -31,12 +30,10 @@ class UserService {
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const textResponse = await response.text();
-        console.error('❌ Response không phải JSON:', textResponse);
         throw new Error('Server trả về response không hợp lệ');
       }
 
       const data = await response.json();
-      console.log('📥 Response lấy profile:', data);
 
       if (!response.ok) {
         // Nếu token hết hạn hoặc không hợp lệ
@@ -80,9 +77,7 @@ class UserService {
         throw new Error('Không tìm thấy token đăng nhập');
       }
 
-      console.log('📤 Gửi yêu cầu cập nhật profile:', updateData);
-
-      const response = await fetch(`${API_BASE_URL}/users/profile`, {
+      const response = await fetch(`${API_URL}/users/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -96,12 +91,10 @@ class UserService {
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const textResponse = await response.text();
-        console.error('❌ Response không phải JSON:', textResponse);
         throw new Error('Server trả về response không hợp lệ');
       }
 
       const data = await response.json();
-      console.log('📥 Response cập nhật profile:', data);
 
       if (!response.ok) {
         // Nếu token hết hạn hoặc không hợp lệ
@@ -121,7 +114,6 @@ class UserService {
       // Cập nhật thông tin user trong localStorage
       if (data.success && data.data && data.data.user) {
         authService.saveUserInfo(data.data.user);
-        console.log('💾 Đã cập nhật thông tin user trong localStorage');
       }
 
       return {

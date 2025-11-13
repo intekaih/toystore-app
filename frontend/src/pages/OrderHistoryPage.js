@@ -7,10 +7,11 @@ import MainLayout from '../layouts/MainLayout';
 import { Button, Badge, Loading, Modal } from '../components/ui';
 import Toast from '../components/Toast';
 import Pagination from '../components/Pagination';
+import config from '../config';
 
 const OrderHistoryPage = () => {
   // Backend API URL
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const API_BASE_URL = config.API_BASE_URL;
   
   // Build full image URL
   const buildImageUrl = (imagePath) => {
