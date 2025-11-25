@@ -5,14 +5,6 @@ module.exports = (sequelize, Sequelize) => {
       primaryKey: true,
       autoIncrement: true
     },
-    TaiKhoanID: {
-      type: Sequelize.INTEGER,
-      allowNull: true,
-      references: {
-        model: 'TaiKhoan',
-        key: 'ID'
-      }
-    },
     HoTen: {
       type: Sequelize.STRING(100),
       allowNull: false
@@ -25,17 +17,17 @@ module.exports = (sequelize, Sequelize) => {
       type: Sequelize.STRING(20),
       allowNull: true
     },
-    DiaChi: {
-      type: Sequelize.TEXT,
-      allowNull: true
+    TaiKhoanID: {
+      type: Sequelize.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'TaiKhoan',
+        key: 'ID'
+      }
     },
     NgayTao: {
       type: Sequelize.DATE,
       allowNull: true
-    },
-    Enable: {
-      type: Sequelize.BOOLEAN,
-      defaultValue: true
     }
   }, {
     tableName: 'KhachHang',

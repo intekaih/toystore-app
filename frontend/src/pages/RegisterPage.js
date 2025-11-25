@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Gift, Sparkles, Heart, UserPlus, User, Mail, Phone, Lock, Eye, EyeOff, IdCard } from 'lucide-react';
 import authService from '../services/authService';
-import { useNavigate, Link } from 'react-router-dom';
-import { UserPlus, User, Mail, Phone, Lock, Eye, EyeOff, IdCard } from 'lucide-react';
 import { Button } from '../components/ui';
 
 const RegisterPage = () => {
@@ -128,11 +128,17 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-rose-50 to-cream-100 flex items-center justify-center p-4">
-      {/* Decorative Elements */}
-      <div className="absolute top-10 left-10 text-6xl opacity-20 animate-float">🎀</div>
-      <div className="absolute bottom-10 right-10 text-6xl opacity-20 animate-float" style={{ animationDelay: '0.5s' }}>🧸</div>
-      <div className="absolute top-1/3 right-20 text-5xl opacity-20 animate-float" style={{ animationDelay: '1s' }}>💝</div>
+    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Decorative Elements - Using Lucide Icons */}
+      <div className="absolute top-10 left-10 text-pink-300 opacity-20 animate-float">
+        <Gift size={64} />
+      </div>
+      <div className="absolute bottom-10 right-10 text-purple-300 opacity-20 animate-float" style={{ animationDelay: '0.5s' }}>
+        <Sparkles size={64} />
+      </div>
+      <div className="absolute top-1/3 right-20 text-blue-300 opacity-20 animate-float" style={{ animationDelay: '1s' }}>
+        <Heart size={48} />
+      </div>
       <div className="absolute bottom-1/4 left-20 text-5xl opacity-20 animate-float" style={{ animationDelay: '1.5s' }}>⭐</div>
 
       <div className="w-full max-w-2xl relative z-10">

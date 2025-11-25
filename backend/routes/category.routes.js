@@ -7,6 +7,9 @@ const { verifyToken, requireAdmin } = require('../middlewares/auth.middleware');
 router.use(verifyToken);
 router.use(requireAdmin);
 
+// GET /api/admin/categories/search - Tìm kiếm để autocomplete
+router.get('/search', categoryController.searchCategories);
+
 // GET /api/admin/categories - Lấy danh sách tất cả danh mục
 router.get('/', categoryController.getAllCategories);
 

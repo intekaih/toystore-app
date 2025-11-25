@@ -3,12 +3,14 @@
   background: white;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+  overflow-x: auto; /* ✅ Cho phép scroll ngang khi cần */
+  overflow-y: visible;
 }
 
 .user-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 1200px; /* ✅ Đảm bảo bảng có chiều rộng tối thiểu */
 }
 
 .user-table thead {
@@ -22,6 +24,20 @@
   font-weight: 600;
   font-size: 0.95rem;
   white-space: nowrap;
+}
+
+/* ✅ Đặt min-width cho từng cột quan trọng */
+.user-table th:nth-child(1) { min-width: 50px; }   /* ID */
+.user-table th:nth-child(2) { min-width: 150px; }  /* Tên đăng nhập */
+.user-table th:nth-child(3) { min-width: 180px; }  /* Họ tên */
+.user-table th:nth-child(4) { min-width: 200px; }  /* Email */
+.user-table th:nth-child(5) { min-width: 120px; }  /* Số điện thoại */
+.user-table th:nth-child(6) { min-width: 130px; }  /* Vai trò */
+.user-table th:nth-child(7) { min-width: 120px; }  /* Trạng thái */
+.user-table th:nth-child(8) { min-width: 140px; }  /* Ngày tạo */
+.user-table th:nth-child(9) { 
+  min-width: 160px;  /* ✅ Hành động - đủ rộng cho 3 nút */
+  text-align: center;
 }
 
 .user-table tbody tr {
@@ -39,6 +55,11 @@
   color: #333;
 }
 
+/* ✅ Căn giữa cột hành động */
+.user-table td:last-child {
+  text-align: center;
+}
+
 .username {
   font-weight: 600;
   color: #667eea;
@@ -54,11 +75,20 @@
   white-space: nowrap;
 }
 
+.badge-danger,
 .badge-admin {
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   color: white;
 }
 
+.badge-warning,
+.badge-staff {
+  background: linear-gradient(135deg, #ffd89b 0%, #ff6b6b 100%);
+  color: white;
+}
+
+.badge-success,
+.badge-customer,
 .badge-user {
   background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
   color: white;
@@ -78,6 +108,9 @@
 .action-buttons {
   display: flex;
   gap: 0.5rem;
+  justify-content: center; /* ✅ Căn giữa các nút */
+  align-items: center;
+  flex-wrap: nowrap; /* ✅ Không cho xuống dòng */
 }
 
 .btn-action {
@@ -88,10 +121,20 @@
   font-size: 1.1rem;
   transition: all 0.3s ease;
   background: #f0f0f0;
+  flex-shrink: 0; /* ✅ Không cho nút bị co lại */
+  min-width: 40px; /* ✅ Đảm bảo nút có chiều rộng tối thiểu */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-action:hover {
   transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-action:active {
+  transform: scale(0.95);
 }
 
 .btn-edit:hover {
@@ -171,17 +214,28 @@
 }
 
 /* Responsive */
-@media (max-width: 1024px) {
+@media (max-width: 1400px) {
   .table-container {
     overflow-x: auto;
   }
+}
 
+@media (max-width: 1024px) {
   .user-table {
-    min-width: 900px;
+    min-width: 1100px;
+  }
+
+  .user-table th,
+  .user-table td {
+    padding: 0.875rem 0.75rem;
   }
 }
 
 @media (max-width: 768px) {
+  .user-table {
+    min-width: 900px;
+  }
+
   .user-table th,
   .user-table td {
     padding: 0.75rem 0.5rem;
@@ -189,11 +243,28 @@
   }
 
   .action-buttons {
-    flex-direction: column;
+    gap: 0.35rem;
   }
 
   .btn-action {
     padding: 0.4rem 0.6rem;
     font-size: 1rem;
+    min-width: 36px;
+  }
+}
+
+@media (max-width: 640px) {
+  .user-table {
+    min-width: 800px;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .btn-action {
+    width: 100%;
+    min-width: unset;
   }
 }

@@ -8,14 +8,6 @@ module.exports = (sequelize, Sequelize) => {
     Ten: {
       type: Sequelize.STRING(100),
       allowNull: false
-    },
-    MoTa: {
-      type: Sequelize.STRING(500),
-      allowNull: true
-    },
-    Enable: {
-      type: Sequelize.BOOLEAN,
-      defaultValue: true
     }
   }, {
     tableName: 'PhuongThucThanhToan',

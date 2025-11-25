@@ -65,6 +65,11 @@ const config = {
       },
     },
     
+    // Admin Vouchers - ✅ MỚI THÊM
+    vouchers: {
+      base: `${API_URL}/admin/vouchers`,
+    },
+    
     // Admin Statistics
     admin: {
       statistics: {

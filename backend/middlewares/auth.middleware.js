@@ -45,7 +45,7 @@ exports.verifyToken = async (req, res, next) => {
     const user = await TaiKhoan.findOne({
       where: {
         ID: decoded.userId,
-        Enable: true
+        TrangThai: true  // Changed from Enable to TrangThai
       }
     });
 
@@ -96,7 +96,7 @@ exports.verifyToken = async (req, res, next) => {
 
 // Middleware kiểm tra quyền admin
 exports.requireAdmin = (req, res, next) => {
-  if (req.user && req.user.role === 'admin') {
+  if (req.user && req.user.role === 'Admin') {  // Changed from 'admin' to 'Admin'
     logger.debug(`Admin access granted: ${req.user.username}`);
     next();
   } else {
@@ -117,6 +117,38 @@ exports.requireAuth = (req, res, next) => {
     return res.status(401).json({
       success: false,
       message: 'Vui lòng đăng nhập để tiếp tục'
+    });
+  }
+};
+
+/**
+ * Middleware kiểm tra quyền nhân viên
+ */
+exports.requireStaff = (req, res, next) => {
+  if (req.user && req.user.role === 'NhanVien') {  // Changed from 'nhanvien' to 'NhanVien'
+    logger.debug(`Staff access granted: ${req.user.username}`);
+    next();
+  } else {
+    logger.warn(`Truy cập bị từ chối: User ${req.user?.username || 'unknown'} không có quyền nhân viên`);
+    return res.status(403).json({
+      success: false,
+      message: 'Bạn không có quyền truy cập. Yêu cầu quyền nhân viên.'
+    });
+  }
+};
+
+/**
+ * Middleware kiểm tra quyền admin hoặc nhân viên
+ */
+exports.requireAdminOrStaff = (req, res, next) => {
+  if (req.user && (req.user.role === 'Admin' || req.user.role === 'NhanVien')) {  // Changed from 'admin'/'nhanvien' to 'Admin'/'NhanVien'
+    logger.debug(`Admin/Staff access granted: ${req.user.username} (${req.user.role})`);
+    next();
+  } else {
+    logger.warn(`Truy cập bị từ chối: User ${req.user?.username || 'unknown'} không có quyền admin/nhân viên`);
+    return res.status(403).json({
+      success: false,
+      message: 'Bạn không có quyền truy cập. Yêu cầu quyền admin hoặc nhân viên.'
     });
   }
 };
@@ -160,7 +192,7 @@ exports.optionalAuth = async (req, res, next) => {
       const user = await TaiKhoan.findOne({
         where: {
           ID: decoded.userId,
-          Enable: true
+          TrangThai: true  // Changed from Enable to TrangThai
         }
       });
 

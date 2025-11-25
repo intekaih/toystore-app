@@ -1,20 +1,27 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, Home, Settings } from 'lucide-react';
+import { RoleChecker } from '../constants/roles';
+import { LogOut, Home, Settings, Gamepad2, Package, ShoppingCart, Users, TrendingUp } from 'lucide-react';
 
 /**
  * 🎮 AdminLayout - Layout cho trang quản trị với header navigation
+ * Hỗ trợ cả Admin và Staff
  */
-const AdminLayout = ({ children }) => {
+const AdminLayout = ({ children, isStaffView = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  
+  // Kiểm tra role
+  const userRole = RoleChecker.getUserRole(user);
+  const isAdmin = RoleChecker.isAdmin(userRole);
+  const isStaff = RoleChecker.isStaff(userRole);
 
   const handleLogout = () => {
     logout();
-    navigate('/admin/login');
+    navigate(isStaffView ? '/login' : '/admin/login');
     setShowUserMenu(false);
   };
 
@@ -22,38 +29,42 @@ const AdminLayout = ({ children }) => {
     setShowUserMenu(!showUserMenu);
   };
 
-  const adminMenuItems = [
+  // Menu items - Ẩn các menu không cần thiết cho Staff
+  const allMenuItems = [
     {
       name: 'Dashboard',
-      path: '/admin/dashboard',
-      icon: '🏠'
-    },
-    {
-      name: 'Danh mục',
-      path: '/admin/categories',
-      icon: '📂'
+      path: isStaffView ? '/staff/dashboard' : '/admin/dashboard',
+      icon: <Home size={18} />,
+      show: true // Cả Admin và Staff đều có
     },
     {
       name: 'Sản phẩm',
-      path: '/admin/products',
-      icon: '📦'
+      path: isStaffView ? '/staff/products' : '/admin/products',
+      icon: <Package size={18} />,
+      show: true // Cả Admin và Staff đều có (nhưng Staff chỉ xem/cập nhật tồn kho)
     },
     {
       name: 'Đơn hàng',
-      path: '/admin/orders',
-      icon: '🛒'
+      path: isStaffView ? '/staff/orders' : '/admin/orders',
+      icon: <ShoppingCart size={18} />,
+      show: true // Cả Admin và Staff đều có
     },
     {
       name: 'Người dùng',
       path: '/admin/users',
-      icon: '👥'
+      icon: <Users size={18} />,
+      show: !isStaffView // Chỉ Admin
     },
     {
-      name: 'Thống kê báo cáo',
+      name: 'Thống kê',
       path: '/admin/statistics',
-      icon: '📈'
+      icon: <TrendingUp size={18} />,
+      show: !isStaffView // Chỉ Admin
     }
   ];
+
+  // Lọc menu items theo quyền
+  const adminMenuItems = allMenuItems.filter(item => item.show);
 
   const isActive = (path) => {
     return location.pathname === path;
@@ -67,11 +78,11 @@ const AdminLayout = ({ children }) => {
           <div className="flex items-center justify-between gap-6 py-3">
             {/* Logo - Giống Store */}
             <div className="flex items-center gap-2 text-xl font-display font-bold text-gradient-primary whitespace-nowrap">
-              <span className="text-2xl animate-bounce-soft">🎮</span>
-              <span className="hidden md:inline">ToyStore Admin</span>
-              <span className="md:hidden">Admin</span>
+              <Gamepad2 size={24} className="animate-bounce-soft" />
+              <span className="hidden md:inline">{isStaffView ? 'ToyStore Staff' : 'ToyStore Admin'}</span>
+              <span className="md:hidden">{isStaffView ? 'Staff' : 'Admin'}</span>
               <span className="ml-1 px-2 py-0.5 bg-gradient-to-r from-primary-400 to-primary-500 text-white text-[10px] rounded-full">
-                Hệ thống quản trị
+                {isStaffView ? 'Nhân viên' : 'Hệ thống quản trị'}
               </span>
             </div>
 
@@ -89,7 +100,7 @@ const AdminLayout = ({ children }) => {
                     }
                   `}
                 >
-                  <span className="text-base">{item.icon}</span>
+                  {item.icon}
                   <span className="hidden lg:inline">{item.name}</span>
                 </button>
               ))}
@@ -136,9 +147,21 @@ const AdminLayout = ({ children }) => {
                           <div className="font-bold text-gray-800">{user?.HoTen || user?.hoTen || 'Khả Ái'}</div>
                           <div className="text-sm text-gray-500">{user?.Email || user?.email || 'admin@toystore.com'}</div>
                           <div className="mt-1">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-200 text-primary-700 rounded-full text-xs font-semibold">
-                              👑 Admin
-                            </span>
+                            {(() => {
+                              const roleDisplay = RoleChecker.getDisplayInfo(userRole);
+                              return (
+                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                  roleDisplay.color === 'purple' 
+                                    ? 'bg-pink-100 text-pink-700 border border-pink-200'
+                                    : roleDisplay.color === 'blue'
+                                    ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                                    : 'bg-primary-200 text-primary-700'
+                                }`}>
+                                  <span>{roleDisplay.icon}</span>
+                                  <span>{roleDisplay.label}</span>
+                                </span>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>
@@ -148,7 +171,7 @@ const AdminLayout = ({ children }) => {
                     <div className="py-2">
                       <button
                         onClick={() => {
-                          navigate('/admin/dashboard');
+                          navigate(isStaffView ? '/staff/dashboard' : '/admin/dashboard');
                           setShowUserMenu(false);
                         }}
                         className="w-full flex items-center gap-3 px-5 py-3 hover:bg-primary-50 transition-colors text-gray-700 hover:text-primary-600"
@@ -195,8 +218,8 @@ const AdminLayout = ({ children }) => {
         ></div>
       )}
 
-      {/* Main Content - Container */}
-      <main className="container-cute py-6 min-h-[calc(100vh-200px)]">
+      {/* Main Content - Container với chiều rộng lớn hơn cho admin */}
+      <main className="w-full max-w-[95%] 2xl:max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 min-h-[calc(100vh-200px)]">
         {children}
       </main>
 

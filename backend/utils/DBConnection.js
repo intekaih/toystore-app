@@ -46,7 +46,8 @@ class DBConnection {
         port: dbConfig.port,
         dialect: dbConfig.dialect,
         dialectOptions: dbConfig.dialectOptions,
-        timezone: dbConfig.timezone,
+        // ✅ XÓA timezone - để Sequelize không thêm offset vào datetime
+        // timezone: '+00:00',
         pool: dbConfig.pool,
         logging: (msg) => Logger.getInstance().info(`[Sequelize] ${msg}`),
         // Tắt logging nếu muốn: logging: false

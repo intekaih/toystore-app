@@ -1,5 +1,6 @@
 // src/components/UserModal.js
 import React, { useState, useEffect } from 'react';
+import { Plus, Edit, Check, Save, Loader, X } from 'lucide-react';
 import '../styles/UserModal.css';
 
 const UserModal = ({ isOpen, onClose, onSubmit, editingUser, mode }) => {
@@ -9,7 +10,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, editingUser, mode }) => {
     HoTen: '',
     Email: '',
     DienThoai: '',
-    VaiTro: 'user'
+    VaiTro: 'KhachHang'
   });
 
   const [errors, setErrors] = useState({});
@@ -25,7 +26,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, editingUser, mode }) => {
           HoTen: editingUser.hoTen || '',
           Email: editingUser.email || '',
           DienThoai: editingUser.dienThoai || '',
-          VaiTro: editingUser.vaiTro || 'user'
+          VaiTro: editingUser.vaiTro || 'KhachHang'
         });
       } else {
         setFormData({
@@ -34,7 +35,7 @@ const UserModal = ({ isOpen, onClose, onSubmit, editingUser, mode }) => {
           HoTen: '',
           Email: '',
           DienThoai: '',
-          VaiTro: 'user'
+          VaiTro: 'KhachHang'
         });
       }
       setErrors({});
@@ -134,8 +135,22 @@ const UserModal = ({ isOpen, onClose, onSubmit, editingUser, mode }) => {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{mode === 'create' ? '➕ Thêm người dùng mới' : '✏️ Cập nhật thông tin người dùng'}</h2>
-          <button className="close-btn" onClick={onClose} disabled={isSubmitting}>×</button>
+          <h2 className="flex items-center gap-2">
+            {mode === 'create' ? (
+              <>
+                <Plus size={18} />
+                Thêm người dùng mới
+              </>
+            ) : (
+              <>
+                <Edit size={18} />
+                Cập nhật thông tin
+              </>
+            )}
+          </h2>
+          <button className="close-btn" onClick={onClose} disabled={isSubmitting}>
+            <X size={20} />
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="user-form">
@@ -253,8 +268,9 @@ const UserModal = ({ isOpen, onClose, onSubmit, editingUser, mode }) => {
                 onChange={handleChange}
                 disabled={isSubmitting}
               >
-                <option value="user">👤 Người dùng</option>
-                <option value="admin">👑 Quản trị viên</option>
+                <option value="KhachHang">Khách hàng</option>
+                <option value="NhanVien">Nhân viên</option>
+                <option value="Admin">Quản trị viên</option>
               </select>
             </div>
           </div>
@@ -262,18 +278,34 @@ const UserModal = ({ isOpen, onClose, onSubmit, editingUser, mode }) => {
           <div className="modal-footer">
             <button
               type="button"
-              className="btn-cancel"
+              className="btn-cancel flex items-center gap-2"
               onClick={onClose}
               disabled={isSubmitting}
             >
-              ❌ Hủy
+              <X size={16} />
+              Hủy
             </button>
             <button
               type="submit"
-              className="btn-submit"
+              className="btn-submit flex items-center gap-2"
               disabled={isSubmitting}
             >
-              {isSubmitting ? '⏳ Đang xử lý...' : mode === 'create' ? '✅ Tạo mới' : '💾 Cập nhật'}
+              {isSubmitting ? (
+                <>
+                  <Loader className="animate-spin" size={16} />
+                  Đang xử lý...
+                </>
+              ) : mode === 'create' ? (
+                <>
+                  <Check size={16} />
+                  Tạo mới
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  Cập nhật
+                </>
+              )}
             </button>
           </div>
         </form>

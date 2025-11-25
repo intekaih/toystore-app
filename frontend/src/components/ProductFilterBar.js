@@ -4,13 +4,15 @@
  */
 
 import React, { useState } from 'react';
-import { getAvailableFilters } from '../api/productApi';
-import { ChevronDown, ChevronUp, X, Sparkles } from 'lucide-react';
+import { productService } from '../services'; // ✅ Sử dụng productService
+import { ChevronDown, ChevronUp, X, Sparkles, DollarSign, Zap } from 'lucide-react';
 import { Button, Badge } from './ui';
 
 const ProductFilterBar = ({ onFilterChange, currentFilters }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const availableFilters = getAvailableFilters();
+  
+  // ✅ Sử dụng productService.getAvailableFilters() thay vì import trực tiếp
+  const availableFilters = productService.getAvailableFilters();
 
   const handleFilterChange = (filterType, value) => {
     onFilterChange({
@@ -102,7 +104,7 @@ const ProductFilterBar = ({ onFilterChange, currentFilters }) => {
             {/* Lọc theo giá */}
             <div>
               <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
-                <span className="text-lg">💰</span>
+                <DollarSign size={18} className="text-primary-500" />
                 <span>Khoảng giá</span>
               </label>
               <div className="flex items-center gap-3">
@@ -129,7 +131,7 @@ const ProductFilterBar = ({ onFilterChange, currentFilters }) => {
             {/* Quick price filters */}
             <div>
               <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
-                <span className="text-lg">⚡</span>
+                <Zap size={18} className="text-primary-500" />
                 <span>Lọc nhanh</span>
               </label>
               <div className="flex flex-wrap gap-2">

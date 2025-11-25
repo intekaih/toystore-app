@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { restoreGuestCart, getOrCreateSessionId } from '../api/cartApi';
+import { cartService } from '../services'; // ✅ Sử dụng cartService
 import './PaymentReturnPage.css';
 
 const PaymentReturnPage = () => {
@@ -116,6 +116,21 @@ const PaymentReturnPage = () => {
     }
   };
 
+  // ✅ Helper function để format giá tiền an toàn
+  const formatPrice = (price) => {
+    try {
+      const numPrice = parseFloat(price);
+      if (isNaN(numPrice) || numPrice === null || numPrice === undefined) {
+        console.warn('Invalid price value:', price);
+        return '0 ₫';
+      }
+      return numPrice.toLocaleString('vi-VN') + ' ₫';
+    } catch (error) {
+      console.error('Error formatting price:', error, price);
+      return '0 ₫';
+    }
+  };
+
   /**
    * Khôi phục giỏ hàng guest sau khi thanh toán thất bại
    */
@@ -130,11 +145,8 @@ const PaymentReturnPage = () => {
         return;
       }
 
-      // Lấy session ID
-      const sessionId = getOrCreateSessionId();
-
-      // Gọi API khôi phục giỏ hàng
-      const result = await restoreGuestCart(sessionId, cartItems);
+      // ✅ Sử dụng cartService thay vì import API trực tiếp
+      const result = await cartService.restoreGuestCart(cartItems);
 
       // Hiển thị thông báo thành công
       if (result.success && result.data.totalRestored > 0) {
@@ -221,16 +233,18 @@ const PaymentReturnPage = () => {
             {paymentResult?.message || 'Không có thông tin'}
           </p>
 
-          {/* Payment details */}
-          {paymentResult?.data && (
+          {/* Payment details - CHỈ HIỂN THỊ NẾU CÓ DỮ LIỆU */}
+          {paymentResult?.data && (paymentResult.data.orderCode || paymentResult.data.orderId || paymentResult.data.amount) && (
             <div className="payment-details">
               <h3>📋 Thông tin giao dịch</h3>
-              <div className="detail-row">
-                <span className="detail-label">Mã đơn hàng:</span>
-                <span className="detail-value">
-                  {paymentResult.data.orderCode || paymentResult.data.orderId}
-                </span>
-              </div>
+              {(paymentResult.data.orderCode || paymentResult.data.orderId) && (
+                <div className="detail-row">
+                  <span className="detail-label">Mã đơn hàng:</span>
+                  <span className="detail-value">
+                    {paymentResult.data.orderCode || paymentResult.data.orderId || 'Không xác định'}
+                  </span>
+                </div>
+              )}
               {paymentResult.data.paymentMethod && (
                 <div className="detail-row">
                   <span className="detail-label">Phương thức:</span>
@@ -243,12 +257,14 @@ const PaymentReturnPage = () => {
                   <span className="detail-value">{paymentResult.data.transactionNo}</span>
                 </div>
               )}
-              <div className="detail-row">
-                <span className="detail-label">Số tiền:</span>
-                <span className="detail-value amount">
-                  {parseFloat(paymentResult.data.amount).toLocaleString('vi-VN')} ₫
-                </span>
-              </div>
+              {paymentResult.data.amount && (
+                <div className="detail-row">
+                  <span className="detail-label">Số tiền:</span>
+                  <span className="detail-value amount">
+                    {formatPrice(paymentResult.data.amount)}
+                  </span>
+                </div>
+              )}
               {paymentResult.data.bankCode && (
                 <div className="detail-row">
                   <span className="detail-label">Ngân hàng:</span>

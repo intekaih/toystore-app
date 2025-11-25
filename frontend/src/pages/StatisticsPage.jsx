@@ -2,13 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { BarChart3, DollarSign, Package, TrendingUp, Award, Users as UsersIcon, RotateCcw } from 'lucide-react';
+import { statisticsService } from '../services'; // ✅ Sử dụng statisticsService
 import RevenueChart from '../components/RevenueChart';
 import Toast from '../components/Toast';
 import { Button, Card } from '../components/ui';
 import AdminLayout from '../layouts/AdminLayout';
 import authService from '../services/authService';
-import axios from 'axios';
-import config from '../config';
 
 const StatisticsPage = () => {
   const navigate = useNavigate();
@@ -40,31 +40,18 @@ const StatisticsPage = () => {
     try {
       setLoading(true);
 
-      const token = authService.getToken();
-      if (!token) {
-        showToast('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại', 'error');
-        setTimeout(() => {
-          logout();
-          navigate('/admin/login');
-        }, 2000);
-        return;
-      }
-
       // Tính startDate và endDate dựa vào viewMode
       let startDate, endDate;
       
       if (mode === 'day') {
-        // Lấy ngày hiện tại
         const today = new Date();
         startDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')} 00:00:00`;
         endDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')} 23:59:59`;
       } else if (mode === 'month') {
-        // Lấy tháng được chọn
         startDate = `${year}-${String(month).padStart(2, '0')}-01 00:00:00`;
         const lastDay = new Date(year, month, 0).getDate();
         endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')} 23:59:59`;
       } else if (mode === 'year') {
-        // Lấy cả năm được chọn
         startDate = `${year}-01-01 00:00:00`;
         endDate = `${year}-12-31 23:59:59`;
       }
@@ -77,34 +64,29 @@ const StatisticsPage = () => {
         endDate
       });
 
-      // ✅ Sửa từ dashboard sang statistics để khớp với backend route
-      const response = await axios.get(`${config.API_URL}/admin/statistics`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        params: {
-          startDate,
-          endDate,
-          year: year,
-          viewMode: mode
-        }
+      // ✅ Sử dụng statisticsService thay vì axios trực tiếp
+      const response = await statisticsService.getStatistics({
+        startDate,
+        endDate,
+        year: year,
+        viewMode: mode
       });
 
-      if (response.data.success) {
-        setStatistics(response.data.data.statistics);
-        console.log('📊 Statistics loaded:', response.data.data.statistics);
+      if (response.success) {
+        setStatistics(response.data.statistics || response.data);
+        console.log('📊 Statistics loaded:', response.data.statistics || response.data);
       }
     } catch (error) {
       console.error('Error fetching statistics:', error);
 
-      if (error.response?.status === 401) {
+      if (error.message?.includes('đăng nhập')) {
         showToast('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại', 'error');
         setTimeout(() => {
           logout();
           navigate('/admin/login');
         }, 2000);
       } else {
-        showToast(error.response?.data?.message || 'Lỗi khi tải thống kê', 'error');
+        showToast(error.message || 'Lỗi khi tải thống kê', 'error');
       }
     } finally {
       setLoading(false);
@@ -188,7 +170,7 @@ const StatisticsPage = () => {
       {/* Page Title */}
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-          <span className="text-3xl">📊</span>
+          <BarChart3 size={32} />
           Thống kê báo cáo
         </h2>
         <p className="text-gray-600 mt-1">Xem báo cáo doanh thu và thống kê</p>
@@ -240,8 +222,9 @@ const StatisticsPage = () => {
           <Button 
             variant="secondary"
             onClick={() => fetchStatistics(selectedMonth, selectedYear, viewMode)}
-            icon="🔄"
+            className="flex items-center gap-2"
           >
+            <RotateCcw size={16} />
             Làm mới
           </Button>
         </div>
@@ -252,7 +235,9 @@ const StatisticsPage = () => {
         {/* Tổng doanh thu */}
         <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-5 border border-green-200 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-500 rounded-xl text-white text-2xl flex-shrink-0">💰</div>
+            <div className="p-3 bg-green-500 rounded-xl text-white flex-shrink-0">
+              <DollarSign size={24} />
+            </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium text-green-700 mb-1">Tổng doanh thu</h3>
               <p className="text-xl font-bold text-green-800 truncate">{formatCurrency(statistics?.tongDoanhThu)}</p>
@@ -266,7 +251,9 @@ const StatisticsPage = () => {
         {/* Tổng số đơn hàng */}
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-5 border border-blue-200 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-500 rounded-xl text-white text-2xl flex-shrink-0">📦</div>
+            <div className="p-3 bg-blue-500 rounded-xl text-white flex-shrink-0">
+              <Package size={24} />
+            </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium text-blue-700 mb-1">Tổng số đơn hàng</h3>
               <p className="text-xl font-bold text-blue-800">{statistics?.soDonHang || 0}</p>
@@ -280,7 +267,9 @@ const StatisticsPage = () => {
         {/* Doanh thu trung bình */}
         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-5 border border-purple-200 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-500 rounded-xl text-white text-2xl flex-shrink-0">📈</div>
+            <div className="p-3 bg-purple-500 rounded-xl text-white flex-shrink-0">
+              <TrendingUp size={24} />
+            </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-medium text-purple-700 mb-1">Doanh thu trung bình</h3>
               <p className="text-xl font-bold text-purple-800 truncate">{formatCurrency(statistics?.doanhThuTrungBinh)}</p>
@@ -343,7 +332,8 @@ const StatisticsPage = () => {
       {statistics?.topSanPham && statistics.topSanPham.length > 0 && (
         <Card className="mb-6" padding="md">
           <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            🏆 Top 5 sản phẩm bán chạy
+            <Award size={28} />
+            Top 5 sản phẩm bán chạy
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {statistics.topSanPham.map((product, index) => (
@@ -383,7 +373,8 @@ const StatisticsPage = () => {
       {statistics?.topKhachHang && statistics.topKhachHang.length > 0 && (
         <Card padding="md">
           <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            👥 Top 5 khách hàng thân thiết
+            <UsersIcon size={28} />
+            Top 5 khách hàng thân thiết
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full">

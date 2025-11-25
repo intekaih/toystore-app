@@ -1,11 +1,11 @@
 // src/components/CategoryModal.js
 import React, { useState, useEffect } from 'react';
+import { Plus, Edit, Check, Save, Loader, X } from 'lucide-react';
 import '../styles/CategoryModal.css';
 
 const CategoryModal = ({ isOpen, onClose, onSubmit, editingCategory, mode }) => {
   const [formData, setFormData] = useState({
-    Ten: '',
-    MoTa: ''
+    Ten: ''
   });
 
   const [errors, setErrors] = useState({});
@@ -15,15 +15,13 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, editingCategory, mode }) => 
   useEffect(() => {
     if (isOpen) {
       if (mode === 'edit' && editingCategory) {
-        // ✅ Đọc PascalCase từ backend
+        // ✅ Chỉ lấy Ten (bỏ MoTa)
         setFormData({
-          Ten: editingCategory.Ten || '',
-          MoTa: editingCategory.MoTa || ''
+          Ten: editingCategory.Ten || editingCategory.ten || ''
         });
       } else {
         setFormData({
-          Ten: '',
-          MoTa: ''
+          Ten: ''
         });
       }
       setErrors({});
@@ -57,11 +55,6 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, editingCategory, mode }) => 
       newErrors.Ten = 'Tên danh mục không được vượt quá 100 ký tự';
     }
 
-    // Validate mô tả (optional)
-    if (formData.MoTa && formData.MoTa.length > 500) {
-      newErrors.MoTa = 'Mô tả không được vượt quá 500 ký tự';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -76,10 +69,9 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, editingCategory, mode }) => 
     setIsSubmitting(true);
 
     try {
-      // Chuẩn bị dữ liệu để gửi
+      // ✅ Chỉ gửi Ten (bỏ MoTa)
       const submitData = {
-        Ten: formData.Ten.trim(),
-        MoTa: formData.MoTa.trim() || null
+        Ten: formData.Ten.trim()
       };
 
       await onSubmit(submitData);
@@ -96,10 +88,24 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, editingCategory, mode }) => 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-content category-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{mode === 'create' ? '➕ Thêm danh mục mới' : '✏️ Cập nhật danh mục'}</h2>
-          <button className="close-btn" onClick={onClose} disabled={isSubmitting}>×</button>
+          <h2 className="flex items-center gap-2">
+            {mode === 'create' ? (
+              <>
+                <Plus size={18} />
+                Thêm danh mục mới
+              </>
+            ) : (
+              <>
+                <Edit size={18} />
+                Cập nhật danh mục
+              </>
+            )}
+          </h2>
+          <button className="close-btn" onClick={onClose} disabled={isSubmitting}>
+            <X size={20} />
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="category-form">
@@ -124,28 +130,10 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, editingCategory, mode }) => 
               <div className="char-count">{formData.Ten.length}/100 ký tự</div>
             </div>
 
-            {/* Mô tả */}
-            <div className="form-group">
-              <label htmlFor="MoTa">Mô tả</label>
-              <textarea
-                id="MoTa"
-                name="MoTa"
-                value={formData.MoTa}
-                onChange={handleChange}
-                className={errors.MoTa ? 'error' : ''}
-                disabled={isSubmitting}
-                placeholder="Nhập mô tả cho danh mục (không bắt buộc)"
-                rows={4}
-                maxLength={500}
-              />
-              {errors.MoTa && <span className="error-message">{errors.MoTa}</span>}
-              <div className="char-count">{formData.MoTa.length}/500 ký tự</div>
-            </div>
-
             {mode === 'edit' && editingCategory && (
               <div className="info-box">
                 <span className="info-icon">ℹ️</span>
-                <span>Danh mục này có <strong>{editingCategory.SoLuongSanPham || 0} sản phẩm</strong></span>
+                <span>Danh mục này có <strong>{editingCategory.SoLuongSanPham || editingCategory.soLuongSanPham || 0} sản phẩm</strong></span>
               </div>
             )}
           </div>
@@ -153,18 +141,34 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, editingCategory, mode }) => 
           <div className="modal-footer">
             <button
               type="button"
-              className="btn-cancel"
+              className="btn-cancel flex items-center gap-2"
               onClick={onClose}
               disabled={isSubmitting}
             >
-              ❌ Hủy
+              <X size={16} />
+              Hủy
             </button>
             <button
               type="submit"
-              className="btn-submit"
+              className="btn-submit flex items-center gap-2"
               disabled={isSubmitting}
             >
-              {isSubmitting ? '⏳ Đang xử lý...' : mode === 'create' ? '✅ Tạo mới' : '💾 Cập nhật'}
+              {isSubmitting ? (
+                <>
+                  <Loader className="animate-spin" size={16} />
+                  Đang xử lý...
+                </>
+              ) : mode === 'create' ? (
+                <>
+                  <Check size={16} />
+                  Tạo mới
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  Cập nhật
+                </>
+              )}
             </button>
           </div>
         </form>

@@ -2,29 +2,34 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  ShoppingCart,
+  RefreshCw,
+  Search,
+  Package,
+  Clock,
+  Truck,
+  CheckCircle,
+  XCircle,
+  PartyPopper
+} from 'lucide-react';
+import { adminService, statisticsService } from '../services';
+import staffService from '../services/staffService';
 import OrderTable from '../components/OrderTable';
 import Pagination from '../components/Pagination';
 import Toast from '../components/Toast';
 import { Button, Card, Input } from '../components/ui';
 import AdminLayout from '../layouts/AdminLayout';
-import authService from '../services/authService';
-import axios from 'axios';
-import config from '../config';
 
-const OrderManagementPage = () => {
+const OrderManagementPage = ({ isStaffView = false }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
-  // State quản lý danh sách đơn hàng
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // ✨ THÊM: State cho auto-refresh
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastRefreshTime, setLastRefreshTime] = useState(new Date());
   const [previousOrderCount, setPreviousOrderCount] = useState(0);
-
-  // State cho dashboard statistics
   const [dashboardStats, setDashboardStats] = useState({
     tongSanPham: 0,
     donHangMoi: 0,
@@ -32,58 +37,61 @@ const OrderManagementPage = () => {
     doanhThu: 0
   });
   const [statsLoading, setStatsLoading] = useState(true);
-
-  // State cho filter
   const [selectedStatus, setSelectedStatus] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-
-  // State cho pagination
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
     totalOrders: 0,
     ordersPerPage: 10
   });
-
-  // State cho toast notification
   const [toast, setToast] = useState({
     show: false,
     message: '',
     type: 'info'
   });
 
-  // Danh sách trạng thái
+  const [statusCounts, setStatusCounts] = useState({
+    tatCa: 0,
+    choXuLy: 0,
+    dangGiao: 0,
+    daGiao: 0,
+    hoanThanh: 0,
+    daHuy: 0
+  });
+
   const statusList = [
-    { value: '', label: 'Tất cả đơn hàng', icon: '📦', color: 'gray' },
-    { value: 'Chờ xử lý', label: 'Chờ xử lý', icon: '⏳', color: 'yellow' },
-    { value: 'Đang giao', label: 'Đang giao', icon: '🚚', color: 'blue' },
-    { value: 'Đã giao', label: 'Đã giao', icon: '📦', color: 'green' },
-    { value: 'Hoàn thành', label: 'Hoàn thành', icon: '✅', color: 'green' },
-    { value: 'Đã hủy', label: 'Đã hủy', icon: '❌', color: 'red' }
+    { value: '', label: 'Tất cả đơn hàng', icon: Package, color: 'gray', countKey: 'tatCa' },
+    { value: 'Chờ xử lý', label: 'Chờ xử lý', icon: Clock, color: 'yellow', countKey: 'choXuLy' },
+    { value: 'Đang giao', label: 'Đang giao', icon: Truck, color: 'blue', countKey: 'dangGiao' },
+    { value: 'Đã giao', label: 'Đã giao', icon: Package, color: 'green', countKey: 'daGiao' },
+    { value: 'Hoàn thành', label: 'Hoàn thành', icon: CheckCircle, color: 'green', countKey: 'hoanThanh' },
+    { value: 'Đã hủy', label: 'Đã hủy', icon: XCircle, color: 'red', countKey: 'daHuy' }
   ];
 
-  // Hiển thị toast
   const showToast = (message, type = 'info') => {
     setToast({ show: true, message, type });
   };
 
-  // Fetch danh sách đơn hàng
-  const fetchOrders = useCallback(async (page = 1, status = '', search = '', silent = false, isRefresh = false) => {
+  const fetchOrderCounts = useCallback(async () => {
+    try {
+      // Staff không có API riêng cho order counts, bỏ qua
+      if (isStaffView) {
+        return;
+      }
+      const response = await adminService.getOrderCountsByStatus();
+      if (response.success) {
+        setStatusCounts(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching order counts:', error);
+    }
+  }, [isStaffView]);
+
+  const fetchOrders = useCallback(async (page = 1, status = '', search = '', silent = false, isRefresh = false, skipStateUpdate = false) => {
     try {
       if (!silent) {
         setLoading(true);
-      }
-
-      // Lấy token từ authService
-      const token = authService.getToken();
-      
-      if (!token) {
-        showToast('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại', 'error');
-        setTimeout(() => {
-          logout();
-          navigate('/admin/login');
-        }, 2000);
-        return;
       }
 
       const params = {
@@ -96,89 +104,132 @@ const OrderManagementPage = () => {
       }
 
       if (search.trim()) {
-        params.search = search.trim();
+        params.keyword = search.trim(); // Staff dùng keyword thay vì search
       }
 
-      const response = await axios.get(config.endpoints.admin.orders, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        params: params
-      });
+      // Dùng service tương ứng với role
+      const service = isStaffView ? staffService : adminService;
+      const method = isStaffView ? 'getOrders' : 'getAllOrders';
+      const response = await service[method](params);
 
-      if (response.data.success) {
-        const newOrders = response.data.data.orders;
-        const newOrderCount = response.data.data.pagination.totalOrders;
-        
-        // ✨ CHỈ hiển thị thông báo khi đang refresh (auto hoặc thủ công), KHÔNG hiển thị khi lọc/tìm kiếm
+      if (response.success) {
+        // Staff response format từ staffService: { success: true, data: [...], pagination: {...} }
+        // Admin response format: { success: true, data: { orders: [...] }, pagination: {...} }
+        let newOrders = isStaffView
+          ? (response.data || [])  // Staff: staffService đã parse, data là array orders
+          : (response.data?.orders || response.data || []); // Admin: data.orders hoặc data
+
+        // Backend đã convert sang camelCase bằng DTOMapper, chỉ cần normalize nhẹ
+        console.log('🔍 [OrderManagementPage] Raw orders from backend:', newOrders);
+        newOrders = newOrders.map(order => {
+          // Tính tổng số lượng sản phẩm
+          const chiTiet = order.chiTiet || [];
+          const tongSoLuongSanPham = chiTiet.reduce((sum, item) => {
+            return sum + (item.soLuong || 0);
+          }, 0);
+
+          // Khách hàng - backend đã convert, lấy từ taiKhoan
+          const khachHang = {
+            hoTen: order.khachHang?.taiKhoan?.hoTen || order.khachHang?.hoTen || '',
+            dienThoai: order.khachHang?.taiKhoan?.dienThoai || order.khachHang?.dienThoai || '',
+            email: order.khachHang?.taiKhoan?.email || order.khachHang?.email || ''
+          };
+
+          // Phương thức thanh toán
+          const phuongThucThanhToan = {
+            ten: order.phuongThucThanhToan?.ten || '',
+            id: order.phuongThucThanhToan?.id
+          };
+
+          // Địa chỉ giao hàng - backend đã convert
+          const diaChiGiaoHang = order.diaChiGiaoHang ? {
+            id: order.diaChiGiaoHang.id,
+            diaChiChiTiet: order.diaChiGiaoHang.diaChiChiTiet || '',
+            tenPhuong: order.diaChiGiaoHang.tenPhuong || '',
+            tenQuan: order.diaChiGiaoHang.tenQuan || '',
+            tenTinh: order.diaChiGiaoHang.tenTinh || '',
+            tenNguoiNhan: order.diaChiGiaoHang.tenNguoiNhan || '',
+            soDienThoai: order.diaChiGiaoHang.soDienThoai || ''
+          } : null;
+
+          return {
+            id: order.id,
+            maHD: order.maHd || order.maHD,
+            trangThai: order.trangThai,
+            tongTien: order.thanhTien || order.tongTien || 0,
+            thanhTien: order.thanhTien || 0,
+            ngayLap: order.ngayLap,
+            tongSoLuongSanPham: tongSoLuongSanPham,
+            khachHang: khachHang,
+            phuongThucThanhToan: phuongThucThanhToan,
+            diaChiGiaoHang: diaChiGiaoHang,
+            chiTiet: chiTiet,
+            ...order // Giữ lại các field khác
+          };
+        });
+        console.log('✅ [OrderManagementPage] Normalized orders:', newOrders);
+
+        const paginationData = response.pagination || {};
+        const newOrderCount = paginationData?.total || paginationData?.totalOrders || newOrders.length;
+
         if (isRefresh && !silent && previousOrderCount > 0 && newOrderCount > previousOrderCount) {
           const newOrdersAdded = newOrderCount - previousOrderCount;
-          showToast(`🎉 Có ${newOrdersAdded} đơn hàng mới!`, 'success');
-          
-          // Phát âm thanh thông báo (optional)
+          showToast(`Có ${newOrdersAdded} đơn hàng mới!`, 'success');
+
           if (typeof Audio !== 'undefined') {
-            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWi77eafTRAMUKfj8LZjHAY4ktfyzHksBSR3x/DdkEAKFF606+uoVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAA==');
-            audio.play().catch(() => {}); // Bỏ qua lỗi nếu không phát được
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWi77eafTRAMUKfj8LZjHAY4ktfyzHksBSR3x/DdkEAKFF606+uoVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgc7y2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBlou+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAAhRftOvqVRQKRp/g8r5sIQUrgsry2Yk2CBloP+3mn00QDFCn4/C2YxwGOJHX8sx5LAUkd8fw3ZBAA==');
+            audio.play().catch(() => { });
           }
         }
-        
+
+        // ✅ SỬA: Luôn dùng dữ liệu từ server, nhưng merge với orders hiện tại để giữ animation mượt
         setOrders(newOrders);
+
         setPreviousOrderCount(newOrderCount);
         setPagination({
-          currentPage: response.data.data.pagination.currentPage,
-          totalPages: response.data.data.pagination.totalPages,
-          totalOrders: response.data.data.pagination.totalOrders,
-          ordersPerPage: response.data.data.pagination.ordersPerPage
+          currentPage: paginationData?.page || paginationData?.currentPage || 1,
+          totalPages: paginationData?.totalPages || 1,
+          totalOrders: paginationData?.total || paginationData?.totalOrders || newOrders.length,
+          ordersPerPage: paginationData?.limit || paginationData?.ordersPerPage || pagination.ordersPerPage
         });
-        
-        // ✨ THÊM: Cập nhật thời gian refresh
+
         setLastRefreshTime(new Date());
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
 
-      if (error.response?.status === 401) {
+      if (error.message?.includes('đăng nhập')) {
         showToast('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại', 'error');
         setTimeout(() => {
           logout();
-          navigate('/admin/login');
+          navigate(isStaffView ? '/login' : '/admin/login');
         }, 2000);
       } else if (!silent) {
-        showToast(error.response?.data?.message || 'Lỗi khi tải danh sách đơn hàng', 'error');
+        showToast(error.message || 'Lỗi khi tải danh sách đơn hàng', 'error');
       }
     } finally {
       if (!silent) {
         setLoading(false);
       }
     }
-  }, [pagination.ordersPerPage, previousOrderCount, logout, navigate]);
+  }, [pagination.ordersPerPage, previousOrderCount, logout, navigate, isStaffView]);
 
-  // Fetch dashboard statistics
   const fetchDashboardStats = useCallback(async () => {
     try {
       setStatsLoading(true);
-      const token = authService.getToken();
-      
-      if (!token) {
-        return;
-      }
 
-      const response = await axios.get(config.endpoints.admin.statistics.dashboard, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await statisticsService.getDashboardStats();
 
-      if (response.data.success) {
-        setDashboardStats(response.data.data);
+      if (response.success) {
+        setDashboardStats(response.data);
       }
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
-      if (error.response?.status === 401) {
+      if (error.message?.includes('đăng nhập')) {
         showToast('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại', 'error');
         setTimeout(() => {
           logout();
-          navigate('/admin/login');
+          navigate(isStaffView ? '/login' : '/admin/login');
         }, 2000);
       }
     } finally {
@@ -186,117 +237,100 @@ const OrderManagementPage = () => {
     }
   }, [logout, navigate]);
 
-  // Load đơn hàng khi component mount
   useEffect(() => {
     fetchOrders(1, selectedStatus, searchTerm);
     fetchDashboardStats();
+    fetchOrderCounts();
   }, []);
 
-  // ✨ THÊM: Auto-refresh mỗi 30 giây
   useEffect(() => {
     if (!autoRefresh) return;
 
     const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing orders...');
-      fetchOrders(pagination.currentPage, selectedStatus, searchTerm, true, true); // silent mode
-    }, 30000); // 30 giây
+      console.log('Auto-refreshing orders...');
+      fetchOrders(pagination.currentPage, selectedStatus, searchTerm, true, true);
+      fetchOrderCounts(); // ⭐ Also refresh badge counts
+    }, 30000);
 
     return () => clearInterval(interval);
-  }, [autoRefresh, pagination.currentPage, selectedStatus, searchTerm, fetchOrders]);
+  }, [autoRefresh, pagination.currentPage, selectedStatus, searchTerm, fetchOrders, fetchOrderCounts]);
 
-  // Xử lý thay đổi filter trạng thái
   const handleStatusChange = (status) => {
     setSelectedStatus(status);
     fetchOrders(1, status, searchTerm);
   };
 
-  // Xử lý tìm kiếm
   const handleSearch = (e) => {
     e.preventDefault();
     fetchOrders(1, selectedStatus, searchTerm);
   };
 
-  // Xử lý chuyển trang
   const handlePageChange = (page) => {
     fetchOrders(page, selectedStatus, searchTerm);
   };
 
-  // Xử lý cập nhật trạng thái đơn hàng
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
-      // Lấy token từ authService
-      const token = authService.getToken();
-      
-      if (!token) {
-        showToast('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại', 'error');
-        setTimeout(() => {
-          logout();
-          navigate('/admin/login');
-        }, 2000);
-        return;
-      }
+      console.log(`🔄 [handleUpdateStatus] Bắt đầu cập nhật order ${orderId} → ${newStatus}`);
 
-      const response = await axios.patch(
-        `${config.endpoints.admin.orders}/${orderId}/status`,
-        { trangThai: newStatus },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      // ✅ CẬP NHẬT NGAY: Cập nhật trạng thái trong state ngay lập tức
+      setOrders(prevOrders => {
+        const updated = prevOrders.map(order =>
+          order.id === orderId
+            ? { ...order, trangThai: newStatus }
+            : order
+        );
+        console.log(`✅ [handleUpdateStatus] Đã cập nhật state local cho order ${orderId}: ${newStatus}`);
+        return updated;
+      });
 
-      if (response.data.success) {
-        showToast(response.data.message || 'Cập nhật trạng thái thành công', 'success');
-        fetchOrders(pagination.currentPage, selectedStatus, searchTerm);
-      }
+      showToast('Cập nhật trạng thái thành công', 'success');
+
+      // ✅ Refresh badge counts
+      await fetchOrderCounts();
+
     } catch (error) {
-      console.error('Error updating order status:', error);
-      showToast(error.response?.data?.message || 'Lỗi khi cập nhật trạng thái đơn hàng', 'error');
+      console.error('❌ [handleUpdateStatus] Error updating order status:', error);
+      showToast(error.message || 'Lỗi khi cập nhật trạng thái đơn hàng', 'error');
+      // ✅ Reload lại orders nếu có lỗi để đồng bộ với server
+      fetchOrders(pagination.currentPage, selectedStatus, searchTerm);
     }
   };
 
-  // ✨ THÊM: Hàm format thời gian refresh
   const formatLastRefreshTime = () => {
     const now = new Date();
-    const diff = Math.floor((now - lastRefreshTime) / 1000); // seconds
-    
+    const diff = Math.floor((now - lastRefreshTime) / 1000);
+
     if (diff < 60) return `${diff} giây trước`;
     if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
     return lastRefreshTime.toLocaleTimeString('vi-VN');
   };
 
-  // ✨ THÊM: Hàm refresh thủ công
   const handleManualRefresh = () => {
-    showToast('🔄 Đang làm mới...', 'info');
+    showToast('Đang làm mới...', 'info');
     fetchOrders(pagination.currentPage, selectedStatus, searchTerm, false, true);
+    fetchOrderCounts(); // ⭐ Refresh badge counts on manual refresh
   };
 
-  // Xử lý đăng xuất
   const handleLogout = () => {
     logout();
     navigate('/admin/login');
   };
 
-  // Thống kê đơn hàng
   const orderStats = {
     total: pagination.totalOrders,
-    totalRevenue: orders.reduce((sum, order) => sum + order.tongTien, 0),
-    totalProducts: orders.reduce((sum, order) => sum + order.tongSoLuongSanPham, 0)
+    totalRevenue: orders.reduce((sum, order) => sum + (order.tongTien || order.thanhTien || 0), 0),
+    totalProducts: orders.reduce((sum, order) => sum + (order.tongSoLuongSanPham || 0), 0)
   };
 
   return (
-    <AdminLayout>
-      {/* 📋 Simple Header - No Card */}
+    <AdminLayout isStaffView={isStaffView}>
       <div className="mb-3 flex items-center justify-between">
-        {/* Left: Title */}
         <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-          <span className="text-xl">🛒</span>
+          <ShoppingCart className="text-pink-500" size={24} />
           Quản lý đơn hàng
         </h2>
-        
-        {/* Right: Manual Refresh Button Only */}
+
         <button
           onClick={handleManualRefresh}
           disabled={loading}
@@ -307,50 +341,61 @@ const OrderManagementPage = () => {
                    transition-all duration-200 shadow-sm hover:shadow-md
                    flex items-center gap-2"
         >
-          <span className={loading ? 'animate-spin' : ''}>🔄</span>
+          <RefreshCw className={loading ? 'animate-spin' : ''} size={16} />
           {loading ? 'Đang tải...' : 'Làm mới'}
         </button>
       </div>
 
-      {/* 🎯 Compact Filter Section */}
       <div className="mb-4 bg-gradient-to-r from-pink-50 via-rose-50 to-pink-50 rounded-xl p-3 shadow-sm border border-pink-100">
-        {/* Status Filters - Compact */}
         <div className="mb-3">
           <h3 className="text-sm font-semibold text-gray-700 mb-2">Lọc theo trạng thái:</h3>
           <div className="flex flex-wrap gap-2">
-            {statusList.map((status) => (
-              <button
-                key={status.value}
-                onClick={() => handleStatusChange(status.value)}
-                className={`
-                  px-3 py-1.5 text-xs font-semibold rounded-lg
-                  transition-all duration-200 shadow-sm
-                  flex items-center gap-1.5
-                  ${selectedStatus === status.value
-                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
-                    : 'bg-white text-gray-700 border border-gray-200 hover:border-pink-300 hover:shadow-md'
-                  }
-                `}
-              >
-                <span className="text-sm">{status.icon}</span>
-                {status.label}
-              </button>
-            ))}
+            {statusList.map((status) => {
+              const IconComponent = status.icon;
+              return (
+                <button
+                  key={status.value}
+                  onClick={() => handleStatusChange(status.value)}
+                  className={`
+                    px-3 py-1.5 text-xs font-semibold rounded-lg
+                    transition-all duration-200 shadow-sm
+                    flex items-center gap-1.5 relative
+                    ${selectedStatus === status.value
+                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-md'
+                      : 'bg-white text-gray-700 border border-gray-200 hover:border-pink-300 hover:shadow-md'
+                    }
+                  `}
+                >
+                  <IconComponent size={14} />
+                  {status.label}
+                  {statusCounts[status.countKey] > 0 && (
+                    <span className={`ml-1 rounded-full px-2 py-0.5 text-xs font-bold ${selectedStatus === status.value
+                      ? 'bg-white/30 text-white'
+                      : 'bg-pink-100 text-pink-600'
+                      }`}>
+                      {statusCounts[status.countKey]}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Search - Compact */}
         <form onSubmit={handleSearch} className="flex gap-2 items-stretch">
-          <input
-            type="text"
-            placeholder="🔍 Tìm kiếm theo mã đơn hàng..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 px-3 py-2 bg-white border-2 border-pink-200 rounded-lg 
-                     text-gray-700 font-medium text-sm placeholder-gray-400
-                     focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400
-                     hover:border-pink-300 transition-all duration-200 shadow-sm"
-          />
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              type="text"
+              placeholder="Tìm kiếm theo mã đơn hàng..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-3 py-2 bg-white border-2 border-pink-200 rounded-lg 
+                       text-gray-700 font-medium text-sm placeholder-gray-400
+                       focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400
+                       hover:border-pink-300 transition-all duration-200 shadow-sm"
+            />
+          </div>
 
           <button
             type="submit"
@@ -361,22 +406,21 @@ const OrderManagementPage = () => {
                      transition-all duration-200 shadow-md hover:shadow-lg
                      flex items-center gap-2 whitespace-nowrap"
           >
-            <span className="text-base">🔍</span>
+            <Search size={16} />
             <span className="hidden sm:inline">Tìm kiếm</span>
           </button>
         </form>
       </div>
 
-      {/* 📊 Order Table - Focus Area */}
       <Card padding="none" className="mb-4">
         <OrderTable
           orders={orders}
+          isStaffView={isStaffView}
           onUpdateStatus={handleUpdateStatus}
           loading={loading}
         />
       </Card>
 
-      {/* 📄 Pagination */}
       {!loading && orders.length > 0 && (
         <div className="flex justify-center">
           <Pagination
@@ -387,7 +431,6 @@ const OrderManagementPage = () => {
         </div>
       )}
 
-      {/* Toast Notification */}
       {toast.show && (
         <Toast
           message={toast.message}

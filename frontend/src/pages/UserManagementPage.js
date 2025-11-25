@@ -2,13 +2,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { Users, Plus, Search, RotateCcw } from 'lucide-react';
+import { adminService } from '../services';
 import UserTable from '../components/UserTable';
 import UserModal from '../components/UserModal';
 import Toast from '../components/Toast';
 import Pagination from '../components/Pagination';
 import { Button, Card, Input } from '../components/ui';
 import AdminLayout from '../layouts/AdminLayout';
-import * as userApi from '../api/userApi';
 
 const UserManagementPage = () => {
   const navigate = useNavigate();
@@ -48,7 +49,8 @@ const UserManagementPage = () => {
   const fetchUsers = useCallback(async (page = 1) => {
     try {
       setLoading(true);
-      const response = await userApi.getAllUsers({
+      
+      const response = await adminService.getUsers({
         page,
         limit: 10,
         search: filters.search,
@@ -57,20 +59,20 @@ const UserManagementPage = () => {
       });
 
       if (response.success) {
-        setUsers(response.data.users);
+        setUsers(response.data.users || response.data);
         setPagination(response.data.pagination);
       }
     } catch (error) {
       console.error('Error fetching users:', error);
       
-      if (error.response?.status === 401) {
+      if (error.message?.includes('đăng nhập')) {
         showToast('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại', 'error');
         setTimeout(() => {
           logout();
           navigate('/admin/login');
         }, 2000);
       } else {
-        showToast(error.response?.data?.message || 'Lỗi khi tải danh sách người dùng', 'error');
+        showToast(error.message || 'Lỗi khi tải danh sách người dùng', 'error');
       }
     } finally {
       setLoading(false);
@@ -128,7 +130,7 @@ const UserManagementPage = () => {
 
   const handleCreateUser = async (userData) => {
     try {
-      const response = await userApi.createUser(userData);
+      const response = await adminService.createUser(userData);
       
       if (response.success) {
         showToast(response.message || 'Tạo người dùng mới thành công', 'success');
@@ -136,14 +138,14 @@ const UserManagementPage = () => {
       }
     } catch (error) {
       console.error('Error creating user:', error);
-      showToast(error.response?.data?.message || 'Lỗi khi tạo người dùng mới', 'error');
+      showToast(error.message || 'Lỗi khi tạo người dùng mới', 'error');
       throw error;
     }
   };
 
   const handleUpdateUser = async (userData) => {
     try {
-      const response = await userApi.updateUser(modalState.editingUser.id, userData);
+      const response = await adminService.updateUser(modalState.editingUser.id, userData);
       
       if (response.success) {
         showToast(response.message || 'Cập nhật thông tin thành công', 'success');
@@ -151,7 +153,7 @@ const UserManagementPage = () => {
       }
     } catch (error) {
       console.error('Error updating user:', error);
-      showToast(error.response?.data?.message || 'Lỗi khi cập nhật thông tin', 'error');
+      showToast(error.message || 'Lỗi khi cập nhật thông tin', 'error');
       throw error;
     }
   };
@@ -172,7 +174,7 @@ const UserManagementPage = () => {
     }
 
     try {
-      const response = await userApi.updateUserStatus(user.id, !user.enable);
+      const response = await adminService.toggleUserStatus(user.id, !user.enable);
       
       if (response.success) {
         showToast(response.message || `${action.charAt(0).toUpperCase() + action.slice(1)} tài khoản thành công`, 'success');
@@ -180,7 +182,7 @@ const UserManagementPage = () => {
       }
     } catch (error) {
       console.error('Error toggling user status:', error);
-      showToast(error.response?.data?.message || `Lỗi khi ${action} tài khoản`, 'error');
+      showToast(error.message || `Lỗi khi ${action} tài khoản`, 'error');
     }
   };
 
@@ -190,7 +192,7 @@ const UserManagementPage = () => {
     }
 
     try {
-      const response = await userApi.deleteUser(user.id);
+      const response = await adminService.deleteUser(user.id);
       
       if (response.success) {
         showToast(response.message || 'Xóa tài khoản thành công', 'success');
@@ -203,7 +205,7 @@ const UserManagementPage = () => {
       }
     } catch (error) {
       console.error('Error deleting user:', error);
-      showToast(error.response?.data?.message || 'Lỗi khi xóa tài khoản', 'error');
+      showToast(error.message || 'Lỗi khi xóa tài khoản', 'error');
     }
   };
 
@@ -220,7 +222,7 @@ const UserManagementPage = () => {
           {/* Left: Title */}
           <div>
             <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-              <span className="text-3xl">👥</span>
+              <Users size={32} />
               Quản lý người dùng
             </h2>
             <p className="text-gray-600 mt-1">Quản lý tài khoản khách hàng</p>
@@ -250,12 +252,12 @@ const UserManagementPage = () => {
       <div className="mb-6 bg-gradient-to-r from-pink-50 via-rose-50 to-pink-50 rounded-2xl p-5 shadow-sm border border-pink-100">
         {/* Dòng 1: Tìm kiếm */}
         <form onSubmit={handleSearch} className="flex gap-3 items-stretch mb-4">
-          {/* 🔍 Ô tìm kiếm */}
+          {/* Ô tìm kiếm */}
           <div className="flex-1">
             <input
               type="text"
               name="search"
-              placeholder="🔍 Tìm kiếm theo tên, email, tên đăng nhập..."
+              placeholder="Tìm kiếm theo tên, email, tên đăng nhập..."
               value={filters.search}
               onChange={handleFilterChange}
               className="w-full px-4 py-2.5 bg-white border-2 border-pink-200 rounded-xl 
@@ -265,7 +267,7 @@ const UserManagementPage = () => {
             />
           </div>
 
-          {/* 🔍 Nút tìm kiếm */}
+          {/* Nút tìm kiếm */}
           <button
             type="submit"
             className="px-6 bg-gradient-to-r from-pink-400 to-rose-400 
@@ -275,7 +277,7 @@ const UserManagementPage = () => {
                      transition-all duration-200 shadow-md hover:shadow-lg
                      flex items-center gap-2 whitespace-nowrap h-[42px]"
           >
-            <span className="text-lg">🔍</span>
+            <Search size={18} />
             Tìm kiếm
           </button>
         </form>
@@ -295,8 +297,9 @@ const UserManagementPage = () => {
                        min-w-[150px] h-[42px] cursor-pointer"
             >
               <option value="">Tất cả vai trò</option>
-              <option value="admin">👑 Admin</option>
-              <option value="user">👤 User</option>
+              <option value="Admin">Admin</option>
+              <option value="KhachHang">Khách hàng</option>
+              <option value="NhanVien">Nhân viên</option>
             </select>
 
             {/* Dropdown Trạng thái */}
@@ -311,8 +314,8 @@ const UserManagementPage = () => {
                        min-w-[150px] h-[42px] cursor-pointer"
             >
               <option value="">Tất cả trạng thái</option>
-              <option value="active">✅ Hoạt động</option>
-              <option value="inactive">🔒 Bị khóa</option>
+              <option value="active">Hoạt động</option>
+              <option value="inactive">Bị khóa</option>
             </select>
 
             {/* Nút Reset */}
@@ -326,7 +329,7 @@ const UserManagementPage = () => {
                        transition-all duration-200 shadow-sm
                        flex items-center gap-2 h-[42px]"
             >
-              <span className="text-lg">🔄</span>
+              <RotateCcw size={18} />
               Reset
             </button>
           </div>
@@ -342,7 +345,7 @@ const UserManagementPage = () => {
                      transition-all duration-200 shadow-md hover:shadow-lg
                      flex items-center gap-2 whitespace-nowrap h-[42px]"
           >
-            <span className="text-lg">➕</span>
+            <Plus size={18} />
             Thêm mới
           </button>
         </div>

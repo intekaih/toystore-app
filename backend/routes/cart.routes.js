@@ -16,6 +16,10 @@ router.delete('/guest/remove/:productId', cartLimiter, cartController.removeGues
 router.delete('/guest/clear', cartLimiter, cartController.clearGuestCart);
 // ✅ THÊM: Route khôi phục giỏ hàng sau khi thanh toán thất bại
 router.post('/guest/restore', cartLimiter, cartController.restoreGuestCart);
+// ✅ MỚI: Routes cho chức năng chọn sản phẩm (guest)
+router.put('/guest/select/:productId', cartLimiter, cartController.toggleSelectGuestItem);
+router.put('/guest/select-all', cartLimiter, cartController.toggleSelectAllGuest);
+router.get('/guest/selected', cartLimiter, cartController.getSelectedGuestItems);
 
 // =======================================
 // AUTHENTICATED CART ROUTES (Cần đăng nhập)
@@ -46,5 +50,10 @@ router.delete('/remove/:productId', cartController.removeCartItem);
 
 // Xóa toàn bộ giỏ hàng
 router.delete('/clear', cartController.clearCart);
+
+// ✅ MỚI: Routes cho chức năng chọn sản phẩm (user)
+router.put('/select/:productId', cartController.toggleSelectItem);
+router.put('/select-all', cartController.toggleSelectAll);
+router.get('/selected', cartController.getSelectedItems);
 
 module.exports = router;

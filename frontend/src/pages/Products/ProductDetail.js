@@ -1,71 +1,74 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getProductById } from '../../api/productApi.js';
-import { addToCart } from '../../api/cartApi.js';
+import { productService, cartService } from '../../services'; // ✅ Sử dụng services
 import { useAuth } from '../../contexts/AuthContext.js';
-import { ArrowLeft, ShoppingCart, Package, Shield, RefreshCw, Truck, Minus, Plus, Heart } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Package, Shield, RefreshCw, Truck, Minus, Plus, Heart, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import MainLayout from '../../layouts/MainLayout';
 import { Button, Badge, Loading } from '../../components/ui';
 import Toast from '../../components/Toast.js';
 import config from '../../config';
+import ReviewList from '../../components/ReviewList';
 
 const ProductDetail = () => {
-  // Backend API URL
-  const API_BASE_URL = config.API_BASE_URL;
-  
-  // Build full image URL
-  const buildImageUrl = (imagePath) => {
-    if (!imagePath) return '/barbie.jpg';
-    
-    // Nếu đã là full URL (http/https)
-    if (imagePath.startsWith('http')) {
-      return imagePath;
-    }
-    
-    // Nếu bắt đầu với /uploads/
-    if (imagePath.startsWith('/uploads/')) {
-      return `${API_BASE_URL}${imagePath}`;
-    }
-    
-    // Nếu chỉ là filename
-    if (!imagePath.startsWith('/')) {
-      return `${API_BASE_URL}/uploads/${imagePath}`;
-    }
-    
-    return '/barbie.jpg';
-  };
-  
-  // Handle image error
-  const handleImageError = (e) => {
-    console.warn('❌ Lỗi load ảnh sản phẩm:', e.target.src);
-    if (!e.target.src.includes('barbie.jpg')) {
-      e.target.src = '/barbie.jpg';
-    }
-  };
-
   const [product, setProduct] = useState(null);
+  const [relatedProducts, setRelatedProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
   const [toast, setToast] = useState(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [expandedSection, setExpandedSection] = useState('description'); // 'description', 'specs', 'policy'
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
 
   useEffect(() => {
     loadProduct();
+    window.scrollTo(0, 0);
   }, [id]);
 
   const loadProduct = async () => {
     try {
       setLoading(true);
-      const response = await getProductById(id);
-      setProduct(response.data.product);
+      
+      const response = await productService.getProductById(id);
+      
+      console.log('📦 Response from API:', response);
+      
+      if (response.success && response.data && response.data.product) {
+        setProduct(response.data.product);
+        console.log('✅ Product loaded:', response.data.product);
+        // Load sản phẩm liên quan (cùng danh mục)
+        if (response.data.product.loaiID) {
+          loadRelatedProducts(response.data.product.loaiID, response.data.product.id);
+        }
+      } else {
+        throw new Error('Không tìm thấy thông tin sản phẩm');
+      }
     } catch (error) {
-      console.error('Error loading product:', error);
-      showToast('Không thể tải chi tiết sản phẩm', 'error');
+      console.error('❌ Error loading product:', error);
+      showToast(error.message || 'Không thể tải chi tiết sản phẩm', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadRelatedProducts = async (categoryId, currentProductId) => {
+    try {
+      const response = await productService.getProducts({
+        loaiId: categoryId,
+        limit: 8
+      });
+      
+      if (response.success && response.data && response.data.products) {
+        // Lọc bỏ sản phẩm hiện tại và chỉ lấy 4 sản phẩm
+        const filtered = response.data.products
+          .filter(p => p.id !== currentProductId)
+          .slice(0, 4);
+        setRelatedProducts(filtered);
+      }
+    } catch (error) {
+      console.error('❌ Error loading related products:', error);
     }
   };
 
@@ -75,7 +78,7 @@ const ProductDetail = () => {
 
   const handleQuantityChange = (e) => {
     const value = parseInt(e.target.value) || 1;
-    const maxQuantity = product?.Ton || product?.ton || 1;
+    const maxQuantity = product?.soLuongTon || 1;
     
     if (value < 1) {
       setQuantity(1);
@@ -88,7 +91,7 @@ const ProductDetail = () => {
   };
 
   const handleIncrement = () => {
-    const maxQuantity = product?.Ton || product?.ton || 1;
+    const maxQuantity = product?.soLuongTon || 1;
     if (quantity < maxQuantity) {
       setQuantity(quantity + 1);
     } else {
@@ -108,7 +111,7 @@ const ProductDetail = () => {
       return;
     }
 
-    const productStock = product.Ton || product.ton || 0;
+    const productStock = product.soLuongTon || 0;
     if (quantity > productStock) {
       showToast(`Chỉ còn ${productStock} sản phẩm trong kho`, 'warning');
       setQuantity(productStock);
@@ -117,18 +120,10 @@ const ProductDetail = () => {
 
     try {
       setAdding(true);
-      const productId = product.ID || product.id;
-      const productName = product.Ten || product.ten;
+      const productId = product.id;
+      const productName = product.ten;
       
-      // Thông tin sản phẩm cho guest user
-      const productInfo = {
-        name: productName,
-        price: productPrice,
-        image: productImage,
-        stock: productStock
-      };
-      
-      const response = await addToCart(productId, quantity, productInfo);
+      const response = await cartService.addToCart(productId, quantity);
 
       if (response.success) {
         showToast(
@@ -138,7 +133,6 @@ const ProductDetail = () => {
         );
         setQuantity(1);
         
-        // Nếu không đăng nhập, hiển thị thông báo thêm
         if (!user) {
           showToast(
             'Bạn có thể thanh toán mà không cần đăng nhập!',
@@ -153,6 +147,25 @@ const ProductDetail = () => {
     } finally {
       setAdding(false);
     }
+  };
+
+  // Handle image navigation
+  const handlePrevImage = () => {
+    if (!product?.hinhAnhs || product.hinhAnhs.length === 0) return;
+    setCurrentImageIndex((prev) => 
+      prev === 0 ? product.hinhAnhs.length - 1 : prev - 1
+    );
+  };
+
+  const handleNextImage = () => {
+    if (!product?.hinhAnhs || product.hinhAnhs.length === 0) return;
+    setCurrentImageIndex((prev) => 
+      prev === product.hinhAnhs.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  const handleThumbnailClick = (index) => {
+    setCurrentImageIndex(index);
   };
 
   if (loading) {
@@ -183,17 +196,18 @@ const ProductDetail = () => {
     );
   }
 
-  const isOutOfStock = (product.Ton || product.ton || 0) <= 0;
-  const isMaxQuantity = quantity >= (product.Ton || product.ton || 0);
+  const isOutOfStock = (product.soLuongTon || 0) <= 0;
+  const isMaxQuantity = quantity >= (product.soLuongTon || 0);
   
   // Helper getters để hỗ trợ cả 2 format
-  const productName = product.Ten || product.ten || '';
-  const productPrice = product.GiaBan || product.giaBan || 0;
-  const productStock = product.Ton || product.ton || 0;
-  const productImage = product.HinhAnhURL || product.hinhAnhURL || '';
-  const productDescription = product.MoTa || product.moTa || 'Không có mô tả';
-  const productCategory = product.LoaiSP || product.loaiSP;
-  const productOriginalPrice = product.GiaBanGoc || product.giaBanGoc;
+  const productName = product.ten || '';
+  const productPrice = product.giaBan || 0;
+  const productStock = product.soLuongTon || 0;
+  const productImages = product.hinhAnhs && product.hinhAnhs.length > 0 ? product.hinhAnhs : (product.hinhAnhURL ? [{ duongDanHinhAnh: product.hinhAnhURL, thuTu: 0, laMacDinh: true }] : []);
+  const productDescription = product.moTa || 'Không có mô tả';
+  const productCategory = product.loaiSP;
+  const productOriginalPrice = product.giaBanGoc;
+  const currentImage = productImages[currentImageIndex]?.duongDanHinhAnh || '/barbie.jpg';
 
   return (
     <MainLayout>
@@ -209,171 +223,296 @@ const ProductDetail = () => {
 
         {/* Product Detail Content */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-          {/* Product Image */}
+          {/* Product Image Gallery - Layout: Thumbnail Left + Main Image Right */}
           <div className="relative">
-            <div className="bg-gradient-to-br from-primary-50 to-rose-50 rounded-bubble overflow-hidden shadow-soft border-2 border-primary-100 sticky top-24">
-              <img
-                src={buildImageUrl(productImage)}
-                alt={productName}
-                className="w-full h-auto object-cover transition-transform duration-500 hover:scale-105"
-                onError={handleImageError}
-                loading="lazy"
-              />
-              
-              {/* Out of Stock Badge */}
-              {isOutOfStock && (
-                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                  <Badge variant="danger" size="lg" className="text-lg px-6 py-3">
-                    Hết hàng
-                  </Badge>
+            <div className="flex gap-4">
+              {/* Thumbnail Column - Only show if more than 1 image */}
+              {productImages.length > 1 && (
+                <div className="flex flex-col gap-3 w-24">
+                  <div className="relative flex flex-col gap-3 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary-300 scrollbar-track-primary-50">
+                    {productImages.map((img, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleThumbnailClick(index)}
+                        className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                          currentImageIndex === index
+                            ? 'border-primary-500 shadow-md ring-2 ring-primary-200'
+                            : 'border-primary-100 hover:border-primary-300 opacity-70 hover:opacity-100'
+                        }`}
+                      >
+                        <img
+                          src={img.duongDanHinhAnh}
+                          alt={`${productName} - Ảnh ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {/* Favorite Button */}
-              <button className="absolute top-4 right-4 p-3 bg-white rounded-full shadow-cute hover:shadow-bubble transition-all hover:scale-110">
-                <Heart size={24} className="text-rose-500" />
-              </button>
+              {/* Main Image */}
+              <div className="flex-1 bg-gradient-to-br from-primary-50 to-rose-50 rounded-bubble overflow-hidden shadow-soft border-2 border-primary-100 sticky top-24">
+                <div className="relative aspect-square">
+                  <img
+                    src={currentImage}
+                    alt={productName}
+                    className="w-full h-full object-contain p-4 transition-transform duration-500"
+                    loading="lazy"
+                  />
+                  
+                  {/* Out of Stock Badge */}
+                  {isOutOfStock && (
+                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                      <Badge variant="danger" size="lg" className="text-lg px-6 py-3">
+                        Hết hàng
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Image Counter */}
+                  {productImages.length > 1 && (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/70 text-white rounded-full text-sm font-semibold">
+                      {currentImageIndex + 1} / {productImages.length}
+                    </div>
+                  )}
+
+                  {/* Favorite Button */}
+                  <button className="absolute top-4 right-4 p-3 bg-white rounded-full shadow-cute hover:shadow-bubble transition-all hover:scale-110">
+                    <Heart size={24} className="text-rose-500" />
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Product Info */}
-          <div className="space-y-6">
+          {/* Product Info - ✅ THIẾT KẾ MỚI THEO ẢNH */}
+          <div className="space-y-5">
             {/* Title */}
-            <h1 className="text-4xl lg:text-5xl font-display font-bold text-gray-800 leading-tight">
+            <h1 className="text-3xl lg:text-4xl font-display font-bold text-gray-800 leading-tight">
               {productName}
             </h1>
 
-            {/* Price */}
-            <div className="flex items-baseline gap-4 p-6 bg-gradient-to-r from-primary-50 to-rose-50 rounded-cute border-2 border-primary-200">
-              <span className="text-4xl font-bold text-gradient-primary">
-                {productPrice?.toLocaleString('vi-VN')} ₫
-              </span>
-              {productOriginalPrice && productOriginalPrice > productPrice && (
-                <span className="text-xl text-gray-400 line-through">
-                  {productOriginalPrice?.toLocaleString('vi-VN')} ₫
+            {/* Price Box - Nổi bật với nền hồng nhạt */}
+            <div className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl p-5 border-2 border-pink-100">
+              <div className="flex items-baseline gap-3">
+                <span className="text-4xl lg:text-5xl font-bold text-pink-600">
+                  {productPrice?.toLocaleString('vi-VN')} ₫
                 </span>
-              )}
-            </div>
-
-            {/* Stock Status */}
-            <div className="flex items-center gap-3">
-              <Package size={20} className="text-primary-500" />
-              <Badge 
-                variant={isOutOfStock ? 'danger' : productStock < 10 ? 'warning' : 'success'}
-                size="lg"
-              >
-                {isOutOfStock ? '🚫 Hết hàng' : `✅ Còn ${productStock} sản phẩm`}
-              </Badge>
-            </div>
-
-            {/* Category */}
-            {productCategory && (
-              <div className="flex items-center gap-3 text-gray-600">
-                <span className="text-lg">🏷️</span>
-                <span className="font-semibold">Danh mục:</span>
-                <Badge variant="primary">{productCategory.Ten || productCategory.ten}</Badge>
+                {productOriginalPrice && productOriginalPrice > productPrice && (
+                  <span className="text-lg text-gray-400 line-through">
+                    {productOriginalPrice?.toLocaleString('vi-VN')} ₫
+                  </span>
+                )}
               </div>
-            )}
+            </div>
 
-            {/* Description */}
-            <div className="bg-white p-6 rounded-cute border-2 border-primary-100 shadow-soft">
-              <h3 className="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
-                <span className="text-2xl">📝</span>
-                Mô tả sản phẩm
-              </h3>
-              <p className="text-gray-600 leading-relaxed">
-                {productDescription}
-              </p>
+            {/* Stock & Category Info */}
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Stock Status */}
+              <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border-2 border-gray-100">
+                <Package size={18} className="text-green-500" />
+                <span className="text-sm font-semibold text-green-600">
+                  {isOutOfStock ? '🚫 Hết hàng' : `Còn ${productStock} sản phẩm`}
+                </span>
+              </div>
+
+              {/* Category */}
+              {productCategory && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-pink-50 rounded-xl border-2 border-pink-200">
+                  <span className="text-sm">🏷️</span>
+                  <span className="text-sm font-semibold text-gray-700">Danh mục:</span>
+                  <span className="text-sm font-bold text-pink-600">{productCategory.ten}</span>
+                </div>
+              )}
             </div>
 
             {/* Add to Cart Section */}
             {!isOutOfStock && (
-              <div className="bg-gradient-to-br from-cream-50 to-primary-50 p-6 rounded-cute border-2 border-primary-200 space-y-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  📦 Số lượng:
-                </label>
+              <div className="bg-white rounded-2xl border-2 border-pink-100 p-5 space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">📦</span>
+                  <span className="font-bold text-gray-800">Số lượng:</span>
+                </div>
                 
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center bg-white rounded-cute border-2 border-primary-200 overflow-hidden">
+                <div className="flex items-center gap-3">
+                  {/* Quantity Selector - Giống ảnh */}
+                  <div className="flex items-center bg-gradient-to-r from-pink-50 to-rose-50 rounded-full border-2 border-pink-200">
                     <button
                       onClick={handleDecrement}
                       disabled={quantity <= 1 || adding}
-                      className="p-3 hover:bg-primary-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-3 hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-l-full"
                     >
-                      <Minus size={20} className="text-primary-600" />
+                      <Minus size={20} className="text-pink-600" />
                     </button>
                     
-                    <input
-                      type="number"
-                      min="1"
-                      max={productStock}
-                      value={quantity}
-                      onChange={handleQuantityChange}
-                      disabled={adding}
-                      className="w-20 text-center font-bold text-lg border-none focus:outline-none"
-                    />
+                    <div className="w-16 text-center font-bold text-2xl text-gray-800">
+                      {quantity}
+                    </div>
                     
                     <button
                       onClick={handleIncrement}
                       disabled={isMaxQuantity || adding}
-                      className="p-3 hover:bg-primary-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-3 hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-r-full"
                     >
-                      <Plus size={20} className="text-primary-600" />
+                      <Plus size={20} className="text-pink-600" />
                     </button>
                   </div>
 
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    fullWidth
+                  {/* Add to Cart Button - Gradient hồng */}
+                  <button
                     onClick={handleAddToCart}
                     disabled={adding || isOutOfStock}
-                    loading={adding}
-                    icon={<ShoppingCart size={20} />}
+                    className="flex-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-4 px-6 rounded-full font-bold text-lg shadow-lg hover:shadow-xl hover:from-pink-600 hover:to-rose-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2"
                   >
-                    {adding ? 'Đang thêm...' : 'Thêm vào giỏ hàng'}
-                  </Button>
+                    {adding ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                        Đang thêm...
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart size={20} />
+                        Thêm vào giỏ hàng
+                      </>
+                    )}
+                  </button>
                 </div>
 
                 {!user && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-xl">
                     <p className="text-sm text-center text-blue-700">
-                      💡 Bạn có thể mua hàng mà không cần đăng nhập!{' '}
-                      <Link to="/login" className="font-semibold hover:underline">
-                        Hoặc đăng nhập
+                      💡 <span className="font-semibold">Mua hàng không cần đăng nhập!</span>{' '}
+                      <Link to="/login" className="font-bold hover:underline text-blue-800">
+                        Đăng nhập ngay
                       </Link>
-                      {' '}để quản lý đơn hàng dễ dàng hơn.
+                      {' '}để theo dõi đơn hàng.
                     </p>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Additional Info */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-center gap-3 p-4 bg-white rounded-cute shadow-soft border border-primary-100">
-                <Truck size={24} className="text-primary-500" />
-                <span className="text-sm font-medium text-gray-700">
-                  Giao hàng toàn quốc
+            {/* Additional Info - 3 Icons dạng card */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="flex flex-col items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border-2 border-gray-100 hover:border-pink-200 hover:shadow-md transition-all">
+                <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50 rounded-full">
+                  <Truck size={24} className="text-pink-500" />
+                </div>
+                <span className="text-xs font-bold text-gray-700 text-center leading-tight">
+                  Giao hàng<br/>toàn quốc
                 </span>
               </div>
               
-              <div className="flex items-center gap-3 p-4 bg-white rounded-cute shadow-soft border border-primary-100">
-                <Shield size={24} className="text-primary-500" />
-                <span className="text-sm font-medium text-gray-700">
-                  Hàng chính hãng 100%
+              <div className="flex flex-col items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border-2 border-gray-100 hover:border-pink-200 hover:shadow-md transition-all">
+                <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50 rounded-full">
+                  <Shield size={24} className="text-pink-500" />
+                </div>
+                <span className="text-xs font-bold text-gray-700 text-center leading-tight">
+                  Hàng chính hãng<br/>100%
                 </span>
               </div>
               
-              <div className="flex items-center gap-3 p-4 bg-white rounded-cute shadow-soft border border-primary-100">
-                <RefreshCw size={24} className="text-primary-500" />
-                <span className="text-sm font-medium text-gray-700">
-                  Đổi trả trong 30 ngày
+              <div className="flex flex-col items-center gap-3 p-4 bg-white rounded-2xl shadow-sm border-2 border-gray-100 hover:border-pink-200 hover:shadow-md transition-all">
+                <div className="w-12 h-12 flex items-center justify-center bg-gradient-to-br from-pink-50 to-rose-50 rounded-full">
+                  <RefreshCw size={24} className="text-pink-500" />
+                </div>
+                <span className="text-xs font-bold text-gray-700 text-center leading-tight">
+                  Đổi trả<br/>30 ngày
                 </span>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Product Description Section - Chỉ giữ lại Mô tả */}
+        <div className="mt-12 bg-white rounded-bubble shadow-soft border-2 border-primary-100 overflow-hidden">
+          <h2 className="text-3xl font-display font-bold text-gray-800 p-6 bg-gradient-to-r from-primary-50 to-rose-50 border-b-2 border-primary-100 flex items-center gap-3">
+            <span className="text-2xl">📝</span>
+            Mô tả sản phẩm
+          </h2>
+
+          {/* Mô tả sản phẩm */}
+          <div className="p-6">
+            <div className="bg-gradient-to-br from-cream-50 to-primary-25 rounded-lg p-6 border border-primary-100">
+              <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+                {productDescription}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ✅ MỚI: Review Section - Hiển thị đánh giá từ database */}
+        <div className="mt-12">
+          <h2 className="text-3xl font-display font-bold text-gray-800 mb-6 flex items-center gap-3">
+            <span className="text-4xl">⭐</span>
+            Đánh giá sản phẩm
+          </h2>
+          <ReviewList sanPhamId={product.id} />
+        </div>
+
+        {/* Related Products Section */}
+        {relatedProducts.length > 0 && (
+          <div className="mt-12">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-3xl font-display font-bold text-gray-800 flex items-center gap-3">
+                <span className="text-4xl">🎁</span>
+                Sản phẩm liên quan
+              </h2>
+              {productCategory && (
+                <Link
+                  to={`/products?category=${productCategory.id}`}
+                  className="text-primary-600 hover:text-primary-700 font-semibold flex items-center gap-2 transition-colors"
+                >
+                  Xem tất cả
+                  <ChevronRight size={20} />
+                </Link>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+              {relatedProducts.map((relatedProduct) => (
+                <Link
+                  key={relatedProduct.id}
+                  to={`/products/${relatedProduct.id}`}
+                  className="group bg-white rounded-bubble shadow-soft hover:shadow-bubble border-2 border-primary-100 overflow-hidden transition-all duration-300 hover:scale-105"
+                >
+                  {/* Product Image */}
+                  <div className="relative aspect-square bg-gradient-to-br from-primary-50 to-rose-50 overflow-hidden">
+                    <img
+                      src={relatedProduct.hinhAnhURL || '/barbie.jpg'}
+                      alt={relatedProduct.ten}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      loading="lazy"
+                    />
+                    {relatedProduct.soLuongTon === 0 && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <Badge variant="danger" size="sm">Hết hàng</Badge>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Product Info */}
+                  <div className="p-4">
+                    <h3 className="font-bold text-gray-800 mb-2 line-clamp-2 text-sm md:text-base group-hover:text-primary-600 transition-colors">
+                      {relatedProduct.ten}
+                    </h3>
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg md:text-xl font-bold text-gradient-primary">
+                        {relatedProduct.giaBan?.toLocaleString('vi-VN')} ₫
+                      </span>
+                      {relatedProduct.soLuongTon > 0 && (
+                        <Badge variant="success" size="sm">
+                          Còn hàng
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Toast Notification */}

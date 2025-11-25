@@ -25,22 +25,14 @@ module.exports = (sequelize, Sequelize) => {
       type: Sequelize.INTEGER,
       allowNull: false
     },
-    GiaBan: {
-      type: Sequelize.DECIMAL(15, 0),
-      allowNull: false
-    },
-    ThanhTien: {
-      type: Sequelize.DECIMAL(15, 0),
-      allowNull: false
-    },
     DonGia: {
-      type: Sequelize.DECIMAL(15, 0),
+      type: Sequelize.DECIMAL(18, 2),
       allowNull: false,
       defaultValue: 0
     },
-    Enable: {
-      type: Sequelize.BOOLEAN,
-      defaultValue: true
+    ThanhTien: {
+      type: Sequelize.DECIMAL(18, 2),
+      allowNull: false
     }
   }, {
     tableName: 'ChiTietHoaDon',

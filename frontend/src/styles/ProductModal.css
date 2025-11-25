@@ -11,6 +11,7 @@
   align-items: center;
   z-index: 1000;
   animation: fadeIn 0.3s ease;
+  padding: 10px;
 }
 
 @keyframes fadeIn {
@@ -25,12 +26,230 @@
 .modal-content.product-modal {
   background: white;
   border-radius: 12px;
-  width: 90%;
-  max-width: 700px;
-  max-height: 90vh;
-  overflow-y: auto;
+  width: 95%;
+  max-width: 1100px;
+  max-height: 95vh;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   animation: slideUp 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== WIDE MODAL - 3 CỘT KHÔNG SCROLL ===== */
+.modal-content.product-modal-wide {
+  max-width: 1400px;
+  width: 98%;
+  max-height: 90vh;
+}
+
+.product-form-wide {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: calc(90vh - 120px);
+}
+
+/* Grid 3 cột */
+.form-body-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.form-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.column-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #374151;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #fce7f3;
+  margin-bottom: 8px;
+}
+
+/* Compact form groups */
+.form-group-compact {
+  margin-bottom: 0;
+}
+
+.form-group-compact label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: #333;
+  font-size: 12px;
+}
+
+.form-group-compact input[type="text"],
+.form-group-compact input[type="number"],
+.form-group-compact textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 13px;
+  transition: all 0.3s ease;
+}
+
+.form-group-compact input:focus,
+.form-group-compact textarea:focus {
+  outline: none;
+  border-color: #ec4899;
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.1);
+}
+
+.form-group-compact input.error,
+.form-group-compact textarea.error {
+  border-color: #e91e63;
+}
+
+.form-row-compact {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Nút navigate nhỏ */
+.btn-navigate-sm {
+  padding: 4px 8px;
+  background: linear-gradient(135deg, #ec4899 0%, #f472b6 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-navigate-sm:hover {
+  background: linear-gradient(135deg, #db2777 0%, #ec4899 100%);
+  transform: scale(1.05);
+}
+
+/* Upload button compact */
+.btn-upload-compact {
+  width: 100%;
+  padding: 10px;
+  border: 2px dashed #ec4899;
+  background: #fef3f2;
+  color: #ec4899;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-upload-compact:hover:not(:disabled) {
+  background: #ec4899;
+  color: white;
+  border-style: solid;
+}
+
+.btn-upload-compact:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Image grid - 1 hàng ngang */
+.image-grid-compact {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.image-item-compact {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #e5e7eb;
+  background: #f9fafb;
+  flex-shrink: 0;
+}
+
+.image-item-compact img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.btn-remove-compact {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  background: rgba(239, 68, 68, 0.95);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-remove-compact:hover {
+  background: rgb(239, 68, 68);
+  transform: scale(1.15);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .form-body-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .form-column:last-child {
+    grid-column: 1 / -1;
+  }
+  
+  .image-grid-compact {
+    justify-content: flex-start;
+  }
+  
+  .image-item-compact {
+    width: 80px;
+    height: 80px;
+  }
+}
+
+@media (max-width: 768px) {
+  .modal-content.product-modal-wide {
+    width: 100%;
+    max-height: 100vh;
+  }
+  
+  .form-body-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .image-grid-compact {
+    justify-content: flex-start;
+  }
+  
+  .image-item-compact {
+    width: 70px;
+    height: 70px;
+  }
 }
 
 @keyframes slideUp {
@@ -48,25 +267,26 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
+  padding: 14px 20px;
   border-bottom: 2px solid #f0f0f0;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border-radius: 12px 12px 0 0;
+  flex-shrink: 0;
 }
 
 .modal-header h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 19px;
 }
 
 .close-btn {
   background: rgba(255, 255, 255, 0.2);
   border: none;
   color: white;
-  font-size: 28px;
-  width: 36px;
-  height: 36px;
+  font-size: 24px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -88,27 +308,59 @@
 
 .product-form {
   padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
+/* HORIZONTAL LAYOUT - 2 cột chính */
 .form-body {
-  padding: 24px;
+  padding: 18px 20px;
+  overflow-y: auto;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 20px;
+  align-content: start;
+}
+
+/* Cột trái - Fields */
+.form-body-left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Cột phải - Image + Description */
+.form-body-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 0;
+}
+
+/* Row cho Giá bán và Tồn kho */
+.form-row-inline {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
   font-weight: 600;
   color: #333;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .required {
   color: #e91e63;
-  margin-left: 4px;
+  margin-left: 2px;
 }
 
 .form-group input[type="text"],
@@ -116,10 +368,10 @@
 .form-group textarea,
 .form-group select {
   width: 100%;
-  padding: 12px 16px;
+  padding: 8px 12px;
   border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 15px;
+  border-radius: 6px;
+  font-size: 14px;
   transition: all 0.3s ease;
   font-family: inherit;
 }
@@ -148,27 +400,29 @@
 .error-message {
   display: block;
   color: #e91e63;
-  font-size: 13px;
-  margin-top: 6px;
+  font-size: 12px;
+  margin-top: 4px;
 }
 
 .char-count {
   text-align: right;
-  font-size: 12px;
+  font-size: 11px;
   color: #999;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
-/* Form Row (2 columns) */
+/* Form Row (không dùng nữa - dùng form-row-inline) */
 .form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
+  display: contents;
 }
 
-/* Image Upload */
+.form-row .form-group {
+  margin-bottom: 0;
+}
+
+/* Image Upload - Compact cho cột phải */
 .image-upload-container {
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .image-preview-box {
@@ -177,22 +431,22 @@
 
 .image-preview {
   max-width: 100%;
-  max-height: 300px;
-  border-radius: 8px;
+  max-height: 280px;
+  border-radius: 6px;
   border: 2px solid #e0e0e0;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   object-fit: contain;
 }
 
 .btn-upload-image,
 .btn-remove-image {
-  padding: 10px 20px;
+  padding: 8px 16px;
   border: 2px dashed #667eea;
   background: #f5f7ff;
   color: #667eea;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   transition: all 0.3s ease;
   width: 100%;
@@ -217,66 +471,67 @@
 }
 
 .image-hint {
-  font-size: 12px;
+  font-size: 11px;
   color: #999;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
-/* Checkbox */
+/* Checkbox - Compact */
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   cursor: pointer;
   user-select: none;
 }
 
 .checkbox-label input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   cursor: pointer;
 }
 
 .checkbox-label span {
   font-weight: 500;
   color: #555;
+  font-size: 13px;
 }
 
-/* Info Box */
+/* Info Box - Compact */
 .info-box {
-  padding: 12px 16px;
+  padding: 8px 12px;
   background: #e3f2fd;
   border-left: 4px solid #1976d2;
   border-radius: 6px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 20px;
-  font-size: 14px;
+  gap: 8px;
+  font-size: 13px;
 }
 
 .info-icon {
-  font-size: 20px;
+  font-size: 16px;
 }
 
-/* Modal Footer */
+/* Modal Footer - Compact */
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  padding: 20px 24px;
+  gap: 10px;
+  padding: 12px 20px;
   border-top: 2px solid #f0f0f0;
   background: #fafafa;
   border-radius: 0 0 12px 12px;
+  flex-shrink: 0;
 }
 
 .btn-cancel,
 .btn-submit {
-  padding: 12px 24px;
+  padding: 9px 20px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   transition: all 0.3s ease;
 }
@@ -309,17 +564,97 @@
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .modal-content.product-modal {
-    width: 95%;
-    max-height: 95vh;
+    width: 98%;
+    max-height: 98vh;
   }
 
-  .form-row {
+  .form-body {
     grid-template-columns: 1fr;
+    padding: 12px 16px;
   }
 
   .modal-header h2 {
-    font-size: 18px;
+    font-size: 16px;
   }
+  
+  .image-preview {
+    max-height: 200px;
+  }
+}
+
+/* Tối ưu cho màn hình nhỏ hơn */
+@media (max-height: 700px) {
+  .form-body {
+    padding: 12px 20px;
+    gap: 12px;
+  }
+  
+  .form-body-left {
+    gap: 10px;
+  }
+  
+  .form-body-right {
+    gap: 10px;
+  }
+  
+  .form-group label {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  
+  .form-group input[type="text"],
+  .form-group input[type="number"],
+  .form-group textarea,
+  .form-group select {
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+  
+  .image-preview {
+    max-height: 200px;
+  }
+}
+
+/* New styles for navigation button */
+.btn-navigate {
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #ec4899 0%, #f472b6 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-navigate:hover {
+  background: linear-gradient(135deg, #db2777 0%, #ec4899 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(236, 72, 153, 0.3);
+}
+
+.btn-navigate:active {
+  transform: translateY(0);
+}
+
+.flex {
+  display: flex;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.mb-2 {
+  margin-bottom: 8px;
 }

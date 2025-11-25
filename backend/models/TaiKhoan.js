@@ -40,16 +40,16 @@ module.exports = (sequelize, Sequelize) => {
       },
       VaiTro: {
         type: Sequelize.STRING(20),
-        defaultValue: 'user'
+        defaultValue: 'KhachHang'  // Changed from 'user' to 'KhachHang'
       },
       NgayTao: {
         type: Sequelize.DATE,
         allowNull: true
-        // Bỏ defaultValue - để SQL Server handle
       },
-      Enable: {
+      TrangThai: {
         type: Sequelize.BOOLEAN,
-        defaultValue: true
+        defaultValue: true,
+        field: 'TrangThai'
       }
     }, {
       tableName: 'TaiKhoan',

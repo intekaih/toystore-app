@@ -47,7 +47,8 @@ app.use((req, res, next) => {
   const corsOrigin = config.getValue('server', 'corsOrigin');
   res.header('Access-Control-Allow-Origin', corsOrigin === '*' ? '*' : corsOrigin);
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-session-id');
+  res.header('Access-Control-Allow-Credentials', 'true');
   
   if (req.method === 'OPTIONS') {
     res.sendStatus(200);
@@ -63,10 +64,17 @@ app.use('/api/products', require('./routes/product.routes'));
 app.use('/api/cart', require('./routes/cart.routes'));
 app.use('/api/orders', require('./routes/order.routes'));
 app.use('/api/payment', require('./routes/payment.routes'));
+app.use('/api/shipping', require('./routes/shipping.routes')); // ⭐ THÊM MỚI: Shipping/GHN API
+app.use('/api/webhooks', require('./routes/webhook.routes')); // 🔔 THÊM MỚI: Webhook từ GHN
+app.use('/api/reviews', require('./routes/review.routes')); // ⭐ THÊM MỚI: Review API
+app.use('/api/vouchers', require('./routes/voucher.routes')); // 🎟️ THÊM MỚI: Voucher API công khai
+app.use('/api/staff', require('./routes/staff.routes')); // ⭐ THÊM MỚI: Staff Management API
 app.use('/api/admin/users', require('./routes/admin.user.routes'));
 app.use('/api/admin/categories', require('./routes/category.routes'));
+app.use('/api/admin/brands', require('./routes/admin.brand.routes')); // ⭐ THÊM MỚI: Brand Management API
 app.use('/api/admin/products', require('./routes/admin.product.routes'));
 app.use('/api/admin/orders', require('./routes/admin.order.routes'));
+app.use('/api/admin/vouchers', require('./routes/admin.voucher.routes'));
 app.use('/api/admin/statistics', require('./routes/admin.statistics.routes'));
 
 // Test route

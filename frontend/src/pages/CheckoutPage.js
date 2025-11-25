@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getCart } from '../api/cartApi';
+import { cartService, shippingService } from '../services'; // ✅ Sử dụng services
 import MainLayout from '../layouts/MainLayout';
 import { Loading } from '../components/ui';
 import Toast from '../components/Toast';
@@ -77,18 +77,20 @@ const CheckoutPage = () => {
     loadProvinces();
   }, []);
 
-  // ✅ LOAD DANH SÁCH TỈNH/THÀNH
+  // ✅ LOAD DANH SÁCH TỈNH/THÀNH - Sử dụng shippingService
   const loadProvinces = async () => {
     try {
       setLoadingProvinces(true);
-      const response = await fetch('https://provinces.open-api.vn/api/p/');
-      const data = await response.json();
-      setProvinces(data);
-      console.log('✅ Đã load', data.length, 'tỉnh/thành phố');
+      const response = await shippingService.getProvinces();
+      
+      if (response.success && response.data) {
+        setProvinces(response.data);
+        console.log('✅ Đã load', response.data.length, 'tỉnh/thành phố');
 
-      // Nếu có saved info, load districts và wards
-      if (savedInfo?.tinhThanhCode) {
-        loadDistricts(savedInfo.tinhThanhCode);
+        // Nếu có saved info, load districts và wards
+        if (savedInfo?.tinhThanhCode) {
+          loadDistricts(savedInfo.tinhThanhCode);
+        }
       }
     } catch (error) {
       console.error('❌ Lỗi load tỉnh/thành:', error);
@@ -98,18 +100,20 @@ const CheckoutPage = () => {
     }
   };
 
-  // ✅ LOAD DANH SÁCH QUẬN/HUYỆN
+  // ✅ LOAD DANH SÁCH QUẬN/HUYỆN - Sử dụng shippingService
   const loadDistricts = async (provinceCode) => {
     try {
       setLoadingDistricts(true);
-      const response = await fetch(`https://provinces.open-api.vn/api/p/${provinceCode}?depth=2`);
-      const data = await response.json();
-      setDistricts(data.districts || []);
-      console.log('✅ Đã load', data.districts?.length || 0, 'quận/huyện');
+      const response = await shippingService.getDistricts(provinceCode);
+      
+      if (response.success && response.data) {
+        setDistricts(response.data);
+        console.log('✅ Đã load', response.data.length || 0, 'quận/huyện');
 
-      // Nếu có saved info, load wards
-      if (savedInfo?.quanHuyenCode && savedInfo?.tinhThanhCode === provinceCode) {
-        loadWards(savedInfo.quanHuyenCode);
+        // Nếu có saved info, load wards
+        if (savedInfo?.quanHuyenCode && savedInfo?.tinhThanhCode === provinceCode) {
+          loadWards(savedInfo.quanHuyenCode);
+        }
       }
     } catch (error) {
       console.error('❌ Lỗi load quận/huyện:', error);
@@ -119,14 +123,16 @@ const CheckoutPage = () => {
     }
   };
 
-  // ✅ LOAD DANH SÁCH PHƯỜNG/XÃ
+  // ✅ LOAD DANH SÁCH PHƯỜNG/XÃ - Sử dụng shippingService
   const loadWards = async (districtCode) => {
     try {
       setLoadingWards(true);
-      const response = await fetch(`https://provinces.open-api.vn/api/d/${districtCode}?depth=2`);
-      const data = await response.json();
-      setWards(data.wards || []);
-      console.log('✅ Đã load', data.wards?.length || 0, 'phường/xã');
+      const response = await shippingService.getWards(districtCode);
+      
+      if (response.success && response.data) {
+        setWards(response.data);
+        console.log('✅ Đã load', response.data.length || 0, 'phường/xã');
+      }
     } catch (error) {
       console.error('❌ Lỗi load phường/xã:', error);
       showToast('Không thể tải danh sách phường/xã', 'error');
@@ -138,30 +144,19 @@ const CheckoutPage = () => {
   const loadCart = async () => {
     try {
       setLoading(true);
-      const response = await getCart();
+      
+      // ✅ Sử dụng cartService thay vì getCart API
+      const response = await cartService.getCart();
+      
       if (response.success && response.data) {
-        const items = response.data.items || [];
+        const items = response.data || [];
         if (items.length === 0) {
           showToast('Giỏ hàng của bạn đang trống', 'warning');
           setTimeout(() => navigate('/cart'), 1500);
           return;
         }
         
-        const normalizedItems = items.map(item => ({
-          ID: item.id || item.ID,
-          SanPhamID: item.sanPhamId || item.SanPhamID,
-          SoLuong: item.soLuong || item.SoLuong,
-          DonGia: item.donGia || item.DonGia,
-          sanPham: {
-            ID: item.sanPham?.id || item.sanPham?.ID,
-            Ten: item.sanPham?.ten || item.sanPham?.Ten,
-            GiaBan: item.sanPham?.giaBan || item.sanPham?.GiaBan,
-            Ton: item.sanPham?.ton || item.sanPham?.Ton,
-            HinhAnhURL: item.sanPham?.hinhAnhURL || item.sanPham?.HinhAnhURL
-          }
-        }));
-        
-        setCartItems(normalizedItems);
+        setCartItems(items);
       }
     } catch (error) {
       console.error('Error loading cart:', error);
@@ -192,13 +187,13 @@ const CheckoutPage = () => {
 
   // ✅ XỬ LÝ THAY ĐỔI TỈNH/THÀNH
   const handleProvinceChange = (e) => {
-    const selectedCode = e.target.value;
-    const selectedProvince = provinces.find(p => p.code.toString() === selectedCode);
+    const selectedId = e.target.value;
+    const selectedProvince = provinces.find(p => p.provinceId.toString() === selectedId);
     
     setFormData(prev => ({
       ...prev,
-      tinhThanhCode: selectedCode,
-      tinhThanhName: selectedProvince?.name || '',
+      tinhThanhCode: selectedId,
+      tinhThanhName: selectedProvince?.provinceName || '',
       quanHuyenCode: '',
       quanHuyenName: '',
       phuongXaCode: '',
@@ -210,8 +205,8 @@ const CheckoutPage = () => {
     setWards([]);
 
     // Load districts của tỉnh mới
-    if (selectedCode) {
-      loadDistricts(selectedCode);
+    if (selectedId) {
+      loadDistricts(selectedId);
     }
 
     if (errors.tinhThanhCode) {
@@ -221,13 +216,13 @@ const CheckoutPage = () => {
 
   // ✅ XỬ LÝ THAY ĐỔI QUẬN/HUYỆN
   const handleDistrictChange = (e) => {
-    const selectedCode = e.target.value;
-    const selectedDistrict = districts.find(d => d.code.toString() === selectedCode);
+    const selectedId = e.target.value;
+    const selectedDistrict = districts.find(d => d.districtId.toString() === selectedId);
     
     setFormData(prev => ({
       ...prev,
-      quanHuyenCode: selectedCode,
-      quanHuyenName: selectedDistrict?.name || '',
+      quanHuyenCode: selectedId,
+      quanHuyenName: selectedDistrict?.districtName || '',
       phuongXaCode: '',
       phuongXaName: ''
     }));
@@ -236,8 +231,8 @@ const CheckoutPage = () => {
     setWards([]);
 
     // Load wards của quận mới
-    if (selectedCode) {
-      loadWards(selectedCode);
+    if (selectedId) {
+      loadWards(selectedId);
     }
 
     if (errors.quanHuyenCode) {
@@ -248,12 +243,12 @@ const CheckoutPage = () => {
   // ✅ XỬ LÝ THAY ĐỔI PHƯỜNG/XÃ
   const handleWardChange = (e) => {
     const selectedCode = e.target.value;
-    const selectedWard = wards.find(w => w.code.toString() === selectedCode);
+    const selectedWard = wards.find(w => w.wardCode === selectedCode);
     
     setFormData(prev => ({
       ...prev,
       phuongXaCode: selectedCode,
-      phuongXaName: selectedWard?.name || ''
+      phuongXaName: selectedWard?.wardName || ''
     }));
 
     if (errors.phuongXaCode) {
@@ -302,18 +297,27 @@ const CheckoutPage = () => {
 
   const calculateTotal = () => {
     return cartItems.reduce((total, item) => {
-      return total + (parseFloat(item.DonGia) * item.SoLuong);
+      // ✅ Hỗ trợ cả 2 format: DonGia (cũ) và donGia (mới từ DTOMapper)
+      const price = parseFloat(item.donGia || item.DonGia || 0);
+      const quantity = parseInt(item.soLuong || item.SoLuong || 0);
+      return total + (price * quantity);
+    }, 0);
+  };
+
+  const getTotalItems = () => {
+    return cartItems.reduce((total, item) => {
+      const quantity = parseInt(item.soLuong || item.SoLuong || 0);
+      return total + quantity;
     }, 0);
   };
 
   const calculateShippingFee = () => {
-    return 30000;
+    const subtotal = calculateTotal();
+    // Miễn phí ship cho đơn hàng >= 500k
+    return subtotal >= 500000 ? 0 : 30000;
   };
 
-  const getTotalItems = () => {
-    return cartItems.reduce((total, item) => total + item.SoLuong, 0);
-  };
-
+  // ✅ LƯU THÔNG TIN KHÁCH HÀNG
   const saveCustomerInfo = () => {
     const infoToSave = {
       hoTen: formData.hoTen.trim(),
@@ -348,9 +352,13 @@ const CheckoutPage = () => {
           email: formData.email.trim(),
           dienThoai: formData.dienThoai.trim(),
           diaChi: formData.diaChi.trim(),
+          // ✅ THÊM: Gửi cả mã và tên để backend có thể tích hợp GHN
           tinhThanh: formData.tinhThanhName,
           quanHuyen: formData.quanHuyenName,
           phuongXa: formData.phuongXaName,
+          maTinhID: formData.tinhThanhCode,      // ✅ Mã tỉnh (cho GHN API)
+          maQuanID: formData.quanHuyenCode,      // ✅ Mã quận (cho GHN API)
+          maPhuongXa: formData.phuongXaCode,     // ✅ Mã phường (cho GHN API)
           ghiChu: formData.ghiChu
         }
       }
@@ -407,180 +415,244 @@ const CheckoutPage = () => {
           </button>
         </div>
 
+        {/* Info Banner */}
+        <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <div className="text-2xl">📦</div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-blue-900 mb-1">Thông tin quan trọng</h3>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Vui lòng kiểm tra kỹ thông tin giao hàng trước khi đặt hàng</li>
+                <li>• Đơn hàng sẽ được giao trong vòng 3-5 ngày làm việc</li>
+                <li>• Miễn phí giao hàng cho đơn hàng trên 500.000₫</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
         {/* Title and Content */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column - Title + Form */}
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-6">Thông Tin Giao Hàng</h1>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-pink-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                1
+              </div>
+              <h1 className="text-2xl font-bold text-gray-800">Thông Tin Giao Hàng</h1>
+            </div>
             
-            <form onSubmit={handleSubmit} className="space-y-3">
-              {/* Họ và tên */}
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">
-                  Họ và tên <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="hoTen"
-                  value={formData.hoTen}
-                  onChange={handleInputChange}
-                  placeholder="Nguyễn Huỳnh Tiến Khải"
-                  className={`w-full px-3 py-2 border ${errors.hoTen ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                />
-                {errors.hoTen && (
-                  <p className="mt-1 text-xs text-red-500">{errors.hoTen}</p>
-                )}
-              </div>
-
-              {/* Email và Số điện thoại - 2 cột */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Email <span className="text-red-500">*</span>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Thông tin liên hệ */}
+              <div className="bg-white border-2 border-gray-200 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <span className="text-xl">👤</span> Thông tin liên hệ
+                </h3>
+                
+                {/* Họ và tên */}
+                <div className="mb-3">
+                  <label className="block text-sm text-gray-700 mb-1 font-medium">
+                    Họ và tên <span className="text-red-500">*</span>
+                    <span className="text-gray-500 text-xs font-normal ml-2">(Người nhận hàng)</span>
                   </label>
                   <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
+                    type="text"
+                    name="hoTen"
+                    value={formData.hoTen}
                     onChange={handleInputChange}
-                    placeholder="ionff01@gmail.com"
-                    className={`w-full px-3 py-2 border ${errors.email ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    placeholder="VD: Nguyễn Văn A"
+                    className={`w-full px-3 py-2.5 border ${errors.hoTen ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all`}
                   />
-                  {errors.email && (
-                    <p className="mt-1 text-xs text-red-500">{errors.email}</p>
+                  {errors.hoTen && (
+                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                      <span>⚠️</span> {errors.hoTen}
+                    </p>
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Số điện thoại <span className="text-red-500">*</span>
+                {/* Email và Số điện thoại - 2 cột */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1 font-medium">
+                      Email <span className="text-red-500">*</span>
+                      <span className="text-gray-500 text-xs font-normal ml-2">(Nhận thông báo)</span>
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      placeholder="example@email.com"
+                      className={`w-full px-3 py-2.5 border ${errors.email ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all`}
+                    />
+                    {errors.email && (
+                      <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                        <span>⚠️</span> {errors.email}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1 font-medium">
+                      Số điện thoại <span className="text-red-500">*</span>
+                      <span className="text-gray-500 text-xs font-normal ml-2">(Liên hệ giao hàng)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      name="dienThoai"
+                      value={formData.dienThoai}
+                      onChange={handleInputChange}
+                      placeholder="0912345678"
+                      className={`w-full px-3 py-2.5 border ${errors.dienThoai ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all`}
+                    />
+                    {errors.dienThoai && (
+                      <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                        <span>⚠️</span> {errors.dienThoai}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Địa chỉ giao hàng */}
+              <div className="bg-white border-2 border-gray-200 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                  <span className="text-xl">📍</span> Địa chỉ giao hàng
+                </h3>
+
+                {/* Địa chỉ */}
+                <div className="mb-3">
+                  <label className="block text-sm text-gray-700 mb-1 font-medium">
+                    Địa chỉ <span className="text-red-500">*</span>
+                    <span className="text-gray-500 text-xs font-normal ml-2">(Số nhà, tên đường)</span>
                   </label>
                   <input
-                    type="tel"
-                    name="dienThoai"
-                    value={formData.dienThoai}
+                    type="text"
+                    name="diaChi"
+                    value={formData.diaChi}
                     onChange={handleInputChange}
-                    placeholder="0916775071"
-                    className={`w-full px-3 py-2 border ${errors.dienThoai ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    placeholder="VD: 68 Trần Khánh Dư"
+                    className={`w-full px-3 py-2.5 border ${errors.diaChi ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all`}
                   />
-                  {errors.dienThoai && (
-                    <p className="mt-1 text-xs text-red-500">{errors.dienThoai}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Địa chỉ */}
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">
-                  Địa chỉ <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="diaChi"
-                  value={formData.diaChi}
-                  onChange={handleInputChange}
-                  placeholder="68, Tran Khanh Du"
-                  className={`w-full px-3 py-2 border ${errors.diaChi ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                />
-                {errors.diaChi && (
-                  <p className="mt-1 text-xs text-red-500">{errors.diaChi}</p>
-                )}
-              </div>
-
-              {/* Tỉnh/thành, Quận/huyện, Phường/xã - 3 cột */}
-              <div className="grid grid-cols-3 gap-3">
-                {/* Tỉnh/Thành phố */}
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Tỉnh / thành <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="tinhThanhCode"
-                    value={formData.tinhThanhCode}
-                    onChange={handleProvinceChange}
-                    disabled={loadingProvinces}
-                    className={`w-full px-3 py-2 border ${errors.tinhThanhCode ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white`}
-                  >
-                    <option value="">
-                      {loadingProvinces ? 'Đang tải...' : 'Chọn tỉnh/thành'}
-                    </option>
-                    {provinces.map((province) => (
-                      <option key={province.code} value={province.code}>
-                        {province.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.tinhThanhCode && (
-                    <p className="mt-1 text-xs text-red-500">{errors.tinhThanhCode}</p>
+                  {errors.diaChi && (
+                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                      <span>⚠️</span> {errors.diaChi}
+                    </p>
                   )}
                 </div>
 
-                {/* Quận/Huyện */}
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Quận / huyện <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="quanHuyenCode"
-                    value={formData.quanHuyenCode}
-                    onChange={handleDistrictChange}
-                    disabled={!formData.tinhThanhCode || loadingDistricts}
-                    className={`w-full px-3 py-2 border ${errors.quanHuyenCode ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed`}
-                  >
-                    <option value="">
-                      {loadingDistricts ? 'Đang tải...' : 'Chọn quận/huyện'}
-                    </option>
-                    {districts.map((district) => (
-                      <option key={district.code} value={district.code}>
-                        {district.name}
+                {/* Tỉnh/thành, Quận/huyện, Phường/xã */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Tỉnh/Thành phố */}
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1 font-medium">
+                      Tỉnh / Thành phố <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="tinhThanhCode"
+                      value={formData.tinhThanhCode}
+                      onChange={handleProvinceChange}
+                      disabled={loadingProvinces}
+                      className={`w-full px-3 py-2.5 border ${errors.tinhThanhCode ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white transition-all`}
+                    >
+                      <option value="">
+                        {loadingProvinces ? '⏳ Đang tải...' : '-- Chọn --'}
                       </option>
-                    ))}
-                  </select>
-                  {errors.quanHuyenCode && (
-                    <p className="mt-1 text-xs text-red-500">{errors.quanHuyenCode}</p>
-                  )}
+                      {provinces.map((province) => (
+                        <option key={province.provinceId} value={province.provinceId}>
+                          {province.provinceName}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.tinhThanhCode && (
+                      <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                        <span>⚠️</span> {errors.tinhThanhCode}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Quận/Huyện */}
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1 font-medium">
+                      Quận / Huyện <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="quanHuyenCode"
+                      value={formData.quanHuyenCode}
+                      onChange={handleDistrictChange}
+                      disabled={!formData.tinhThanhCode || loadingDistricts}
+                      className={`w-full px-3 py-2.5 border ${errors.quanHuyenCode ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed transition-all`}
+                    >
+                      <option value="">
+                        {loadingDistricts ? '⏳ Đang tải...' : formData.tinhThanhCode ? '-- Chọn --' : '(Chọn tỉnh trước)'}
+                      </option>
+                      {districts.map((district) => (
+                        <option key={district.districtId} value={district.districtId}>
+                          {district.districtName}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.quanHuyenCode && (
+                      <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                        <span>⚠️</span> {errors.quanHuyenCode}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Phường/Xã */}
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1 font-medium">
+                      Phường / Xã <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="phuongXaCode"
+                      value={formData.phuongXaCode}
+                      onChange={handleWardChange}
+                      disabled={!formData.quanHuyenCode || loadingWards}
+                      className={`w-full px-3 py-2.5 border ${errors.phuongXaCode ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed transition-all`}
+                    >
+                      <option value="">
+                        {loadingWards ? '⏳ Đang tải...' : formData.quanHuyenCode ? '-- Chọn --' : '(Chọn quận trước)'}
+                      </option>
+                      {wards.map((ward) => (
+                        <option key={ward.wardCode} value={ward.wardCode}>
+                          {ward.wardName}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.phuongXaCode && (
+                      <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                        <span>⚠️</span> {errors.phuongXaCode}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                {/* Phường/Xã */}
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">
-                    Phường / xã <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="phuongXaCode"
-                    value={formData.phuongXaCode}
-                    onChange={handleWardChange}
-                    disabled={!formData.quanHuyenCode || loadingWards}
-                    className={`w-full px-3 py-2 border ${errors.phuongXaCode ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed`}
-                  >
-                    <option value="">
-                      {loadingWards ? 'Đang tải...' : 'Chọn phường/xã'}
-                    </option>
-                    {wards.map((ward) => (
-                      <option key={ward.code} value={ward.code}>
-                        {ward.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.phuongXaCode && (
-                    <p className="mt-1 text-xs text-red-500">{errors.phuongXaCode}</p>
-                  )}
+                {/* Hint */}
+                <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="text-xs text-blue-800 flex items-start gap-2">
+                    <span className="text-sm">💡</span>
+                    <span>Vui lòng chọn đầy đủ Tỉnh/Thành phố, Quận/Huyện và Phường/Xã để chúng tôi tính phí vận chuyển chính xác</span>
+                  </p>
                 </div>
               </div>
 
               {/* Ghi chú */}
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">
-                  Ghi chú (tùy chọn)
+              <div className="bg-white border-2 border-gray-200 rounded-lg p-4">
+                <label className="block text-sm text-gray-700 mb-1 font-medium flex items-center gap-2">
+                  <span className="text-xl">📝</span>
+                  <span>Ghi chú đơn hàng (tùy chọn)</span>
                 </label>
                 <textarea
                   name="ghiChu"
                   value={formData.ghiChu}
                   onChange={handleInputChange}
-                  placeholder="Ghi chú về đơn hàng..."
-                  rows="2"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  placeholder="VD: Giao hàng giờ hành chính, gọi trước 15 phút..."
+                  rows="3"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Bạn có thể để lại lưu ý về thời gian giao hàng, địa chỉ cụ thể hơn...
+                </p>
               </div>
 
               {/* Buttons */}
@@ -588,18 +660,23 @@ const CheckoutPage = () => {
                 <button
                   type="button"
                   onClick={() => navigate('/cart')}
-                  className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                  className="px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
                   disabled={submitting}
                 >
-                  ← Giỏ hàng
+                  <span>←</span> Giỏ hàng
                 </button>
                 
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-400 to-pink-500 text-white font-semibold rounded-lg hover:from-pink-500 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-400 to-pink-500 text-white font-semibold rounded-lg hover:from-pink-500 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
                   disabled={submitting}
                 >
-                  {submitting ? 'Đang xử lý...' : 'Tiếp tục đến phương thức thanh toán →'}
+                  {submitting ? '⏳ Đang xử lý...' : (
+                    <>
+                      <span>Tiếp tục thanh toán</span>
+                      <span>→</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -607,87 +684,126 @@ const CheckoutPage = () => {
 
           {/* Right Column - Order Summary */}
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-0 invisible h-0">Placeholder</h1>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                2
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">Đơn Hàng Của Bạn</h2>
+            </div>
             
-            <div className="bg-white border border-gray-200 rounded-lg p-4 sticky top-6">
-              <h3 className="text-base font-bold text-gray-800 mb-3">
-                Đơn hàng ({getTotalItems()} sản phẩm)
+            <div className="bg-white border-2 border-gray-200 rounded-lg p-5 sticky top-6 shadow-sm">
+              <h3 className="text-base font-bold text-gray-800 mb-4 flex items-center justify-between">
+                <span>Chi tiết đơn hàng</span>
+                <span className="text-sm font-normal text-gray-600">({getTotalItems()} sản phẩm)</span>
               </h3>
               
               {/* Danh sách sản phẩm */}
-              <div className="space-y-3 mb-4 max-h-48 overflow-y-auto pt-2 pr-1">
-                {cartItems.map((item, index) => (
-                  <div key={index} className="flex gap-3 pb-3 border-b border-gray-100">
-                    <div className="relative flex-shrink-0 w-14 h-14">
-                      <img
-                        src={buildImageUrl(item.sanPham?.HinhAnhURL)}
-                        alt={item.sanPham?.Ten}
-                        className="w-full h-full object-cover rounded-lg border"
-                        onError={handleImageError}
-                      />
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-md z-10">
-                        {item.SoLuong}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm text-gray-800 line-clamp-2">
-                        {item.sanPham?.Ten}
+              <div className="space-y-3 mb-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                {cartItems.map((item, index) => {
+                  // ✅ Hỗ trợ cả 2 format field names
+                  const itemPrice = parseFloat(item.donGia || item.DonGia || 0);
+                  const itemQuantity = parseInt(item.soLuong || item.SoLuong || 0);
+                  const itemImage = item.sanPham?.hinhAnhUrl || item.sanPham?.HinhAnhURL;
+                  const itemName = item.sanPham?.ten || item.sanPham?.Ten;
+                  
+                  return (
+                    <div key={index} className="flex gap-3 pb-3 border-b border-gray-100 hover:bg-gray-50 p-2 rounded-lg transition-colors">
+                      <div className="relative flex-shrink-0 w-16 h-16">
+                        <img
+                          src={buildImageUrl(itemImage)}
+                          alt={itemName}
+                          className="w-full h-full object-cover rounded-lg border-2 border-gray-200"
+                          onError={handleImageError}
+                        />
+                        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[11px] font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-md z-10">
+                          {itemQuantity}
+                        </span>
                       </div>
-                      <div className="text-sm font-semibold text-red-600 mt-1">
-                        {(parseFloat(item.DonGia) * item.SoLuong).toLocaleString('vi-VN')}₫
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-gray-800 line-clamp-2 mb-1">
+                          {itemName}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">
+                            {itemPrice.toLocaleString('vi-VN')}₫ × {itemQuantity}
+                          </span>
+                          <span className="text-sm font-bold text-red-600">
+                            {(itemPrice * itemQuantity).toLocaleString('vi-VN')}₫
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Mã giảm giá */}
-              <div className="mb-3">
+              <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <label className="block text-xs font-semibold text-gray-700 mb-2">
+                  🎟️ Mã giảm giá / Voucher
+                </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Mã giảm giá"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nhập mã giảm giá"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
                   />
-                  <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors">
-                    Sử dụng
+                  <button className="px-4 py-2 bg-yellow-400 text-gray-800 rounded-lg text-sm font-semibold hover:bg-yellow-500 transition-colors">
+                    Áp dụng
                   </button>
                 </div>
               </div>
 
-              {/* Tính toán */}
-              <div className="space-y-2 mb-3 pt-3 border-t border-gray-200">
+              {/* Tính toán chi tiết */}
+              <div className="space-y-3 mb-4 pt-4 border-t-2 border-gray-200">
                 <div className="flex justify-between text-gray-700">
-                  <span>Tạm tính:</span>
-                  <span className="font-medium">{subtotal.toLocaleString('vi-VN')}₫</span>
+                  <span className="flex items-center gap-2">
+                    <span>📦</span>
+                    <span>Tạm tính:</span>
+                  </span>
+                  <span className="font-semibold">{subtotal.toLocaleString('vi-VN')}₫</span>
                 </div>
                 <div className="flex justify-between text-gray-700">
-                  <span>Phí vận chuyển:</span>
-                  <span className="font-medium">{shippingFee.toLocaleString('vi-VN')}₫</span>
+                  <div className="flex items-center gap-2">
+                    <span>🚚</span>
+                    <span>Phí vận chuyển:</span>
+                  </div>
+                  <span className="font-semibold text-green-600">{shippingFee.toLocaleString('vi-VN')}₫</span>
+                </div>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-2 text-xs text-green-800">
+                  💡 Miễn phí ship cho đơn hàng từ 500.000₫
                 </div>
               </div>
 
               {/* Tổng cộng */}
-              <div className="pt-3 border-t-2 border-gray-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-base font-bold text-gray-800">Tổng cộng:</span>
+              <div className="pt-4 border-t-2 border-gray-300 bg-gradient-to-r from-red-50 to-pink-50 -mx-5 -mb-5 px-5 pb-5 rounded-b-lg">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-lg font-bold text-gray-800">Tổng thanh toán:</span>
                   <div className="text-right">
-                    <div className="text-sm text-gray-500">VND</div>
-                    <div className="text-2xl font-bold text-red-600">
+                    <div className="text-xs text-gray-500 mb-1">VND</div>
+                    <div className="text-3xl font-bold text-red-600">
                       {total.toLocaleString('vi-VN')} ₫
                     </div>
                   </div>
+                </div>
+                <div className="text-xs text-gray-600 text-right">
+                  (Đã bao gồm VAT nếu có)
                 </div>
               </div>
 
               {/* Login reminder */}
               {!user && (
-                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-xs text-blue-800">
-                    💡 <strong>Khách hàng thân thiết:</strong> Đăng nhập để tích điểm và nhận ưu đãi!
+                <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-900 font-medium mb-2">
+                    🌟 <strong>Ưu đãi dành cho thành viên:</strong>
                   </p>
-                  <Link to="/login" className="text-xs text-blue-600 hover:underline font-medium mt-1 inline-block">
-                    Đăng nhập ngay →
+                  <ul className="text-xs text-blue-800 space-y-1 mb-2">
+                    <li>• Tích điểm mỗi đơn hàng</li>
+                    <li>• Nhận voucher độc quyền</li>
+                    <li>• Theo dõi đơn hàng dễ dàng</li>
+                  </ul>
+                  <Link to="/login" className="text-xs text-blue-700 hover:text-blue-900 font-bold inline-flex items-center gap-1 hover:underline">
+                    Đăng nhập ngay → 
                   </Link>
                 </div>
               )}

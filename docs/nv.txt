@@ -1,0 +1,21 @@
+Authentication (Login/Register)
+Products (Public)
+Shopping Cart
+Orders
+Payment
+Shipping
+Reviews
+Staff Management
+Admin Management
+Statistics
+
+PHASE 1: Tạo Services (3 giờ) 🔥 Ưu tiên cao nhất
+Tạo 8 services: product, cart, order, payment, shipping, review, staff, admin
+PHASE 2: Refactor Pages (2 giờ)
+Chuyển tất cả pages sang dùng services thay vì gọi API trực tiếp
+PHASE 3: Reviews (2 giờ)
+Triển khai hoàn chỉnh hệ thống đánh giá
+PHASE 4: Staff Management (2 giờ)
+Tạo dashboard và quản lý đơn hàng cho nhân viên
+PHASE 5: Shipping (2 giờ)
+Hoàn thiện quản lý địa chỉ và tính phí vận chuyển

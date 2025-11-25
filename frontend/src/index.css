@@ -47,9 +47,9 @@
 
 /* 🎨 Custom Components */
 @layer components {
-  /* Container */
+  /* Container - ✅ TĂNG WIDTH, GIẢM PADDING */
   .container-cute {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+    @apply max-w-[1450px] mx-auto px-3 sm:px-4 lg:px-6;
   }
   
   /* Buttons - Dễ thương với bo góc mềm mại */
@@ -181,6 +181,35 @@
   
   .hover-glow {
     @apply transition-shadow duration-300 hover:shadow-cute;
+  }
+
+  /* Category Navigation Bar - Scrollbar hide */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Custom scrollbar cho dropdown */
+  .category-dropdown-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .category-dropdown-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+  
+  .category-dropdown-scrollbar::-webkit-scrollbar-thumb {
+    background: #ffb3d4;
+    border-radius: 10px;
+  }
+  
+  .category-dropdown-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #ff8cbf;
   }
 }
 

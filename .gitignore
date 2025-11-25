@@ -28,6 +28,8 @@ Thumbs.db
 # Build
 build/
 dist/
+frontend/build/
+backend/dist/
 
 # Uploads
 backend/uploads/*

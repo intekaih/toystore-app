@@ -14,9 +14,37 @@ class DTOMapper {
   /**
    * Chuyển string từ PascalCase sang camelCase
    * VD: "TenSanPham" -> "tenSanPham"
+   *     "ID" -> "id"
+   *     "URL" -> "url"
+   *     "SanPhamID" -> "sanPhamId"  ✅ QUAN TRỌNG
    */
   static toCamelCaseString(str) {
     if (!str || typeof str !== 'string') return str;
+    
+    // ✅ XỬ LÝ TRƯỜNG HỢP ĐẶC BIỆT: Các field viết hoa toàn bộ
+    // ID, URL, VAT, API, HTML, JSON, XML, etc.
+    if (str === str.toUpperCase() && str.length <= 5) {
+      return str.toLowerCase();
+    }
+    
+    // ✅ XỬ LÝ TRƯỜNG HỢP ĐẶC BIỆT: Field kết thúc bằng "ID"
+    // VD: "SanPhamID" -> "sanPhamId", "TaiKhoanID" -> "taiKhoanId"
+    if (str.endsWith('ID') && str.length > 2) {
+      const base = str.slice(0, -2); // Lấy phần trước "ID"
+      const camelBase = base.charAt(0).toLowerCase() + base.slice(1);
+      return camelBase + 'Id'; // Thêm "Id" (lowercase d)
+    }
+    
+    // ✅ XỬ LÝ TRƯỜNG HỢP ĐẶC BIỆT: Field kết thúc bằng "URL"
+    // VD: "HinhAnhURL" -> "hinhAnhUrl"
+    if (str.endsWith('URL') && str.length > 3) {
+      const base = str.slice(0, -3);
+      const camelBase = base.charAt(0).toLowerCase() + base.slice(1);
+      return camelBase + 'Url';
+    }
+    
+    // ✅ XỬ LÝ TRƯỜNG HỢP: Bắt đầu bằng nhiều chữ hoa liên tiếp
+    // VD: "HoTen" -> "hoTen", "URLImage" -> "urlImage"
     return str.charAt(0).toLowerCase() + str.slice(1);
   }
 

@@ -3,11 +3,6 @@
  * MODEL: GioHangKhachVangLai (Guest Cart)
  * =======================================
  * Mục đích: Lưu giỏ hàng của khách vãng lai (không đăng nhập) vào DB
- * Thay thế: localStorage
- * Ưu điểm: 
- * - Đồng bộ 100% với DB
- * - Không bị mất khi đổi thiết bị/trình duyệt
- * - Dễ quản lý và debug
  */
 
 module.exports = (sequelize, DataTypes) => {
@@ -18,17 +13,17 @@ module.exports = (sequelize, DataTypes) => {
       autoIncrement: true,
       field: 'ID'
     },
-    SessionID: {
+    MaPhien: {
       type: DataTypes.STRING(255),
       allowNull: false,
-      field: 'SessionID',
+      field: 'MaPhien',
       validate: {
         notEmpty: {
-          msg: 'Session ID không được để trống'
+          msg: 'Mã phiên không được để trống'
         },
         len: {
           args: [1, 255],
-          msg: 'Session ID phải từ 1-255 ký tự'
+          msg: 'Mã phiên phải từ 1-255 ký tự'
         }
       },
       comment: 'UUID từ frontend để định danh guest user'
@@ -63,7 +58,7 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     DonGia: {
-      type: DataTypes.DECIMAL(15, 0),
+      type: DataTypes.DECIMAL(18, 2),
       allowNull: false,
       field: 'DonGia',
       defaultValue: 0,
@@ -81,50 +76,39 @@ module.exports = (sequelize, DataTypes) => {
         return rawValue ? parseFloat(rawValue) : 0;
       }
     },
-    NgayThem: {
-      type: DataTypes.DATE,
-      allowNull: true, // ✅ Cho phép null trong Sequelize
-      field: 'NgayThem'
-      // SQL Server sẽ tự động điền qua DEFAULT GETDATE()
-    },
-    NgayCapNhat: {
-      type: DataTypes.DATE,
-      allowNull: true, // ✅ Cho phép null trong Sequelize
-      field: 'NgayCapNhat'
-      // SQL Server sẽ tự động điền qua DEFAULT GETDATE()
-    },
-    Enable: {
+    DaChon: {
       type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: true,
-      field: 'Enable'
+      allowNull: true,
+      field: 'DaChon',
+      defaultValue: false,
+      comment: 'Đánh dấu sản phẩm được chọn để thanh toán'
+    },
+    NgayHetHan: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'NgayHetHan',
+      comment: 'Ngày hết hạn giỏ hàng (để cleanup tự động)'
     }
   }, {
     tableName: 'GioHangKhachVangLai',
     timestamps: false,
     indexes: [
       {
-        name: 'IX_GioHangKhachVangLai_SessionID',
-        fields: ['SessionID']
+        name: 'IX_GioHangKhachVangLai_MaPhien',
+        fields: ['MaPhien']
       },
       {
-        name: 'IX_GioHangKhachVangLai_NgayThem',
-        fields: ['NgayThem']
-      },
-      {
-        name: 'UQ_GuestCart_Session_Product',
+        name: 'UQ_GuestCart_MaPhien_Product',
         unique: true,
-        fields: ['SessionID', 'SanPhamID']
+        fields: ['MaPhien', 'SanPhamID']
       }
     ]
-    // ❌ XÓA hook beforeUpdate - để SQL Server tự động cập nhật
   });
 
   // =======================================
   // ASSOCIATIONS (Mối quan hệ)
   // =======================================
   GioHangKhachVangLai.associate = (models) => {
-    // Một giỏ hàng guest thuộc về một sản phẩm
     GioHangKhachVangLai.belongsTo(models.SanPham, {
       foreignKey: 'SanPhamID',
       as: 'sanPham',
@@ -134,228 +118,117 @@ module.exports = (sequelize, DataTypes) => {
   };
 
   // =======================================
-  // INSTANCE METHODS (Phương thức instance)
+  // INSTANCE METHODS
   // =======================================
   
-  /**
-   * Tính thành tiền
-   */
   GioHangKhachVangLai.prototype.getThanhTien = function() {
     return this.SoLuong * parseFloat(this.DonGia);
   };
 
-  /**
-   * Kiểm tra giỏ hàng có hết hạn chưa (>7 ngày)
-   */
   GioHangKhachVangLai.prototype.isExpired = function() {
-    const now = new Date();
-    const diffTime = now - this.NgayCapNhat;
-    const diffDays = diffTime / (1000 * 60 * 60 * 24);
-    return diffDays > 7;
+    if (!this.NgayHetHan) return false;
+    return new Date() > new Date(this.NgayHetHan);
   };
 
   // =======================================
-  // CLASS METHODS (Phương thức static)
+  // CLASS METHODS
   // =======================================
   
-  /**
-   * Lấy giỏ hàng theo SessionID
-   * @param {string} sessionId - UUID của guest user
-   * @param {object} models - Danh sách models
-   * @returns {Promise<Array>}
-   */
-  GioHangKhachVangLai.getCartBySession = async function(sessionId, models) {
+  GioHangKhachVangLai.getCartBySession = async function(maPhien, models) {
     return await this.findAll({
       where: {
-        SessionID: sessionId,
-        Enable: true
+        MaPhien: maPhien
       },
       include: [{
         model: models.SanPham,
         as: 'sanPham',
-        where: { Enable: true },
+        where: { TrangThai: true },
         required: true,
-        attributes: ['ID', 'Ten', 'GiaBan', 'Ton', 'HinhAnhURL', 'LoaiID'],
+        attributes: ['ID', 'Ten', 'GiaBan', 'SoLuongTon', 'HinhAnhURL', 'LoaiID'],
         include: [{
           model: models.LoaiSP,
-          as: 'loaiSP', // ✅ SỬA: 'loai' → 'loaiSP'
+          as: 'loaiSP',
           attributes: ['ID', 'Ten']
         }]
       }],
-      order: [['NgayThem', 'DESC']]
+      order: [['ID', 'DESC']]
     });
   };
 
-  /**
-   * Thêm sản phẩm vào giỏ hàng guest
-   * @param {string} sessionId - UUID của guest user
-   * @param {number} sanPhamId - ID sản phẩm
-   * @param {number} soLuong - Số lượng
-   * @param {number} donGia - Đơn giá
-   * @returns {Promise<object>}
-   */
-  GioHangKhachVangLai.addToCart = async function(sessionId, sanPhamId, soLuong, donGia) {
-    // ✅ Tìm item hiện có (BẤT KỂ Enable true/false để tránh vi phạm unique constraint)
+  GioHangKhachVangLai.addToCart = async function(maPhien, sanPhamId, soLuong, donGia) {
     const existingItem = await this.findOne({
       where: {
-        SessionID: sessionId,
-        SanPhamID: sanPhamId
-        // ❌ BỎ Enable: true - tìm cả item đã bị soft delete
-      }
-    });
-
-    if (existingItem) {
-      // ✅ Đã tồn tại → cộng dồn số lượng và enable lại
-      await existingItem.update({
-        SoLuong: existingItem.Enable ? existingItem.SoLuong + soLuong : soLuong,
-        Enable: true // Enable lại nếu đã bị soft delete
-      });
-      return existingItem;
-    } else {
-      // ✅ Chưa tồn tại → tạo mới
-      const newItem = await this.create({
-        SessionID: sessionId,
-        SanPhamID: sanPhamId,
-        SoLuong: soLuong,
-        DonGia: donGia,
-        Enable: true
-      });
-      return newItem;
-    }
-  };
-
-  /**
-   * Khôi phục sản phẩm vào giỏ hàng (không cộng dồn số lượng)
-   * Dùng khi thanh toán thất bại
-   * @param {string} sessionId - UUID của guest user
-   * @param {number} sanPhamId - ID sản phẩm
-   * @param {number} soLuong - Số lượng cần khôi phục
-   * @param {number} donGia - Đơn giá
-   * @returns {Promise<object>}
-   */
-  GioHangKhachVangLai.restoreToCart = async function(sessionId, sanPhamId, soLuong, donGia) {
-    // ✅ Tìm item hiện có
-    const existingItem = await this.findOne({
-      where: {
-        SessionID: sessionId,
+        MaPhien: maPhien,
         SanPhamID: sanPhamId
       }
     });
 
     if (existingItem) {
-      // ✅ Đã tồn tại → SET lại số lượng (KHÔNG cộng dồn) và enable lại
       await existingItem.update({
-        SoLuong: soLuong, // ✅ SET = số lượng cần khôi phục (không cộng thêm)
-        DonGia: donGia,
-        Enable: true
+        SoLuong: existingItem.SoLuong + soLuong,
+        DaChon: true // ✅ Tự động chọn khi cập nhật số lượng
       });
       return existingItem;
     } else {
-      // ✅ Chưa tồn tại → tạo mới
       const newItem = await this.create({
-        SessionID: sessionId,
+        MaPhien: maPhien,
         SanPhamID: sanPhamId,
         SoLuong: soLuong,
         DonGia: donGia,
-        Enable: true
+        DaChon: true // ✅ Tự động chọn khi thêm mới
       });
       return newItem;
     }
   };
 
-  /**
-   * Cập nhật số lượng sản phẩm trong giỏ
-   * @param {string} sessionId - UUID của guest user
-   * @param {number} sanPhamId - ID sản phẩm
-   * @param {number} soLuong - Số lượng mới
-   * @returns {Promise<boolean>}
-   */
-  GioHangKhachVangLai.updateQuantity = async function(sessionId, sanPhamId, soLuong) {
+  GioHangKhachVangLai.updateQuantity = async function(maPhien, sanPhamId, soLuong) {
     const [affectedRows] = await this.update(
-      { 
-        SoLuong: soLuong
-        // ❌ XÓA NgayCapNhat - để SQL Server tự động cập nhật qua trigger/default
-      },
+      { SoLuong: soLuong },
       {
         where: {
-          SessionID: sessionId,
-          SanPhamID: sanPhamId,
-          Enable: true
-        }
-      }
-    );
-
-    return affectedRows > 0;
-  };
-
-  /**
-   * Xóa sản phẩm khỏi giỏ hàng (soft delete)
-   * @param {string} sessionId - UUID của guest user
-   * @param {number} sanPhamId - ID sản phẩm
-   * @returns {Promise<boolean>}
-   */
-  GioHangKhachVangLai.removeFromCart = async function(sessionId, sanPhamId) {
-    const [affectedRows] = await this.update(
-      { Enable: false },
-      {
-        where: {
-          SessionID: sessionId,
+          MaPhien: maPhien,
           SanPhamID: sanPhamId
         }
       }
     );
-
     return affectedRows > 0;
   };
 
-  /**
-   * Xóa toàn bộ giỏ hàng của guest
-   * @param {string} sessionId - UUID của guest user
-   * @returns {Promise<boolean>}
-   */
-  GioHangKhachVangLai.clearCart = async function(sessionId) {
-    const [affectedRows] = await this.update(
-      { Enable: false },
-      {
-        where: {
-          SessionID: sessionId
-        }
-      }
-    );
-
-    return affectedRows > 0;
-  };
-
-  /**
-   * Xóa giỏ hàng cũ (>7 ngày) - Chạy tự động
-   * @returns {Promise<number>}
-   */
-  GioHangKhachVangLai.cleanupOldCarts = async function() {
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
+  GioHangKhachVangLai.removeFromCart = async function(maPhien, sanPhamId) {
     const deletedCount = await this.destroy({
       where: {
-        NgayCapNhat: {
-          [sequelize.Sequelize.Op.lt]: sevenDaysAgo
-        }
-      },
-      force: true // Hard delete
+        MaPhien: maPhien,
+        SanPhamID: sanPhamId
+      }
     });
+    return deletedCount > 0;
+  };
 
+  GioHangKhachVangLai.clearCart = async function(maPhien) {
+    const deletedCount = await this.destroy({
+      where: {
+        MaPhien: maPhien
+      }
+    });
+    return deletedCount > 0;
+  };
+
+  GioHangKhachVangLai.cleanupExpired = async function() {
+    const now = new Date();
+    const deletedCount = await this.destroy({
+      where: {
+        NgayHetHan: {
+          [sequelize.Sequelize.Op.lt]: now
+        }
+      }
+    });
     return deletedCount;
   };
 
-  /**
-   * Tính tổng tiền giỏ hàng
-   * @param {string} sessionId - UUID của guest user
-   * @returns {Promise<number>}
-   */
-  GioHangKhachVangLai.getTotalAmount = async function(sessionId) {
+  GioHangKhachVangLai.getTotalAmount = async function(maPhien) {
     const cartItems = await this.findAll({
       where: {
-        SessionID: sessionId,
-        Enable: true
+        MaPhien: maPhien
       },
       attributes: ['SoLuong', 'DonGia']
     });

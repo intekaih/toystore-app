@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getCart, updateCartItem, removeFromCart, clearCart } from '../api/cartApi';
+import { cartService } from '../services'; // ✅ Sử dụng cartService
 import { ShoppingCart, Trash2, Plus, Minus, ArrowRight, ArrowLeft, Package, Truck, Shield, RefreshCw } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import { Button, Badge, Loading, Modal } from '../components/ui';
@@ -11,33 +11,16 @@ import config from '../config';
 const CartPage = () => {
   const API_BASE_URL = config.API_BASE_URL;
   
-  // Build full image URL
   const buildImageUrl = (imagePath) => {
     if (!imagePath) return '/barbie.jpg';
-    
-    // Nếu đã là full URL (http/https)
-    if (imagePath.startsWith('http')) {
-      return imagePath;
-    }
-    
-    // Nếu bắt đầu với /uploads/
-    if (imagePath.startsWith('/uploads/')) {
-      return `${API_BASE_URL}${imagePath}`;
-    }
-    
-    // Nếu chỉ là filename
-    if (!imagePath.startsWith('/')) {
-      return `${API_BASE_URL}/uploads/${imagePath}`;
-    }
-    
+    if (imagePath.startsWith('http')) return imagePath;
+    if (imagePath.startsWith('/uploads/')) return `${API_BASE_URL}${imagePath}`;
+    if (!imagePath.startsWith('/')) return `${API_BASE_URL}/uploads/${imagePath}`;
     return '/barbie.jpg';
   };
   
-  // Handle image error với multiple fallback
   const handleImageError = (e) => {
     console.warn('❌ Lỗi load ảnh trong giỏ hàng:', e.target.src);
-    
-    // Fallback: Thử ảnh barbie.jpg trong public
     if (!e.target.src.includes('barbie.jpg')) {
       e.target.src = '/barbie.jpg';
     }
@@ -53,36 +36,19 @@ const CartPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // ✅ BỎ KIỂM TRA ĐĂNG NHẬP - Cho phép guest xem giỏ hàng
     loadCart();
   }, []);
 
   const loadCart = async () => {
     try {
       setLoading(true);
-      const response = await getCart();
+      
+      // ✅ Sử dụng cartService.getCart()
+      const response = await cartService.getCart();
       
       if (response.success && response.data) {
-        // ✅ Normalize data structure từ API
-        const items = response.data.items || [];
-        const normalizedItems = items.map(item => ({
-          // Đảm bảo có cả 2 format: PascalCase và camelCase
-          ID: item.id || item.ID,
-          SanPhamID: item.sanPhamId || item.SanPhamID,
-          SoLuong: item.soLuong || item.SoLuong,
-          DonGia: item.donGia || item.DonGia,
-          sanPham: {
-            ID: item.sanPham?.id || item.sanPham?.ID,
-            Ten: item.sanPham?.ten || item.sanPham?.Ten,
-            GiaBan: item.sanPham?.giaBan || item.sanPham?.GiaBan,
-            Ton: item.sanPham?.ton || item.sanPham?.Ton,
-            HinhAnhURL: item.sanPham?.hinhAnhURL || item.sanPham?.HinhAnhURL
-          }
-        }));
-        
-        setCartItems(normalizedItems);
-        
-        console.log('✅ Đã load giỏ hàng:', normalizedItems);
+        setCartItems(response.data);
+        console.log('✅ Đã load giỏ hàng:', response.data);
       }
     } catch (error) {
       console.error('Error loading cart:', error);
@@ -97,50 +63,56 @@ const CartPage = () => {
   };
 
   const handleIncrement = async (item) => {
-    const productId = item.SanPhamID;
-    const currentQuantity = item.SoLuong;
-    const maxStock = item.sanPham.Ton;
+    // 🔍 DEBUG: Log để xem cấu trúc item
+    console.log('🔍 handleIncrement - item:', item);
+    console.log('🔍 handleIncrement - item.sanPhamId:', item.sanPhamId);
+    console.log('🔍 handleIncrement - item keys:', Object.keys(item));
+    
+    const productId = item.sanPhamId; // ✅ Sửa từ SanPhamID → sanPhamId
+    const currentQuantity = item.soLuong; // ✅ Sửa từ SoLuong → soLuong
+    const maxStock = item.sanPham.soLuongTon;
+
+    console.log('🔍 handleIncrement - productId:', productId);
+    console.log('🔍 handleIncrement - currentQuantity:', currentQuantity);
 
     if (currentQuantity >= maxStock) {
       showToast(`Chỉ còn ${maxStock} sản phẩm trong kho`, 'warning');
       return;
     }
 
-    const newQuantity = currentQuantity + 1;
-    await updateQuantity(productId, newQuantity, item.sanPham.Ten);
+    await updateQuantity(productId, currentQuantity + 1, item.sanPham.ten);
   };
 
   const handleDecrement = async (item) => {
-    const productId = item.SanPhamID;
-    const currentQuantity = item.SoLuong;
+    const productId = item.sanPhamId; // ✅ Sửa từ SanPhamID → sanPhamId
+    const currentQuantity = item.soLuong; // ✅ Sửa từ SoLuong → soLuong
 
     if (currentQuantity <= 1) {
       setShowDeleteConfirm({ 
         productId, 
-        productName: item.sanPham.Ten 
+        productName: item.sanPham.ten
       });
       return;
     }
 
-    const newQuantity = currentQuantity - 1;
-    await updateQuantity(productId, newQuantity, item.sanPham.Ten);
+    await updateQuantity(productId, currentQuantity - 1, item.sanPham.ten);
   };
 
   const updateQuantity = async (productId, newQuantity, productName) => {
     try {
       setUpdating(prev => ({ ...prev, [productId]: true }));
 
-      const response = await updateCartItem(productId, newQuantity);
+      // ✅ Sử dụng cartService.updateQuantity()
+      const response = await cartService.updateQuantity(productId, newQuantity);
 
       if (response.success) {
         setCartItems(prevItems =>
           prevItems.map(item =>
-            item.SanPhamID === productId
-              ? { ...item, SoLuong: newQuantity }
+            item.sanPhamId === productId // ✅ Sửa từ SanPhamID → sanPhamId
+              ? { ...item, soLuong: newQuantity } // ✅ Sửa từ SoLuong → soLuong
               : item
           )
         );
-
         showToast(`Cập nhật số lượng "${productName}" thành công`, 'success', 2000);
       }
     } catch (error) {
@@ -155,11 +127,12 @@ const CartPage = () => {
     try {
       setUpdating(prev => ({ ...prev, [productId]: true }));
 
-      const response = await removeFromCart(productId);
+      // ✅ Sử dụng cartService.removeFromCart()
+      const response = await cartService.removeFromCart(productId);
 
       if (response.success) {
         setCartItems(prevItems => 
-          prevItems.filter(item => item.SanPhamID !== productId)
+          prevItems.filter(item => item.sanPhamId !== productId) // ✅ Sửa từ SanPhamID → sanPhamId
         );
         showToast(`Đã xóa "${productName}" khỏi giỏ hàng`, 'success');
       }
@@ -176,7 +149,8 @@ const CartPage = () => {
     try {
       setLoading(true);
 
-      const response = await clearCart();
+      // ✅ Sử dụng cartService.clearCart()
+      const response = await cartService.clearCart();
 
       if (response.success) {
         setCartItems([]);
@@ -193,12 +167,94 @@ const CartPage = () => {
 
   const calculateTotal = () => {
     return cartItems.reduce((total, item) => {
-      return total + (parseFloat(item.DonGia) * item.SoLuong);
+      return total + (parseFloat(item.donGia) * item.soLuong); // ✅ Sửa từ DonGia → donGia, SoLuong → soLuong
     }, 0);
   };
 
   const getTotalItems = () => {
-    return cartItems.reduce((total, item) => total + item.SoLuong, 0);
+    return cartItems.reduce((total, item) => total + item.soLuong, 0); // ✅ Sửa từ SoLuong → soLuong
+  };
+
+  // ✅ HÀM KIỂM TRA THÔNG TIN ĐÃ ĐẦY ĐỦ CHƯA
+  const checkCustomerInfoComplete = () => {
+    const STORAGE_KEY = 'checkout_customer_info';
+    const savedInfo = localStorage.getItem(STORAGE_KEY);
+    
+    if (!savedInfo) {
+      return false;
+    }
+
+    try {
+      const info = JSON.parse(savedInfo);
+      
+      // ✅ Kiểm tra tất cả các trường bắt buộc
+      const isComplete = !!(
+        info.hoTen?.trim() &&
+        info.email?.trim() &&
+        info.dienThoai?.trim() &&
+        info.diaChi?.trim() &&
+        info.tinhThanhCode &&
+        info.tinhThanhName &&
+        info.quanHuyenCode &&
+        info.quanHuyenName &&
+        info.phuongXaCode &&
+        info.phuongXaName
+      );
+
+      console.log('✅ Kiểm tra thông tin khách hàng:', {
+        isComplete,
+        hasName: !!info.hoTen,
+        hasEmail: !!info.email,
+        hasPhone: !!info.dienThoai,
+        hasAddress: !!info.diaChi,
+        hasProvince: !!info.tinhThanhCode,
+        hasDistrict: !!info.quanHuyenCode,
+        hasWard: !!info.phuongXaCode
+      });
+
+      return isComplete;
+    } catch (e) {
+      console.error('❌ Lỗi khi parse thông tin:', e);
+      return false;
+    }
+  };
+
+  // ✅ HÀM XỬ LÝ KHI NHẤN "TIẾN HÀNH THANH TOÁN"
+  const handleCheckout = () => {
+    const isInfoComplete = checkCustomerInfoComplete();
+
+    if (isInfoComplete) {
+      // ✅ Thông tin đã đầy đủ → Chuyển thẳng sang trang chọn phương thức thanh toán
+      const savedInfo = JSON.parse(localStorage.getItem('checkout_customer_info'));
+      
+      showToast('Thông tin giao hàng đã sẵn sàng! 🎉', 'success', 2000);
+      
+      setTimeout(() => {
+        navigate('/payment-method', {
+          state: {
+            customerInfo: {
+              hoTen: savedInfo.hoTen,
+              email: savedInfo.email,
+              dienThoai: savedInfo.dienThoai,
+              diaChi: savedInfo.diaChi,
+              // ✅ GỬI TÊN (để hiển thị)
+              tinhThanh: savedInfo.tinhThanhName,
+              quanHuyen: savedInfo.quanHuyenName,
+              phuongXa: savedInfo.phuongXaName,
+              // ✅ THÊM: GỬI MÃ (cho GHN API)
+              maTinhID: savedInfo.tinhThanhCode,
+              maQuanID: savedInfo.quanHuyenCode,
+              maPhuongXa: savedInfo.phuongXaCode,
+              ghiChu: ''
+            }
+          }
+        });
+      }, 500);
+    } else {
+      // ❌ Thông tin chưa đầy đủ → Chuyển đến trang checkout để nhập
+      console.log('⚠️ Thông tin chưa đầy đủ, chuyển đến trang checkout');
+      navigate('/checkout');
+    }
   };
 
   if (loading) {
@@ -266,17 +322,17 @@ const CartPage = () => {
 
             {/* Items List */}
             {cartItems.map((item) => {
-              const isUpdating = updating[item.SanPhamID];
-              const itemTotal = parseFloat(item.DonGia) * item.SoLuong;
-              const isOutOfStock = item.sanPham.Ton <= 0;
-              const isMaxQuantity = item.SoLuong >= item.sanPham.Ton;
+              const isUpdating = updating[item.sanPhamId]; // ✅ Sửa từ SanPhamID → sanPhamId
+              const itemTotal = parseFloat(item.donGia) * item.soLuong; // ✅ Sửa từ DonGia → donGia, SoLuong → soLuong
+              const isOutOfStock = item.sanPham.soLuongTon <= 0;
+              const isMaxQuantity = item.soLuong >= item.sanPham.soLuongTon; // ✅ Sửa từ SoLuong → soLuong
               
               // Build image URL từ backend
-              const imageUrl = buildImageUrl(item.sanPham.HinhAnhURL);
+              const imageUrl = buildImageUrl(item.sanPham.hinhAnhUrl); // ✅ Sửa từ hinhAnhURL → hinhAnhUrl
 
               return (
                 <div 
-                  key={item.ID} 
+                  key={item.id} // ✅ Sửa từ ID → id
                   className={`bg-white rounded-cute shadow-soft border-2 border-primary-100 p-4 transition-all ${
                     isUpdating ? 'opacity-50' : ''
                   } ${isOutOfStock ? 'bg-gray-50' : ''}`}
@@ -286,7 +342,7 @@ const CartPage = () => {
                     <div className="relative w-full md:w-24 h-24 flex-shrink-0">
                       <img
                         src={imageUrl}
-                        alt={item.sanPham.Ten}
+                        alt={item.sanPham.ten}
                         className="w-full h-full object-cover rounded-cute"
                         onError={handleImageError}
                         loading="lazy"
@@ -298,27 +354,25 @@ const CartPage = () => {
                       )}
                     </div>
 
-                    {/* Product Info */}
                     <div className="flex-1 min-w-0">
                       <Link 
-                        to={`/products/${item.SanPhamID}`}
+                        to={`/products/${item.sanPhamId}`}
                         className="text-lg font-bold text-gray-800 hover:text-primary-600 transition-colors line-clamp-1"
                       >
-                        {item.sanPham.Ten}
+                        {item.sanPham.ten}
                       </Link>
                       <div className="text-xl font-bold text-primary-600 mt-1">
-                        {parseFloat(item.DonGia).toLocaleString('vi-VN')} ₫
+                        {parseFloat(item.donGia).toLocaleString('vi-VN')} ₫
                       </div>
                       <div className="text-sm text-gray-600 mt-1">
                         {isOutOfStock ? (
                           <Badge variant="danger" size="sm">🚫 Hết hàng</Badge>
                         ) : (
-                          <span>Còn {item.sanPham.Ton} sản phẩm</span>
+                          <span>Còn {item.sanPham.soLuongTon} sản phẩm</span>
                         )}
                       </div>
                     </div>
 
-                    {/* Quantity Control */}
                     <div className="flex flex-col items-end gap-3">
                       <div className="flex items-center gap-2">
                         <button
@@ -330,7 +384,7 @@ const CartPage = () => {
                         </button>
                         
                         <div className="w-16 text-center font-bold text-lg">
-                          {item.SoLuong}
+                          {item.soLuong}
                         </div>
                         
                         <button
@@ -351,8 +405,8 @@ const CartPage = () => {
 
                       <button
                         onClick={() => setShowDeleteConfirm({ 
-                          productId: item.SanPhamID, 
-                          productName: item.sanPham.Ten 
+                          productId: item.sanPhamId, // ✅ Sửa từ SanPhamID → sanPhamId
+                          productName: item.sanPham.ten 
                         })}
                         disabled={isUpdating}
                         className="text-red-500 hover:text-red-700 disabled:opacity-50 transition-colors"
@@ -414,7 +468,7 @@ const CartPage = () => {
                   size="lg"
                   fullWidth
                   icon={<ArrowRight size={20} />}
-                  onClick={() => navigate('/checkout')}
+                  onClick={handleCheckout}
                 >
                   Tiến Hành Thanh Toán
                 </Button>

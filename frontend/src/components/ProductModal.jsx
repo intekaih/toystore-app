@@ -1,68 +1,103 @@
 // src/components/ProductModal.jsx
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Edit, FileText, Tag, FolderOpen, Camera, Folder, Check, Save, Loader, X } from 'lucide-react';
 import config from '../config';
+import adminService from '../services/adminService';
+import AutocompleteInput from './AutocompleteInput';
 import '../styles/ProductModal.css';
 
-const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, mode }) => {
+const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, brands, mode, onRefreshData }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    Ten: '',
-    MoTa: '',
-    GiaBan: '',
-    Ton: '',
-    LoaiID: '',
-    Enable: true
+    ten: '',
+    moTa: '',
+    giaBan: '',
+    soLuongTon: '',
+    loaiID: '',
+    thuongHieuID: '',
+    enable: true
   });
 
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Reset form khi modal đóng/mở hoặc chuyển mode
+  const [categoryData, setCategoryData] = useState({ id: null, ten: '' });
+  const [brandData, setBrandData] = useState({ id: null, tenThuongHieu: '' });
+  const [newCategories, setNewCategories] = useState([]);
+  const [newBrands, setNewBrands] = useState([]);
+
   useEffect(() => {
     if (isOpen) {
       if (mode === 'edit' && editingProduct) {
-        setFormData({
-          Ten: editingProduct.ten || '',
-          MoTa: editingProduct.moTa || '',
-          GiaBan: editingProduct.giaBan || '',
-          Ton: editingProduct.ton || '',
-          LoaiID: editingProduct.loaiID || '', // Sửa từ loaiId thành loaiID
-          Enable: editingProduct.enable !== undefined ? editingProduct.enable : true
-        });
+        const stock = editingProduct.soLuongTon !== undefined ? editingProduct.soLuongTon :
+                     editingProduct.SoLuongTon !== undefined ? editingProduct.SoLuongTon :
+                     editingProduct.Ton !== undefined ? editingProduct.Ton :
+                     editingProduct.ton !== undefined ? editingProduct.ton : '';
         
-        // Set preview cho ảnh cũ sử dụng config.getImageUrl()
-        setImagePreview(
-          editingProduct.hinhAnhURL 
-            ? config.getImageUrl(editingProduct.hinhAnhURL)
-            : null
-        );
+        setFormData({
+          ten: editingProduct.ten || '',
+          moTa: editingProduct.moTa || '',
+          giaBan: editingProduct.giaBan || '',
+          soLuongTon: stock,
+          loaiID: editingProduct.loaiID || '',
+          thuongHieuID: editingProduct.thuongHieuID || '',
+          enable: editingProduct.enable !== undefined ? editingProduct.enable : true
+        });
+
+        const category = categories.find(c => c.id === editingProduct.loaiID);
+        if (category) {
+          setCategoryData({ id: category.id, ten: category.ten });
+        }
+
+        const brand = brands.find(b => b.id === editingProduct.thuongHieuID);
+        if (brand) {
+          setBrandData({ id: brand.id, tenThuongHieu: brand.tenThuongHieu });
+        }
+
+        if (editingProduct.hinhAnhURL) {
+          try {
+            const urls = JSON.parse(editingProduct.hinhAnhURL);
+            if (Array.isArray(urls)) {
+              setImagePreviews(urls.map(url => config.getImageUrl(url)));
+            } else {
+              setImagePreviews([config.getImageUrl(editingProduct.hinhAnhURL)]);
+            }
+          } catch {
+            setImagePreviews([config.getImageUrl(editingProduct.hinhAnhURL)]);
+          }
+        }
       } else {
         setFormData({
-          Ten: '',
-          MoTa: '',
-          GiaBan: '',
-          Ton: '',
-          LoaiID: '',
-          Enable: true
+          ten: '',
+          moTa: '',
+          giaBan: '',
+          soLuongTon: '',
+          loaiID: '',
+          thuongHieuID: '',
+          enable: true
         });
-        setImagePreview(null);
+        setCategoryData({ id: null, ten: '' });
+        setBrandData({ id: null, tenThuongHieu: '' });
+        setImagePreviews([]);
       }
-      setImageFile(null);
+      setImageFiles([]);
       setErrors({});
+      setNewCategories([]);
+      setNewBrands([]);
     }
-  }, [isOpen, mode, editingProduct]);
+  }, [isOpen, mode, editingProduct, categories, brands]);
 
-  // Xử lý thay đổi input
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
-    
-    // Xóa lỗi khi user bắt đầu nhập
+
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -71,105 +106,161 @@ const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, m
     }
   };
 
-  // Xử lý upload ảnh
   const handleImageChange = (e) => {
-    const file = e.target.files[0];
+    const files = Array.from(e.target.files);
     
-    if (file) {
-      // Validate file
-      const maxSize = 5 * 1024 * 1024; // 5MB
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-      
+    if (files.length === 0) return;
+
+    const maxSize = 5 * 1024 * 1024;
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    const maxImages = 5;
+
+    if (imageFiles.length + files.length > maxImages) {
+      setErrors(prev => ({
+        ...prev,
+        hinhAnh: `Tối đa ${maxImages} ảnh`
+      }));
+      return;
+    }
+
+    const validFiles = [];
+    const newPreviews = [];
+
+    for (const file of files) {
       if (!allowedTypes.includes(file.type)) {
         setErrors(prev => ({
           ...prev,
           hinhAnh: 'Chỉ chấp nhận file ảnh (JPEG, PNG, GIF, WEBP)'
         }));
-        return;
+        continue;
       }
-      
+
       if (file.size > maxSize) {
         setErrors(prev => ({
           ...prev,
           hinhAnh: 'Kích thước ảnh không được vượt quá 5MB'
         }));
-        return;
+        continue;
       }
-      
-      setImageFile(file);
-      
-      // Tạo preview
+
+      validFiles.push(file);
+
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result);
+        newPreviews.push(reader.result);
+        if (newPreviews.length === validFiles.length) {
+          setImagePreviews(prev => [...prev, ...newPreviews]);
+        }
       };
       reader.readAsDataURL(file);
-      
-      // Xóa lỗi nếu có
-      if (errors.hinhAnh) {
-        setErrors(prev => ({
-          ...prev,
-          hinhAnh: ''
-        }));
+    }
+
+    setImageFiles(prev => [...prev, ...validFiles]);
+
+    if (errors.hinhAnh && validFiles.length > 0) {
+      setErrors(prev => ({
+        ...prev,
+        hinhAnh: ''
+      }));
+    }
+  };
+
+  const handleRemoveImage = (index) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const searchCategories = async (query) => {
+    try {
+      const response = await adminService.searchCategories(query);
+      if (response.success) {
+        return response.data.categories || [];
       }
+      return [];
+    } catch (error) {
+      console.error('❌ Lỗi tìm kiếm danh mục:', error);
+      return [];
     }
   };
 
-  // Xóa ảnh
-  const handleRemoveImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const searchBrands = async (query) => {
+    try {
+      const response = await adminService.searchBrands(query);
+      if (response.success) {
+        return response.data.brands || [];
+      }
+      return [];
+    } catch (error) {
+      console.error('❌ Lỗi tìm kiếm thương hiệu:', error);
+      return [];
     }
   };
 
-  // Validate form
+  const handleCategorySelect = (item) => {
+    if (item.isNew) {
+      setCategoryData({ id: null, ten: item.ten, isNew: true });
+      setFormData(prev => ({ ...prev, loaiID: '' }));
+      setNewCategories([...newCategories, item.ten]);
+    } else {
+      setCategoryData({ id: item.id, ten: item.ten });
+      setFormData(prev => ({ ...prev, loaiID: item.id }));
+    }
+    
+    if (errors.loaiID) {
+      setErrors(prev => ({ ...prev, loaiID: '' }));
+    }
+  };
+
+  const handleBrandSelect = (item) => {
+    if (item.isNew) {
+      setBrandData({ id: null, tenThuongHieu: item.tenThuongHieu, isNew: true });
+      setFormData(prev => ({ ...prev, thuongHieuID: '' }));
+      setNewBrands([...newBrands, item.tenThuongHieu]);
+    } else {
+      setBrandData({ id: item.id, tenThuongHieu: item.tenThuongHieu });
+      setFormData(prev => ({ ...prev, thuongHieuID: item.id }));
+    }
+  };
+
   const validateForm = () => {
     const newErrors = {};
 
-    // Validate tên sản phẩm
-    if (!formData.Ten.trim()) {
-      newErrors.Ten = 'Tên sản phẩm là bắt buộc';
-    } else if (formData.Ten.trim().length < 3) {
-      newErrors.Ten = 'Tên sản phẩm phải có ít nhất 3 ký tự';
-    } else if (formData.Ten.trim().length > 200) {
-      newErrors.Ten = 'Tên sản phẩm không được vượt quá 200 ký tự';
+    if (!formData.ten.trim()) {
+      newErrors.ten = 'Tên sản phẩm là bắt buộc';
+    } else if (formData.ten.trim().length < 3) {
+      newErrors.ten = 'Tên sản phẩm phải có ít nhất 3 ký tự';
+    } else if (formData.ten.trim().length > 200) {
+      newErrors.ten = 'Tên sản phẩm không được vượt quá 200 ký tự';
     }
 
-    // Validate giá bán
-    if (!formData.GiaBan) {
-      newErrors.GiaBan = 'Giá bán là bắt buộc';
-    } else if (isNaN(formData.GiaBan) || parseFloat(formData.GiaBan) < 0) {
-      newErrors.GiaBan = 'Giá bán phải là số dương';
-    } else if (parseFloat(formData.GiaBan) > 1000000000) {
-      newErrors.GiaBan = 'Giá bán không hợp lệ';
+    if (!formData.giaBan) {
+      newErrors.giaBan = 'Giá bán là bắt buộc';
+    } else if (isNaN(formData.giaBan) || parseFloat(formData.giaBan) < 0) {
+      newErrors.giaBan = 'Giá bán phải là số dương';
+    } else if (parseFloat(formData.giaBan) > 1000000000) {
+      newErrors.giaBan = 'Giá bán không hợp lệ';
     }
 
-    // Validate tồn kho
-    if (!formData.Ton && formData.Ton !== 0) {
-      newErrors.Ton = 'Tồn kho là bắt buộc';
-    } else if (isNaN(formData.Ton) || parseInt(formData.Ton) < 0) {
-      newErrors.Ton = 'Tồn kho phải là số không âm';
-    } else if (!Number.isInteger(parseFloat(formData.Ton))) {
-      newErrors.Ton = 'Tồn kho phải là số nguyên';
+    if (!formData.soLuongTon && formData.soLuongTon !== 0) {
+      newErrors.soLuongTon = 'Tồn kho là bắt buộc';
+    } else if (isNaN(formData.soLuongTon) || parseInt(formData.soLuongTon) < 0) {
+      newErrors.soLuongTon = 'Tồn kho phải là số không âm';
+    } else if (!Number.isInteger(parseFloat(formData.soLuongTon))) {
+      newErrors.soLuongTon = 'Tồn kho phải là số nguyên';
     }
 
-    // Validate loại sản phẩm
-    if (!formData.LoaiID) {
-      newErrors.LoaiID = 'Vui lòng chọn loại sản phẩm';
+    if (!formData.loaiID && !categoryData.isNew) {
+      newErrors.loaiID = 'Vui lòng chọn hoặc nhập danh mục';
     }
 
-    // Validate ảnh (chỉ bắt buộc khi tạo mới)
-    if (mode === 'create' && !imageFile) {
-      newErrors.hinhAnh = 'Vui lòng chọn ảnh sản phẩm';
+    if (mode === 'create' && imageFiles.length === 0) {
+      newErrors.hinhAnh = 'Vui lòng chọn ít nhất 1 ảnh sản phẩm';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Submit form
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -180,156 +271,242 @@ const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, m
     setIsSubmitting(true);
 
     try {
-      // Tạo FormData để gửi file
-      const submitData = new FormData();
-      submitData.append('Ten', formData.Ten.trim());
-      submitData.append('MoTa', formData.MoTa.trim() || '');
-      submitData.append('GiaBan', parseFloat(formData.GiaBan));
-      submitData.append('Ton', parseInt(formData.Ton));
-      submitData.append('LoaiID', parseInt(formData.LoaiID));
-      submitData.append('Enable', formData.Enable ? 'true' : 'false');
-      
-      // Thêm file ảnh nếu có
-      if (imageFile) {
-        submitData.append('hinhAnh', imageFile);
+      let categoryId = formData.loaiID;
+      let brandId = formData.thuongHieuID;
+
+      if (categoryData.isNew && categoryData.ten) {
+        const catResponse = await adminService.createCategory({ Ten: categoryData.ten });
+        if (catResponse.success) {
+          categoryId = catResponse.data.category.id;
+          if (onRefreshData) onRefreshData();
+        }
       }
 
-      // Debug: Log FormData content
-      console.log('📤 Sending FormData:');
-      for (let pair of submitData.entries()) {
-        console.log(pair[0] + ':', pair[1]);
+      if (brandData.isNew && brandData.tenThuongHieu) {
+        const brandResponse = await adminService.createBrand({ TenThuongHieu: brandData.tenThuongHieu });
+        if (brandResponse.success) {
+          brandId = brandResponse.data.brand.id;
+          if (onRefreshData) onRefreshData();
+        }
       }
+
+      const submitData = new FormData();
+      submitData.append('Ten', formData.ten.trim());
+      submitData.append('MoTa', formData.moTa.trim() || '');
+      submitData.append('GiaBan', parseFloat(formData.giaBan));
+      submitData.append('Ton', parseInt(formData.soLuongTon));
+      submitData.append('LoaiID', parseInt(categoryId));
+      if (brandId) {
+        submitData.append('ThuongHieuID', parseInt(brandId));
+      }
+      submitData.append('Enable', formData.enable ? 'true' : 'false');
+
+      imageFiles.forEach((file, index) => {
+        submitData.append('hinhAnh', file);
+      });
 
       await onSubmit(submitData);
-      // onClose sẽ được gọi từ parent component sau khi submit thành công
     } catch (error) {
       console.error('Error submitting form:', error);
-      // Lỗi sẽ được xử lý ở component cha
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleNavigateToCategories = () => {
+    navigate('/admin/categories');
+    onClose();
+  };
+
+  const handleNavigateToBrands = () => {
+    navigate('/admin/brands');
+    onClose();
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content product-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-content product-modal-wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{mode === 'create' ? '➕ Thêm sản phẩm mới' : '✏️ Cập nhật sản phẩm'}</h2>
-          <button className="close-btn" onClick={onClose} disabled={isSubmitting}>×</button>
+          <h2 className="flex items-center gap-2">
+            {mode === 'create' ? (
+              <>
+                <Plus size={18} />
+                Thêm sản phẩm mới
+              </>
+            ) : (
+              <>
+                <Edit size={18} />
+                Cập nhật sản phẩm
+              </>
+            )}
+          </h2>
+          <button className="close-btn" onClick={onClose} disabled={isSubmitting}>
+            <X size={20} />
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="product-form">
-          <div className="form-body">
-            {/* Tên sản phẩm */}
-            <div className="form-group">
-              <label htmlFor="Ten">
-                Tên sản phẩm <span className="required">*</span>
-              </label>
-              <input
-                type="text"
-                id="Ten"
-                name="Ten"
-                value={formData.Ten}
-                onChange={handleChange}
-                className={errors.Ten ? 'error' : ''}
-                disabled={isSubmitting}
-                placeholder="Nhập tên sản phẩm (VD: Búp bê Barbie)"
-                maxLength={200}
-              />
-              {errors.Ten && <span className="error-message">{errors.Ten}</span>}
-              <div className="char-count">{formData.Ten.length}/200 ký tự</div>
-            </div>
-
-            {/* Mô tả */}
-            <div className="form-group">
-              <label htmlFor="MoTa">Mô tả sản phẩm</label>
-              <textarea
-                id="MoTa"
-                name="MoTa"
-                value={formData.MoTa}
-                onChange={handleChange}
-                className={errors.MoTa ? 'error' : ''}
-                disabled={isSubmitting}
-                placeholder="Nhập mô tả chi tiết về sản phẩm..."
-                rows={4}
-                maxLength={1000}
-              />
-              {errors.MoTa && <span className="error-message">{errors.MoTa}</span>}
-              <div className="char-count">{formData.MoTa.length}/1000 ký tự</div>
-            </div>
-
-            {/* Row: Giá bán và Tồn kho */}
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="GiaBan">
-                  Giá bán (VNĐ) <span className="required">*</span>
-                </label>
+        <form onSubmit={handleSubmit} className="product-form-wide">
+          <div className="form-body-grid">
+            <div className="form-column">
+              <h3 className="column-title flex items-center gap-2">
+                <FileText size={16} />
+                Thông tin cơ bản
+              </h3>
+              
+              <div className="form-group-compact">
+                <label htmlFor="ten">Tên sản phẩm <span className="required">*</span></label>
                 <input
-                  type="number"
-                  id="GiaBan"
-                  name="GiaBan"
-                  value={formData.GiaBan}
+                  type="text"
+                  id="ten"
+                  name="ten"
+                  value={formData.ten}
                   onChange={handleChange}
-                  className={errors.GiaBan ? 'error' : ''}
+                  className={errors.ten ? 'error' : ''}
                   disabled={isSubmitting}
-                  placeholder="VD: 150000"
-                  min="0"
-                  step="1000"
+                  placeholder="Nhập tên sản phẩm"
+                  maxLength={200}
                 />
-                {errors.GiaBan && <span className="error-message">{errors.GiaBan}</span>}
+                {errors.ten && <span className="error-message">{errors.ten}</span>}
               </div>
 
-              <div className="form-group">
-                <label htmlFor="Ton">
-                  Tồn kho <span className="required">*</span>
+              <div className="form-row-compact">
+                <div className="form-group-compact">
+                  <label htmlFor="giaBan">Giá bán (VNĐ) <span className="required">*</span></label>
+                  <input
+                    type="number"
+                    id="giaBan"
+                    name="giaBan"
+                    value={formData.giaBan}
+                    onChange={handleChange}
+                    className={errors.giaBan ? 'error' : ''}
+                    disabled={isSubmitting}
+                    placeholder="150000"
+                    min="0"
+                    step="1000"
+                  />
+                  {errors.giaBan && <span className="error-message">{errors.giaBan}</span>}
+                </div>
+
+                <div className="form-group-compact">
+                  <label htmlFor="soLuongTon">Tồn kho <span className="required">*</span></label>
+                  <input
+                    type="number"
+                    id="soLuongTon"
+                    name="soLuongTon"
+                    value={formData.soLuongTon}
+                    onChange={handleChange}
+                    className={errors.soLuongTon ? 'error' : ''}
+                    disabled={isSubmitting}
+                    placeholder="100"
+                    min="0"
+                    step="1"
+                  />
+                  {errors.soLuongTon && <span className="error-message">{errors.soLuongTon}</span>}
+                </div>
+              </div>
+
+              <div className="form-group-compact">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    name="enable"
+                    checked={formData.enable}
+                    onChange={handleChange}
+                    disabled={isSubmitting}
+                  />
+                  <span>Hiển thị sản phẩm</span>
                 </label>
-                <input
-                  type="number"
-                  id="Ton"
-                  name="Ton"
-                  value={formData.Ton}
-                  onChange={handleChange}
-                  className={errors.Ton ? 'error' : ''}
-                  disabled={isSubmitting}
-                  placeholder="VD: 100"
-                  min="0"
-                  step="1"
-                />
-                {errors.Ton && <span className="error-message">{errors.Ton}</span>}
               </div>
             </div>
 
-            {/* Loại sản phẩm */}
-            <div className="form-group">
-              <label htmlFor="LoaiID">
-                Loại sản phẩm <span className="required">*</span>
-              </label>
-              <select
-                id="LoaiID"
-                name="LoaiID"
-                value={formData.LoaiID}
-                onChange={handleChange}
-                className={errors.LoaiID ? 'error' : ''}
-                disabled={isSubmitting}
-              >
-                <option value="">-- Chọn loại sản phẩm --</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.ten}
-                  </option>
-                ))}
-              </select>
-              {errors.LoaiID && <span className="error-message">{errors.LoaiID}</span>}
+            <div className="form-column">
+              <h3 className="column-title flex items-center gap-2">
+                <Tag size={16} />
+                Phân loại & Thương hiệu
+              </h3>
+
+              <div className="form-group-compact">
+                <div className="flex items-center justify-between mb-2">
+                  <label>Danh mục <span className="required">*</span></label>
+                  <button
+                    type="button"
+                    onClick={handleNavigateToCategories}
+                    className="btn-navigate-sm"
+                    title="Quản lý danh mục"
+                  >
+                    <FolderOpen size={16} />
+                  </button>
+                </div>
+                <AutocompleteInput
+                  value={categoryData}
+                  onSelect={handleCategorySelect}
+                  searchFunction={searchCategories}
+                  placeholder="Nhập hoặc chọn..."
+                  required
+                  error={errors.loaiID}
+                  disabled={isSubmitting}
+                  displayKey="ten"
+                  valueKey="id"
+                  createText="Tạo mới"
+                />
+              </div>
+
+              <div className="form-group-compact">
+                <div className="flex items-center justify-between mb-2">
+                  <label>Thương hiệu</label>
+                  <button
+                    type="button"
+                    onClick={handleNavigateToBrands}
+                    className="btn-navigate-sm"
+                    title="Quản lý thương hiệu"
+                  >
+                    <Tag size={16} />
+                  </button>
+                </div>
+                <AutocompleteInput
+                  value={brandData}
+                  onSelect={handleBrandSelect}
+                  searchFunction={searchBrands}
+                  placeholder="Nhập hoặc chọn..."
+                  disabled={isSubmitting}
+                  displayKey="tenThuongHieu"
+                  valueKey="id"
+                  createText="Tạo mới"
+                />
+              </div>
+
+              <div className="form-group-compact">
+                <label htmlFor="moTa">Mô tả sản phẩm</label>
+                <textarea
+                  id="moTa"
+                  name="moTa"
+                  value={formData.moTa}
+                  onChange={handleChange}
+                  className={errors.moTa ? 'error' : ''}
+                  disabled={isSubmitting}
+                  placeholder="Nhập mô tả..."
+                  rows={4}
+                  maxLength={1000}
+                />
+                {errors.moTa && <span className="error-message">{errors.moTa}</span>}
+              </div>
             </div>
 
-            {/* Upload ảnh */}
-            <div className="form-group">
-              <label htmlFor="hinhAnh">
-                Hình ảnh sản phẩm {mode === 'create' && <span className="required">*</span>}
-              </label>
-              <div className="image-upload-container">
+            <div className="form-column">
+              <h3 className="column-title flex items-center gap-2">
+                <Camera size={16} />
+                Hình ảnh (Tối đa 5)
+              </h3>
+
+              <div className="form-group-compact">
+                <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-700 font-medium flex items-center gap-2">
+                    💡 <span>Ảnh đầu tiên bạn chọn sẽ là <strong>ảnh chính</strong> hiển thị trên danh sách sản phẩm</span>
+                  </p>
+                </div>
+
                 <input
                   type="file"
                   id="hinhAnh"
@@ -338,75 +515,76 @@ const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, m
                   onChange={handleImageChange}
                   ref={fileInputRef}
                   disabled={isSubmitting}
+                  multiple
                   style={{ display: 'none' }}
                 />
-                
-                {imagePreview ? (
-                  <div className="image-preview-box">
-                    <img src={imagePreview} alt="Preview" className="image-preview" />
+
+                <button
+                  type="button"
+                  className="btn-upload-compact flex items-center justify-center gap-2"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isSubmitting || imagePreviews.length >= 5}
+                >
+                  <Folder size={16} />
+                  Chọn ảnh ({imagePreviews.length}/5)
+                </button>
+                {errors.hinhAnh && <span className="error-message">{errors.hinhAnh}</span>}
+              </div>
+
+              <div className="image-grid-compact">
+                {imagePreviews.map((preview, index) => (
+                  <div key={index} className="image-item-compact relative">
+                    <img src={preview} alt={`Preview ${index + 1}`} />
+                    {index === 0 && (
+                      <div className="absolute top-1 left-1 bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                        Ảnh chính
+                      </div>
+                    )}
                     <button
                       type="button"
-                      className="btn-remove-image"
-                      onClick={handleRemoveImage}
+                      className="btn-remove-compact"
+                      onClick={() => handleRemoveImage(index)}
                       disabled={isSubmitting}
                     >
-                      ❌ Xóa ảnh
+                      <X size={14} />
                     </button>
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn-upload-image"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isSubmitting}
-                  >
-                    📁 Chọn ảnh
-                  </button>
-                )}
-              </div>
-              {errors.hinhAnh && <span className="error-message">{errors.hinhAnh}</span>}
-              <div className="image-hint">
-                Định dạng: JPEG, PNG, GIF, WEBP. Kích thước tối đa: 5MB
+                ))}
               </div>
             </div>
-
-            {/* Trạng thái */}
-            <div className="form-group">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  name="Enable"
-                  checked={formData.Enable}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                />
-                <span>Hiển thị sản phẩm (Enable)</span>
-              </label>
-            </div>
-
-            {mode === 'edit' && editingProduct && (
-              <div className="info-box">
-                <span className="info-icon">ℹ️</span>
-                <span>Sản phẩm ID: <strong>#{editingProduct.id}</strong></span>
-              </div>
-            )}
           </div>
 
           <div className="modal-footer">
             <button
               type="button"
-              className="btn-cancel"
+              className="btn-cancel flex items-center gap-2"
               onClick={onClose}
               disabled={isSubmitting}
             >
-              ❌ Hủy
+              <X size={16} />
+              Hủy
             </button>
             <button
               type="submit"
-              className="btn-submit"
+              className="btn-submit flex items-center gap-2"
               disabled={isSubmitting}
             >
-              {isSubmitting ? '⏳ Đang xử lý...' : mode === 'create' ? '✅ Tạo mới' : '💾 Cập nhật'}
+              {isSubmitting ? (
+                <>
+                  <Loader className="animate-spin" size={16} />
+                  Đang xử lý...
+                </>
+              ) : mode === 'create' ? (
+                <>
+                  <Check size={16} />
+                  Tạo mới
+                </>
+              ) : (
+                <>
+                  <Save size={16} />
+                  Cập nhật
+                </>
+              )}
             </button>
           </div>
         </form>

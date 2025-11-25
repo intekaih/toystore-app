@@ -22,10 +22,8 @@ const formatUserData = (userData) => {
   
   console.log('🔄 Formatting user data:', userData);
   
-  // Xác định giá trị Enable/enable một cách chính xác
-  const enableValue = userData.Enable !== undefined 
-    ? userData.Enable 
-    : (userData.enable !== undefined ? userData.enable : true);
+  // ✅ Backend luôn trả về enable (camelCase), không cần fallback Enable nữa
+  const enableValue = userData.enable !== undefined ? userData.enable : true;
   
   const formatted = {
     id: userData.ID || userData.id,
@@ -35,9 +33,7 @@ const formatUserData = (userData) => {
     dienThoai: userData.DienThoai || userData.dienThoai,
     vaiTro: userData.VaiTro || userData.vaiTro || userData.role,
     ngayTao: userData.NgayTao || userData.ngayTao,
-    enable: enableValue,
-    // Giữ lại các trường gốc để tương thích ngược
-    Enable: enableValue // Đồng bộ cả 2 trường
+    enable: enableValue
   };
   
   console.log('✅ Formatted user data:', formatted);
@@ -180,6 +176,9 @@ export const AuthProvider = ({ children }) => {
     error,
     isLoggedIn: () => authService.isLoggedIn(),
     isAdmin: () => authService.isAdmin(),
+    isStaff: () => authService.isStaff(),
+    isAdminOrStaff: () => authService.isAdminOrStaff(),
+    getUserRole: () => authService.getUserRole(),
   };
 
   return (

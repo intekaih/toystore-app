@@ -71,11 +71,6 @@ module.exports = (sequelize) => {
       defaultValue: 1,
       comment: 'Mỗi người dùng được dùng tối đa bao nhiêu lần'
     },
-    ApDungChoKhachVangLai: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true,
-      comment: 'Có áp dụng cho khách vãng lai không'
-    },
     TrangThai: {
       type: DataTypes.STRING(20),
       defaultValue: 'HoatDong',
@@ -83,34 +78,6 @@ module.exports = (sequelize) => {
         isIn: [['HoatDong', 'TamDung', 'HetHan']]
       },
       comment: 'Trạng thái voucher'
-    },
-    Enable: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true
-    },
-    NgayTao: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW
-    },
-    NguoiTao: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      references: {
-        model: 'TaiKhoan',
-        key: 'ID'
-      }
-    },
-    NgayCapNhat: {
-      type: DataTypes.DATE,
-      allowNull: true
-    },
-    NguoiCapNhat: {
-      type: DataTypes.INTEGER,
-      allowNull: true,
-      references: {
-        model: 'TaiKhoan',
-        key: 'ID'
-      }
     }
   }, {
     tableName: 'Voucher',
@@ -125,11 +92,6 @@ module.exports = (sequelize) => {
   // ✅ PHƯƠNG THỨC KIỂM TRA VOUCHER HỢP LỆ
   Voucher.prototype.isValid = function(tongTienSanPham, taiKhoanId = null) {
     const now = new Date();
-    
-    // Kiểm tra enable
-    if (!this.Enable) {
-      return { valid: false, message: 'Voucher đã bị vô hiệu hóa' };
-    }
     
     // Kiểm tra trạng thái
     if (this.TrangThai !== 'HoatDong') {
@@ -150,10 +112,7 @@ module.exports = (sequelize) => {
       return { valid: false, message: 'Voucher đã hết số lượng' };
     }
     
-    // Kiểm tra khách vãng lai
-    if (!taiKhoanId && !this.ApDungChoKhachVangLai) {
-      return { valid: false, message: 'Voucher không áp dụng cho khách vãng lai' };
-    }
+    // ✅ Voucher chỉ áp dụng cho toàn đơn hàng (ToanDon)
     
     // Kiểm tra giá trị đơn hàng tối thiểu
     if (tongTienSanPham < this.DonHangToiThieu) {

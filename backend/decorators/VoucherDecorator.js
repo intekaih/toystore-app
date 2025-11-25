@@ -37,20 +37,27 @@ class VoucherDecorator extends OrderPriceDecorator {
       }
     }
 
-    // Tính giảm giá
-    if (this.voucherInfo.type === 'PERCENT') {
-      // Giảm theo phần trăm
+    // ✅ FIX: Voucher PHẦN TRĂM chỉ tính trên GIÁ GỐC SẢN PHẨM (không tính VAT)
+    if (this.voucherInfo.type === 'PhanTram' || this.voucherInfo.type === 'PERCENT') {
+      // Lấy giá gốc sản phẩm từ details (trước VAT)
+      const previousDetails = this.calculator.getDetails();
+      const basePrice = new Decimal(previousDetails.tongTienSanPham || subtotal);
+      
+      // Tính giảm giá trên giá gốc
       const discountRate = new Decimal(this.voucherInfo.value).dividedBy(100);
-      discountAmount = subtotal.times(discountRate);
+      discountAmount = basePrice.times(discountRate);
+
+      console.log(`🎟️ Voucher ${this.voucherInfo.value}% trên giá gốc ${basePrice.toFixed(2)} = ${discountAmount.toFixed(2)}`);
 
       // Áp dụng giảm giá tối đa nếu có
       if (this.voucherInfo.maxDiscount) {
         const maxDiscount = new Decimal(this.voucherInfo.maxDiscount);
         if (discountAmount.greaterThan(maxDiscount)) {
           discountAmount = maxDiscount;
+          console.log(`🎟️ Áp dụng giảm tối đa: ${maxDiscount.toFixed(2)}`);
         }
       }
-    } else if (this.voucherInfo.type === 'FIXED') {
+    } else if (this.voucherInfo.type === 'TienMat' || this.voucherInfo.type === 'FIXED') {
       // Giảm cố định
       discountAmount = new Decimal(this.voucherInfo.value);
     }
@@ -90,10 +97,12 @@ class VoucherDecorator extends OrderPriceDecorator {
     }
 
     if (isApplied) {
-      // Tính giảm giá
-      if (this.voucherInfo.type === 'PERCENT') {
+      // ✅ FIX: Voucher PHẦN TRĂM tính trên GIÁ GỐC (tongTienSanPham)
+      if (this.voucherInfo.type === 'PhanTram' || this.voucherInfo.type === 'PERCENT') {
+        // Lấy giá gốc sản phẩm từ details (trước VAT)
+        const basePrice = new Decimal(previousDetails.tongTienSanPham || subtotal);
         const discountRate = new Decimal(this.voucherInfo.value).dividedBy(100);
-        discountAmount = subtotal.times(discountRate);
+        discountAmount = basePrice.times(discountRate);
 
         if (this.voucherInfo.maxDiscount) {
           const maxDiscount = new Decimal(this.voucherInfo.maxDiscount);
@@ -102,7 +111,7 @@ class VoucherDecorator extends OrderPriceDecorator {
             message = `Đã áp dụng giảm tối đa ${maxDiscount.toFixed(0).toLocaleString('vi-VN')}đ`;
           }
         }
-      } else if (this.voucherInfo.type === 'FIXED') {
+      } else if (this.voucherInfo.type === 'TienMat' || this.voucherInfo.type === 'FIXED') {
         discountAmount = new Decimal(this.voucherInfo.value);
       }
 
@@ -115,6 +124,7 @@ class VoucherDecorator extends OrderPriceDecorator {
     return {
       ...previousDetails,
       voucher: {
+        voucherId: this.voucherInfo.voucherId, // ✅ THÊM DÒNG NÀY: Trả về ID để controller lưu vào DB
         code: this.voucherInfo.code,
         type: this.voucherInfo.type,
         value: this.voucherInfo.value,

@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const SanPham = db.SanPham;
 const LoaiSP = db.LoaiSP;
 const ChiTietHoaDon = db.ChiTietHoaDon;
+const DTOMapper = require('../utils/DTOMapper');
 
 // 🎯 Import Strategy Pattern
 const FilterContext = require('../strategies/FilterContext');
@@ -24,6 +25,7 @@ exports.getAllProducts = async (req, res) => {
     const minPrice = req.query.minPrice ? parseFloat(req.query.minPrice) : null;
     const maxPrice = req.query.maxPrice ? parseFloat(req.query.maxPrice) : null;
     const categoryId = req.query.categoryId ? parseInt(req.query.categoryId) : null;
+    const brandId = req.query.brandId ? parseInt(req.query.brandId) : null; // ✅ THÊM brandId
     
     const offset = (page - 1) * limit;
 
@@ -44,7 +46,7 @@ exports.getAllProducts = async (req, res) => {
 
     // Tạo điều kiện tìm kiếm
     const whereCondition = {
-      Enable: true
+      TrangThai: true
     };
 
     // Thêm điều kiện tìm kiếm theo tên nếu có
@@ -59,6 +61,11 @@ exports.getAllProducts = async (req, res) => {
       whereCondition.LoaiID = categoryId;
     }
 
+    // ✅ THÊM: Lọc theo brandId nếu có
+    if (brandId) {
+      whereCondition.ThuongHieuID = brandId;
+    }
+
     console.log('🔍 Điều kiện tìm kiếm:', whereCondition);
     console.log('🎯 Filter type:', filterType);
 
@@ -68,8 +75,8 @@ exports.getAllProducts = async (req, res) => {
       {
         model: LoaiSP,
         as: 'loaiSP',
-        attributes: ['ID', 'Ten', 'MoTa'],
-        where: { Enable: true }
+        attributes: ['ID', 'Ten'],
+        where: { TrangThai: true }
       }
     ];
 
@@ -91,11 +98,14 @@ exports.getAllProducts = async (req, res) => {
         'Ten',
         'MoTa', 
         'GiaBan', 
-        'Ton',
+        'SoLuongTon',
         'HinhAnhURL',
         'LoaiID',
+        'ThuongHieuID',
         'NgayTao',
-        'Enable'
+        'TrangThai',
+        'TongSoDanhGia',
+        'DiemTrungBinh'
       ],
       distinct: true
     });
@@ -133,25 +143,30 @@ exports.getAllProducts = async (req, res) => {
     // Lấy base URL từ request
     const baseUrl = `${req.protocol}://${req.get('host')}`;
 
-    // Format dữ liệu trả về theo cấu trúc chuẩn - CHUẨN HÓA THEO DATABASE
-    const products = paginatedProducts.map(product => ({
-      ID: product.ID,
-      Ten: product.Ten,
-      MoTa: product.MoTa,
-      GiaBan: parseFloat(product.GiaBan),
-      Ton: product.Ton,
-      HinhAnhURL: product.HinhAnhURL ? `${baseUrl}${product.HinhAnhURL}` : null,
-      LoaiID: product.LoaiID,
-      NgayTao: product.NgayTao,
-      Enable: product.Enable,
-      // Thêm totalSold nếu là bestSeller strategy
-      ...(product.totalSold !== undefined && { SoLuongBan: product.totalSold }),
-      LoaiSP: product.loaiSP ? {
-        ID: product.loaiSP.ID,
-        Ten: product.loaiSP.Ten,
-        MoTa: product.loaiSP.MoTa
-      } : null
-    }));
+    // ✅ SỬ DỤNG DTOMapper để chuyển đổi PascalCase -> camelCase
+    const products = paginatedProducts.map(product => {
+      const productData = {
+        ID: product.ID,
+        Ten: product.Ten,
+        MoTa: product.MoTa,
+        GiaBan: parseFloat(product.GiaBan),
+        SoLuongTon: product.SoLuongTon,
+        HinhAnhURL: product.HinhAnhURL ? `${baseUrl}${product.HinhAnhURL}` : null,
+        LoaiID: product.LoaiID,
+        ThuongHieuID: product.ThuongHieuID,
+        NgayTao: product.NgayTao,
+        TrangThai: product.TrangThai,
+        TongSoDanhGia: product.TongSoDanhGia,
+        DiemTrungBinh: product.DiemTrungBinh,
+        ...(product.totalSold !== undefined && { SoLuongBan: product.totalSold }),
+        LoaiSP: product.loaiSP ? {
+          ID: product.loaiSP.ID,
+          Ten: product.loaiSP.Ten
+        } : null
+      };
+      
+      return DTOMapper.toCamelCase(productData);
+    });
 
     console.log(`✅ Lấy ${products.length}/${totalProducts} sản phẩm thành công`);
 
@@ -220,20 +235,26 @@ exports.getProductById = async (req, res) => {
       });
     }
 
-    // Truy vấn sản phẩm theo ID với JOIN bảng LoaiSP
+    // Truy vấn sản phẩm theo ID với JOIN bảng LoaiSP và SanPhamHinhAnh
     const product = await SanPham.findOne({
       where: {
         ID: productId,
-        Enable: true
+        TrangThai: true
       },
       include: [
         {
           model: LoaiSP,
           as: 'loaiSP',
-          attributes: ['ID', 'Ten', 'MoTa'],
+          attributes: ['ID', 'Ten'],
           where: {
-            Enable: true
+            TrangThai: true
           }
+        },
+        {
+          model: db.SanPhamHinhAnh,
+          as: 'hinhAnhs',
+          attributes: ['ID', 'DuongDanHinhAnh', 'ThuTu', 'LaMacDinh'],
+          required: false // LEFT JOIN để lấy cả sản phẩm không có ảnh trong bảng SanPhamHinhAnh
         }
       ],
       attributes: [
@@ -241,11 +262,17 @@ exports.getProductById = async (req, res) => {
         'Ten',
         'MoTa',
         'GiaBan',
-        'Ton',
+        'SoLuongTon',
         'HinhAnhURL',
         'LoaiID',
+        'ThuongHieuID',
         'NgayTao',
-        'Enable'
+        'TrangThai',
+        'TongSoDanhGia',
+        'DiemTrungBinh'
+      ],
+      order: [
+        [{ model: db.SanPhamHinhAnh, as: 'hinhAnhs' }, 'ThuTu', 'ASC']
       ]
     });
 
@@ -262,26 +289,38 @@ exports.getProductById = async (req, res) => {
     // Lấy base URL từ request
     const baseUrl = `${req.protocol}://${req.get('host')}`;
 
-    // Format dữ liệu trả về với URL đầy đủ - CHUẨN HÓA THEO DATABASE
-    const productDetail = {
+    // ✅ SỬ DỤNG DTOMapper để chuyển đổi PascalCase -> camelCase
+    const productDetail = DTOMapper.toCamelCase({
       ID: product.ID,
       Ten: product.Ten,
       MoTa: product.MoTa,
-      // Thêm base URL vào đường dẫn ảnh
       HinhAnhURL: product.HinhAnhURL ? `${baseUrl}${product.HinhAnhURL}` : null,
       GiaBan: parseFloat(product.GiaBan),
-      Ton: product.Ton,
+      SoLuongTon: product.SoLuongTon,
       LoaiID: product.LoaiID,
+      ThuongHieuID: product.ThuongHieuID,
       NgayTao: product.NgayTao,
-      Enable: product.Enable,
+      TrangThai: product.TrangThai,
+      TongSoDanhGia: product.TongSoDanhGia,
+      DiemTrungBinh: product.DiemTrungBinh,
       LoaiSP: product.loaiSP ? {
         ID: product.loaiSP.ID,
-        Ten: product.loaiSP.Ten,
-        MoTa: product.loaiSP.MoTa
-      } : null
-    };
+        Ten: product.loaiSP.Ten
+      } : null,
+      HinhAnhs: product.hinhAnhs && product.hinhAnhs.length > 0 ? product.hinhAnhs.map(img => ({
+        ID: img.ID,
+        DuongDanHinhAnh: `${baseUrl}${img.DuongDanHinhAnh}`,
+        ThuTu: img.ThuTu,
+        LaMacDinh: img.LaMacDinh
+      })) : (product.HinhAnhURL ? [{
+        ID: 0,
+        DuongDanHinhAnh: `${baseUrl}${product.HinhAnhURL}`,
+        ThuTu: 0,
+        LaMacDinh: true
+      }] : [])
+    });
 
-    console.log('✅ Lấy chi tiết sản phẩm thành công:', productDetail.Ten);
+    console.log('✅ Lấy chi tiết sản phẩm thành công:', productDetail.ten);
 
     // Trả về thông tin chi tiết sản phẩm
     res.status(200).json({

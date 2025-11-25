@@ -11,11 +11,11 @@ const PriceBreakdown = ({ priceBreakdown, showTitle = true, className = '' }) =>
   }
 
   const {
-    tongTienSanPham = 0,
+    tienGoc = 0,
     vat = null,
     shipping = null,
     voucher = null,
-    tongTienCuoi = 0
+    thanhTien = 0
   } = priceBreakdown;
 
   const formatCurrency = (amount) => {
@@ -37,7 +37,7 @@ const PriceBreakdown = ({ priceBreakdown, showTitle = true, className = '' }) =>
         {/* Tổng tiền sản phẩm */}
         <div className="flex justify-between items-center text-gray-700">
           <span className="text-sm">Tổng tiền sản phẩm</span>
-          <span className="font-medium">{formatCurrency(tongTienSanPham)}</span>
+          <span className="font-medium">{formatCurrency(tienGoc)}</span>
         </div>
 
         {/* VAT */}
@@ -91,7 +91,7 @@ const PriceBreakdown = ({ priceBreakdown, showTitle = true, className = '' }) =>
             Tổng cộng
           </span>
           <span className="text-xl font-bold text-red-600">
-            {formatCurrency(tongTienCuoi)}
+            {formatCurrency(thanhTien)}
           </span>
         </div>
       </div>
@@ -110,7 +110,7 @@ const PriceBreakdown = ({ priceBreakdown, showTitle = true, className = '' }) =>
 
 PriceBreakdown.propTypes = {
   priceBreakdown: PropTypes.shape({
-    tongTienSanPham: PropTypes.number,
+    tienGoc: PropTypes.number,
     vat: PropTypes.shape({
       rate: PropTypes.number,
       ratePercent: PropTypes.string,
@@ -124,7 +124,7 @@ PriceBreakdown.propTypes = {
       code: PropTypes.string,
       discountAmount: PropTypes.number
     }),
-    tongTienCuoi: PropTypes.number
+    thanhTien: PropTypes.number
   }),
   showTitle: PropTypes.bool,
   className: PropTypes.string

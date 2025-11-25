@@ -1,5 +1,6 @@
 import axios from 'axios';
 import config from '../config';
+import { RoleChecker } from '../constants/roles';
 
 const API_URL = config.API_URL; // Sửa từ API_BASE_URL thành API_URL
 
@@ -110,11 +111,26 @@ class AuthService {
   }
 
   /**
+   * Alias cho isLoggedIn() - để tương thích với các service khác
+   */
+  isAuthenticated() {
+    return this.isLoggedIn();
+  }
+
+  /**
    * Lấy token từ localStorage
    */
   getToken() {
     try {
-      return localStorage.getItem(this.TOKEN_KEY);
+      // Thử lấy token user trước
+      let token = localStorage.getItem(this.TOKEN_KEY);
+      
+      // Nếu không có, thử lấy adminToken
+      if (!token) {
+        token = localStorage.getItem('adminToken');
+      }
+      
+      return token;
     } catch (error) {
       console.error('Error getting token:', error);
       return null;
@@ -181,7 +197,37 @@ class AuthService {
    */
   isAdmin() {
     const user = this.getUser();
-    return user && user.vaiTro === 'admin';
+    if (!user) return false;
+    const role = user.vaiTro || user.VaiTro || user.role;
+    return RoleChecker.isAdmin(role);
+  }
+
+  /**
+   * Kiểm tra user có phải nhân viên không
+   */
+  isStaff() {
+    const user = this.getUser();
+    if (!user) return false;
+    const role = user.vaiTro || user.VaiTro || user.role;
+    return RoleChecker.isStaff(role);
+  }
+
+  /**
+   * Kiểm tra user có phải admin hoặc nhân viên không
+   */
+  isAdminOrStaff() {
+    const user = this.getUser();
+    if (!user) return false;
+    const role = user.vaiTro || user.VaiTro || user.role;
+    return RoleChecker.isAdminOrStaff(role);
+  }
+
+  /**
+   * Lấy role của user
+   */
+  getUserRole() {
+    const user = this.getUser();
+    return RoleChecker.getUserRole(user);
   }
 
   /**

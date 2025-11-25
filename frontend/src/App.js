@@ -20,11 +20,21 @@ import AdminLoginPage from './pages/AdminLoginPage.js';
 import AdminDashboard from './pages/AdminDashboard.js';
 import UserManagementPage from './pages/UserManagementPage.js';
 import CategoryManagementPage from './pages/CategoryManagementPage.js';
+import BrandManagementPage from './pages/BrandManagementPage.jsx';
 import ProductManagementPage from './pages/ProductManagementPage.jsx';
 import OrderManagementPage from './pages/OrderManagementPage.jsx';
 import StatisticsPage from './pages/StatisticsPage.jsx';
+import VoucherManagementPage from './pages/VoucherManagementPage.jsx';
+import GHNManagementPage from './pages/GHNManagementPage.jsx';
+import GHNMockTestPage from './pages/GHNMockTestPage.jsx';
+// ✅ THÊM: Import các trang đánh giá
+import ReviewableProductsPage from './pages/ReviewableProductsPage.jsx';
+import AdminReviewManagementPage from './pages/AdminReviewManagementPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.js';
 import AdminRoute from './components/AdminRoute.js';
+// ✅ THÊM: Import StaffRoute và các trang Staff
+import StaffRoute from './components/StaffRoute.js';
+import StaffDashboard from './pages/StaffDashboard.js';
 import './index.css';
 import './App.css';
 
@@ -82,6 +92,15 @@ function App() {
                   </AdminRoute>
                 } 
               />
+              {/* ✅ MỚI: Quản lý Thương hiệu */}
+              <Route 
+                path="/admin/brands" 
+                element={
+                  <AdminRoute>
+                    <BrandManagementPage />
+                  </AdminRoute>
+                } 
+              />
               <Route 
                 path="/admin/products" 
                 element={
@@ -98,12 +117,84 @@ function App() {
                   </AdminRoute>
                 } 
               />
+              {/* ✅ MỚI: Quản lý Voucher */}
+              <Route 
+                path="/admin/vouchers" 
+                element={
+                  <AdminRoute>
+                    <VoucherManagementPage />
+                  </AdminRoute>
+                } 
+              />
+              {/* ✅ MỚI: Quản lý GHN - Theo dõi vận chuyển */}
+              <Route 
+                path="/admin/ghn-tracking" 
+                element={
+                  <AdminRoute>
+                    <GHNManagementPage />
+                  </AdminRoute>
+                } 
+              />
+              {/* ✅ MỚI: GHN Mock Test - Công cụ test mock mode */}
+              <Route 
+                path="/admin/ghn-mock-test" 
+                element={
+                  <AdminRoute>
+                    <GHNMockTestPage />
+                  </AdminRoute>
+                } 
+              />
+              {/* ✅ MỚI: Quản lý Đánh giá (Admin) */}
+              <Route 
+                path="/admin/reviews" 
+                element={
+                  <AdminRoute>
+                    <AdminReviewManagementPage />
+                  </AdminRoute>
+                } 
+              />
               <Route 
                 path="/admin/statistics" 
                 element={
                   <AdminRoute>
                     <StatisticsPage />
                   </AdminRoute>
+                } 
+              />
+              
+              {/* =======================================
+                  STAFF ROUTES - Dành cho Nhân viên
+                  ======================================= */}
+              <Route 
+                path="/staff/dashboard" 
+                element={
+                  <StaffRoute>
+                    <StaffDashboard />
+                  </StaffRoute>
+                } 
+              />
+              <Route 
+                path="/staff/orders" 
+                element={
+                  <StaffRoute>
+                    <OrderManagementPage isStaffView={true} />
+                  </StaffRoute>
+                } 
+              />
+              <Route 
+                path="/staff/orders/:id" 
+                element={
+                  <StaffRoute>
+                    <OrderDetailPage isStaffView={true} />
+                  </StaffRoute>
+                } 
+              />
+              <Route 
+                path="/staff/products" 
+                element={
+                  <StaffRoute>
+                    <ProductManagementPage isStaffView={true} />
+                  </StaffRoute>
                 } 
               />
               
@@ -121,6 +212,15 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <OrderDetailPage />
+                  </ProtectedRoute>
+                } 
+              />
+              {/* ✅ MỚI: Sản phẩm có thể đánh giá (User) */}
+              <Route 
+                path="/reviews/reviewable" 
+                element={
+                  <ProtectedRoute>
+                    <ReviewableProductsPage />
                   </ProtectedRoute>
                 } 
               />

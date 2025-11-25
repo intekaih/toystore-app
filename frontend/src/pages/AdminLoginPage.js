@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { authService } from '../services'; // ✅ Sử dụng authService
 import { Lock, User, ArrowRight, Home, Shield, BarChart3, Users, Package, ShoppingCart } from 'lucide-react';
 import { Button } from '../components/ui';
 import Toast from '../components/Toast';
 import config from '../config';
+import { RoleChecker } from '../constants/roles';
 
 const AdminLoginPage = () => {
   const navigate = useNavigate();
@@ -21,14 +23,11 @@ const AdminLoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    if (user && user.role === 'admin') {
-      navigate('/admin/dashboard', { replace: true });
-    } else if (user && user.role !== 'admin') {
-      setToast({
-        message: 'Bạn không có quyền truy cập trang quản trị',
-        type: 'error',
-        duration: 3000
-      });
+    if (user) {
+      const role = user.vaiTro || user.VaiTro || user.role;
+      if (RoleChecker.isAdminOrStaff(role)) {
+        navigate('/admin/dashboard');
+      }
     }
   }, [user, navigate]);
 
@@ -81,39 +80,28 @@ const AdminLoginPage = () => {
     setLoading(true);
 
     try {
-      const response = await fetch(config.endpoints.auth.adminLogin, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          username: formData.tenDangNhap,
-          password: formData.matKhau
-        })
+      // ✅ Sử dụng authService thay vì fetch trực tiếp
+      const response = await authService.adminLogin({
+        username: formData.tenDangNhap.trim(),
+        password: formData.matKhau
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Đăng nhập thất bại');
+      if (!response.success || !response.data) {
+        throw new Error(response.message || 'Đăng nhập thất bại');
       }
 
-      if (!data.data || !data.data.admin) {
-        throw new Error('Dữ liệu không hợp lệ');
-      }
-
-      const adminUser = data.data.admin;
+      const adminUser = response.data.admin || response.data.user;
       
-      if (adminUser.role !== 'admin') {
+      if (!RoleChecker.isAdmin(adminUser.role || adminUser.vaiTro)) {
         showToast('❌ Bạn không có quyền truy cập trang quản trị', 'error', 4000);
         setLoading(false);
         return;
       }
 
-      localStorage.setItem('token', data.data.token);
-      
+      // authService đã tự động lưu token và user vào localStorage
+      // Cập nhật context
       const userForContext = {
-        id: adminUser.id,
+        id: adminUser.id || adminUser.ID,
         tenDangNhap: adminUser.username || adminUser.tenDangNhap,
         hoTen: adminUser.hoTen || adminUser.HoTen || 'Admin',
         email: adminUser.email || adminUser.Email || '',
@@ -121,8 +109,6 @@ const AdminLoginPage = () => {
         vaiTro: 'admin'
       };
       
-      localStorage.setItem('user', JSON.stringify(userForContext));
-
       setUser(userForContext);
 
       showToast('✅ Đăng nhập thành công! Chào mừng Admin.', 'success', 2000);
@@ -136,8 +122,6 @@ const AdminLoginPage = () => {
       
       if (error.message.includes('không có quyền')) {
         showToast(error.message, 'error', 4000);
-      } else if (error.message.includes('Sai thông tin')) {
-        showToast('❌ Tên đăng nhập hoặc mật khẩu không đúng', 'error');
       } else {
         showToast('❌ ' + (error.message || 'Đăng nhập thất bại. Vui lòng thử lại.'), 'error');
       }

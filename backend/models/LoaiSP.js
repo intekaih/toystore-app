@@ -5,18 +5,15 @@ module.exports = (sequelize, Sequelize) => {
       primaryKey: true,
       autoIncrement: true
     },
-    Ten: {  // Tên cột trong DB là "Ten"
+    Ten: {
       type: Sequelize.STRING(100),
       allowNull: false,
       unique: true
     },
-    MoTa: {
-      type: Sequelize.STRING(500),
-      allowNull: true
-    },
-    Enable: {  // Tên cột trong DB là "Enable"
+    TrangThai: {
       type: Sequelize.BOOLEAN,
-      defaultValue: true
+      defaultValue: true,
+      field: 'TrangThai'
     }
   }, {
     tableName: 'LoaiSP',

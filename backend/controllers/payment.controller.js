@@ -2,6 +2,8 @@ const crypto = require('crypto');
 const querystring = require('qs');
 const vnpayConfig = require('../config/vnpay.config');
 const db = require('../models');
+const DTOMapper = require('../utils/DTOMapper'); // ✅ THÊM DTOMapper
+
 const HoaDon = db.HoaDon;
 const ChiTietHoaDon = db.ChiTietHoaDon;
 
@@ -70,13 +72,13 @@ async function processPaymentSuccess(hoaDon, paymentInfo, transaction) {
   // Lấy chi tiết đơn hàng với sản phẩm
   const chiTietHoaDon = await ChiTietHoaDon.findAll({
     where: {
-      HoaDonID: hoaDon.ID,
-      Enable: true
+      HoaDonID: hoaDon.ID
+      // ✅ XÓA Enable: true vì bảng ChiTietHoaDon KHÔNG có cột Enable
     },
     include: [{
       model: db.SanPham,
       as: 'sanPham',
-      attributes: ['ID', 'Ten', 'Ton']
+      attributes: ['ID', 'Ten', 'SoLuongTon']
     }],
     transaction
   });
@@ -99,13 +101,13 @@ async function processPaymentSuccess(hoaDon, paymentInfo, transaction) {
         available: 0
       });
       console.error(`❌ [${source}] Sản phẩm "${item.sanPham.Ten}" không tồn tại`);
-    } else if (sanPham.Ton < item.SoLuong) {
+    } else if (sanPham.SoLuongTon < item.SoLuong) { // ✅ FIX: Ton → SoLuongTon
       outOfStockItems.push({
         name: sanPham.Ten,
         requested: item.SoLuong,
-        available: sanPham.Ton
+        available: sanPham.SoLuongTon // ✅ FIX: Ton → SoLuongTon
       });
-      console.error(`❌ [${source}] Sản phẩm "${sanPham.Ten}" không đủ hàng: Cần ${item.SoLuong}, Còn ${sanPham.Ton}`);
+      console.error(`❌ [${source}] Sản phẩm "${sanPham.Ten}" không đủ hàng: Cần ${item.SoLuong}, Còn ${sanPham.SoLuongTon}`); // ✅ FIX
     }
   }
 
@@ -126,16 +128,16 @@ async function processPaymentSuccess(hoaDon, paymentInfo, transaction) {
       transaction,
       lock: transaction.LOCK.UPDATE // 🔒 LOCK lại để đảm bảo an toàn
     });
-    const tonTruoc = sanPham.Ton;
+    const tonTruoc = sanPham.SoLuongTon;
     
     // ✅ TRỪ KHO VỚI ĐIỀU KIỆN AN TOÀN
     const [affectedRows] = await db.SanPham.update(
-      { Ton: db.sequelize.literal(`Ton - ${item.SoLuong}`) },
+      { SoLuongTon: db.sequelize.literal(`SoLuongTon - ${item.SoLuong}`) },
       {
         where: { 
           ID: item.SanPhamID,
           // ✅ KIỂM TRA LẠI TỒN KHO NGAY TRƯỚC KHI TRỪ (double-check)
-          Ton: { [db.Sequelize.Op.gte]: item.SoLuong }
+          SoLuongTon: { [db.Sequelize.Op.gte]: item.SoLuong }
         },
         transaction
       }
@@ -150,7 +152,7 @@ async function processPaymentSuccess(hoaDon, paymentInfo, transaction) {
         outOfStockItems: [{
           name: item.sanPham.Ten,
           requested: item.SoLuong,
-          available: sanPham.Ton
+          available: sanPham.SoLuongTon
         }]
       };
     }
@@ -161,11 +163,12 @@ async function processPaymentSuccess(hoaDon, paymentInfo, transaction) {
 
   // ✅ CẬP NHẬT TRẠNG THÁI ĐƠN HÀNG
   await hoaDon.update({
-    TrangThai: 'Đã thanh toán',
-    GhiChu: `Thanh toán VNPay - Mã GD: ${transactionNo} - Ngân hàng: ${bankCode} - Nguồn: ${source}`
+    TrangThai: 'Đã xác nhận', // ✅ FIX: Thanh toán thành công → Đã xác nhận (chờ shop đóng gói và tạo đơn GHN)
+    GhiChu: `Thanh toán VNPay thành công - Mã GD: ${transactionNo} - Ngân hàng: ${bankCode} - Nguồn: ${source}`
   }, { transaction });
 
-  console.log(`✅ [${source}] Cập nhật trạng thái đơn hàng thành công`);
+  console.log(`✅ [${source}] Cập nhật trạng thái đơn hàng thành công → Đã xác nhận`);
+  console.log(`📦 [${source}] Đơn hàng chờ shop đóng gói và tạo đơn GHN`);
 
   return {
     success: true,
@@ -175,13 +178,22 @@ async function processPaymentSuccess(hoaDon, paymentInfo, transaction) {
 
 /**
  * Tạo URL thanh toán VNPay
- * GET /api/payment/vnpay/create-payment-url
+ * POST /api/payment/vnpay/create-payment-url
  */
 exports.createVNPayPaymentUrl = async (req, res) => {
   try {
-    console.log('💳 Tạo URL thanh toán VNPay - Params:', req.query);
+    console.log('💳 Tạo URL thanh toán VNPay - Body:', req.body);
+    
+    // ✅ LOG CONFIG ĐỂ KIỂM TRA
+    console.log('🔧 VNPay Config:', {
+      vnp_TmnCode: vnpayConfig.vnp_TmnCode,
+      vnp_HashSecret: vnpayConfig.vnp_HashSecret ? '***' + vnpayConfig.vnp_HashSecret.slice(-4) : 'MISSING',
+      vnp_Url: vnpayConfig.vnp_Url,
+      vnp_ReturnUrl: vnpayConfig.vnp_ReturnUrl
+    });
 
-    const { orderId, amount, bankCode, language } = req.query;
+    // ✅ FIX: Đọc từ req.body thay vì req.query vì frontend gọi POST với body
+    const { orderId, amount, bankCode, language } = req.body;
     // Không bắt buộc phải có user (hỗ trợ guest checkout)
     const taiKhoanId = req.user?.id;
 
@@ -203,8 +215,8 @@ exports.createVNPayPaymentUrl = async (req, res) => {
     // Kiểm tra đơn hàng có tồn tại không
     const hoaDon = await HoaDon.findOne({
       where: {
-        ID: orderId,
-        Enable: true
+        ID: orderId
+        // ✅ FIX: Xóa Enable: true vì bảng HoaDon không có cột Enable
       },
       include: [{
         model: db.KhachHang,
@@ -222,7 +234,7 @@ exports.createVNPayPaymentUrl = async (req, res) => {
 
     // ✅ VALIDATE AMOUNT - KIỂM TRA SỐ TIỀN KHỚP VỚI ĐƠN HÀNG
     const requestAmount = parseFloat(amount);
-    const orderAmount = parseFloat(hoaDon.TongTien);
+    const orderAmount = parseFloat(hoaDon.ThanhTien);
     
     console.log('💰 Kiểm tra số tiền:', {
       requestAmount: requestAmount,
@@ -235,7 +247,7 @@ exports.createVNPayPaymentUrl = async (req, res) => {
       console.error(`❌ Số tiền không khớp: Request=${requestAmount}, Order=${orderAmount}`);
       return res.status(400).json({
         success: false,
-        message: 'Số tiền thanh toán không khớp với đơn hàng',
+        message: 'Số tiền không khớp với đơn hàng',
         data: {
           requestAmount: requestAmount,
           orderAmount: orderAmount,
@@ -258,16 +270,30 @@ exports.createVNPayPaymentUrl = async (req, res) => {
       });
     }
 
-    // Lấy IP address của client
+    // ✅ FIX: Lấy IP address của client và chuyển đổi IPv6 sang IPv4
     let ipAddr = req.headers['x-forwarded-for'] ||
       req.connection.remoteAddress ||
       req.socket.remoteAddress ||
       req.connection.socket.remoteAddress;
 
-    // Lấy IPv4 nếu có IPv6
-    if (ipAddr && ipAddr.includes('::ffff:')) {
-      ipAddr = ipAddr.split('::ffff:')[1];
+    // ✅ Xử lý IPv6 localhost (::1) và IPv6 mapped IPv4 (::ffff:x.x.x.x)
+    if (ipAddr) {
+      if (ipAddr === '::1' || ipAddr === '::ffff:127.0.0.1') {
+        // Localhost IPv6 → chuyển thành IPv4
+        ipAddr = '127.0.0.1';
+      } else if (ipAddr.includes('::ffff:')) {
+        // IPv6 mapped IPv4 → lấy phần IPv4
+        ipAddr = ipAddr.split('::ffff:')[1];
+      } else if (ipAddr.includes(':') && !ipAddr.includes('.')) {
+        // IPv6 thuần túy → fallback về localhost IPv4
+        ipAddr = '127.0.0.1';
+      }
+    } else {
+      // Fallback mặc định
+      ipAddr = '127.0.0.1';
     }
+
+    console.log('🌐 IP Address:', ipAddr);
 
     // Tạo ngày giờ theo format của VNPay: yyyyMMddHHmmss
     const createDate = new Date();
@@ -426,12 +452,12 @@ exports.vnpayReturn = async (req, res) => {
         {
           model: ChiTietHoaDon,
           as: 'chiTiet',
-          where: { Enable: true },
+          // ✅ XÓA where: { Enable: true } vì bảng ChiTietHoaDon KHÔNG có cột Enable
           required: false,
           include: [{
             model: db.SanPham,
             as: 'sanPham',
-            attributes: ['ID', 'Ten', 'Ton', 'HinhAnhURL']
+            attributes: ['ID', 'Ten', 'SoLuongTon', 'HinhAnhURL']
           }]
         }
       ],
@@ -446,7 +472,7 @@ exports.vnpayReturn = async (req, res) => {
     }
 
     // ✅ VALIDATE AMOUNT - KIỂM TRA SỐ TIỀN KHỚP VỚI ĐƠN HÀNG
-    const orderAmount = parseFloat(hoaDon.TongTien);
+    const orderAmount = parseFloat(hoaDon.ThanhTien);
     if (orderAmount !== vnp_Amount) {
       await transaction.rollback();
       console.error(`❌ Return URL - Số tiền không khớp: Order=${orderAmount}, VNPay=${vnp_Amount}`);
@@ -559,7 +585,7 @@ exports.vnpayReturn = async (req, res) => {
               price: item.DonGia,
               quantity: item.SoLuong,
               image: item.sanPham.HinhAnhURL || '',
-              stock: item.sanPham.Ton
+              stock: item.sanPham.SoLuongTon
             }))) : '[]'
           });
           
@@ -620,7 +646,7 @@ exports.vnpayReturn = async (req, res) => {
           price: item.DonGia,
           quantity: item.SoLuong,
           image: item.sanPham.HinhAnhURL || '',
-          stock: item.sanPham.Ton
+          stock: item.sanPham.SoLuongTon
         }))) : '[]'
       });
       
@@ -629,11 +655,81 @@ exports.vnpayReturn = async (req, res) => {
 
   } catch (error) {
     // Rollback transaction nếu có lỗi
-    await transaction.rollback();
+    if (transaction) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError) {
+        console.error('❌ Lỗi khi rollback transaction:', rollbackError);
+      }
+    }
     
     console.error('❌ Lỗi xử lý VNPay return:', error);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    return res.redirect(`${frontendUrl}/payment/return?success=false&message=Server_error`);
+    
+    // ✅ CỐ GẮNG LẤY THÔNG TIN TỪ URL ĐỂ TRUYỀN VỀ FRONTEND
+    try {
+      const vnp_TxnRef = req.query['vnp_TxnRef'];
+      const vnp_Amount = req.query['vnp_Amount'] ? parseFloat(req.query['vnp_Amount']) / 100 : 0;
+      const orderCode = vnp_TxnRef ? vnp_TxnRef.split('_')[0] : '';
+      
+      console.log('📋 Cố gắng lấy thông tin đơn hàng từ DB:', orderCode);
+      
+      // Cố gắng lấy thông tin đơn hàng từ DB (KHÔNG dùng transaction)
+      let orderId = '';
+      let cartItemsJson = '[]';
+      
+      if (orderCode) {
+        const hoaDon = await HoaDon.findOne({
+          where: { MaHD: orderCode },
+          include: [{
+            model: ChiTietHoaDon,
+            as: 'chiTiet',
+            // ✅ XÓA where: { Enable: true } vì bảng ChiTietHoaDon KHÔNG có cột Enable
+            required: false,
+            include: [{
+              model: db.SanPham,
+              as: 'sanPham',
+              attributes: ['ID', 'Ten', 'HinhAnhURL', 'SoLuongTon']
+            }]
+          }]
+          // ✅ KHÔNG dùng transaction vì đã bị rollback
+        });
+        
+        if (hoaDon) {
+          orderId = hoaDon.ID;
+          cartItemsJson = JSON.stringify(hoaDon.chiTiet.map(item => ({
+            id: item.SanPhamID,
+            name: item.sanPham.Ten,
+            price: item.DonGia,
+            quantity: item.SoLuong,
+            image: item.sanPham.HinhAnhURL || '',
+            stock: item.sanPham.SoLuongTon
+          })));
+          console.log('✅ Đã lấy được thông tin đơn hàng:', orderId);
+        } else {
+          console.warn('⚠️ Không tìm thấy đơn hàng trong DB');
+        }
+      }
+      
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const redirectParams = new URLSearchParams({
+        success: 'false',
+        responseCode: '99',
+        message: encodeURIComponent('Đã xảy ra lỗi khi xử lý thanh toán. Vui lòng thử lại hoặc liên hệ hỗ trợ.'),
+        txnRef: vnp_TxnRef || '',
+        amount: vnp_Amount || 0,
+        orderId: orderId,
+        orderCode: orderCode,
+        cartItems: cartItemsJson
+      });
+      
+      console.log('🔗 Redirect với params đầy đủ:', redirectParams.toString());
+      return res.redirect(`${frontendUrl}/payment/return?${redirectParams.toString()}`);
+    } catch (fallbackError) {
+      console.error('❌ Lỗi khi xử lý fallback redirect:', fallbackError);
+      // Fallback cuối cùng - chỉ message
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/payment/return?success=false&message=Server_error`);
+    }
   }
 };
 
@@ -699,12 +795,12 @@ exports.vnpayIPN = async (req, res) => {
         {
           model: ChiTietHoaDon,
           as: 'chiTiet',
-          where: { Enable: true },
+          // ✅ XÓA where: { Enable: true } vì bảng ChiTietHoaDon KHÔNG có cột Enable
           required: false,
           include: [{
             model: db.SanPham,
             as: 'sanPham',
-            attributes: ['ID', 'Ten', 'Ton']
+            attributes: ['ID', 'Ten', 'SoLuongTon']
           }]
         }
       ],
@@ -721,7 +817,7 @@ exports.vnpayIPN = async (req, res) => {
     }
 
     // Kiểm tra số tiền
-    if (parseFloat(hoaDon.TongTien) !== vnp_Amount) {
+    if (parseFloat(hoaDon.ThanhTien) !== vnp_Amount) {
       await transaction.rollback();
       console.error('❌ IPN - Số tiền không khớp');
       return res.status(200).json({

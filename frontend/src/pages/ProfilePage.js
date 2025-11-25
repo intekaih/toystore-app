@@ -5,6 +5,7 @@ import { User, Mail, Phone, Calendar, Shield, Edit, Home, ShoppingBag, RefreshCw
 import MainLayout from '../layouts/MainLayout';
 import { Button, Badge, Loading } from '../components/ui';
 import LogoutButton from '../components/LogoutButton';
+import { RoleChecker } from '../constants/roles';
 
 const ProfilePage = () => {
   const { user, refreshUser, loading: authLoading } = useAuth();
@@ -13,6 +14,14 @@ const ProfilePage = () => {
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   const navigate = useNavigate();
+
+  const getRoleDisplay = () => {
+    if (!user) return null;
+    const role = user.vaiTro || user.VaiTro || user.role;
+    return RoleChecker.getDisplayInfo(role);
+  };
+
+  const roleDisplay = getRoleDisplay();
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -137,12 +146,15 @@ const ProfilePage = () => {
                   {user.hoTen || 'Chưa cập nhật'}
                 </h3>
                 <p className="text-gray-600 mb-3">@{user.tenDangNhap}</p>
-                <Badge 
-                  variant={user.vaiTro === 'admin' ? 'danger' : 'success'}
-                  size="lg"
-                >
-                  {user.vaiTro === 'admin' ? '👑 Admin' : '👤 User'}
-                </Badge>
+                {/* ✅ Sử dụng roleDisplay thay vì hardcode */}
+                {roleDisplay && (
+                  <Badge 
+                    variant={roleDisplay.color}
+                    size="lg"
+                  >
+                    {roleDisplay.icon} {roleDisplay.label}
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
@@ -184,17 +196,32 @@ const ProfilePage = () => {
                   <Shield className="text-primary-500" size={20} />
                   <strong className="text-gray-700">Trạng thái</strong>
                 </div>
-                <p className={`ml-8 font-bold ${
-                  (user.enable !== undefined ? user.enable : user.Enable) 
-                    ? 'text-green-600' 
-                    : 'text-red-600'
+                <p className={`ml-8 font-bold flex items-center gap-2 ${
+                  user.enable ? 'text-green-600' : 'text-red-600'
                 }`}>
-                  {(user.enable !== undefined ? user.enable : user.Enable) 
-                    ? '🟢 Hoạt động' 
-                    : '🔴 Bị khóa'
-                  }
+                  {user.enable ? (
+                    <>
+                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                      Hoạt động
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                      Bị khóa
+                    </>
+                  )}
                 </p>
               </div>
+            </div>
+
+            {/* Role Badge */}
+            <div className="flex items-center gap-2">
+              <span className="text-gray-600">Vai trò:</span>
+              {roleDisplay && (
+                <Badge variant={roleDisplay.color}>
+                  {roleDisplay.icon} {roleDisplay.label}
+                </Badge>
+              )}
             </div>
 
             {/* Actions */}

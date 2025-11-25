@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import config from '../config';
-import { X, ShoppingCart, Heart, Package, Tag, Star } from 'lucide-react';
+import { X, ShoppingCart, Heart, Package, Tag, Star, Minus, Plus } from 'lucide-react';
 import { Modal, Badge, Button } from './ui';
+import reviewService from '../services/reviewService';
 
 /**
  * 👁️ ProductQuickViewModal - Modal xem nhanh sản phẩm
@@ -15,6 +16,27 @@ const ProductQuickViewModal = ({
 }) => {
   const [quantity, setQuantity] = useState(1);
   const [isFavorited, setIsFavorited] = useState(false);
+  const [reviewStats, setReviewStats] = useState(null);
+
+  // ✅ MỚI: Load thống kê đánh giá từ database
+  useEffect(() => {
+    if (isOpen && product?.id) {
+      loadReviewStats();
+    }
+  }, [isOpen, product?.id]);
+
+  const loadReviewStats = async () => {
+    try {
+      const productId = product.ID || product.id || product.MaSP || product.maSP;
+      const result = await reviewService.getProductReviews(productId, { page: 1, limit: 1 });
+      
+      if (result.success && result.statistics) {
+        setReviewStats(result.statistics);
+      }
+    } catch (error) {
+      console.error('Error loading review stats:', error);
+    }
+  };
 
   if (!product) return null;
 
@@ -35,13 +57,15 @@ const ProductQuickViewModal = ({
     return '/barbie.jpg';
   };
   
-  const productImageRaw = product.HinhAnhURL || product.hinhAnhURL || product.hinhAnh || product.HinhAnh || product.image;
+  // ✅ SỬA: Hỗ trợ nhiều tên field để tương thích
+  const productImageRaw = product.hinhAnhUrl || product.HinhAnhURL || product.hinhAnhURL || product.hinhAnh || product.HinhAnh || product.image;
   const productImage = buildImageUrl(productImageRaw);
   
-  const productStock = product.Ton !== undefined ? product.Ton : 
+  // ✅ Hỗ trợ nhiều format tên biến tồn kho từ backend
+  const productStock = product.SoLuongTon !== undefined ? product.SoLuongTon :
+                       product.soLuongTon !== undefined ? product.soLuongTon :
+                       product.Ton !== undefined ? product.Ton :
                        product.ton !== undefined ? product.ton :
-                       product.soLuongTon !== undefined ? product.soLuongTon : 
-                       product.SoLuongTon !== undefined ? product.SoLuongTon : 
                        product.stock !== undefined ? product.stock : 0;
   const productCategory = product.LoaiSP?.Ten || product.loaiSP?.Ten || product.loaiSP?.tenLoai || product.TenLoai || product.tenLoai || product.category || '';
   
@@ -77,6 +101,37 @@ const ProductQuickViewModal = ({
   const handleAddToCartClick = () => {
     onAddToCart && onAddToCart(product, quantity);
     onClose();
+  };
+
+  // ✅ MỚI: Tính rating từ database hoặc dùng mặc định
+  const averageRating = reviewStats?.averageRating || product.DiemTrungBinh || product.diemTrungBinh || 5;
+  const totalReviews = reviewStats?.totalReviews || product.TongSoDanhGia || product.tongSoDanhGia || 0;
+
+  // ✅ MỚI: Render stars theo rating thực
+  const renderStars = () => {
+    const stars = [];
+    const fullStars = Math.floor(averageRating);
+    const hasHalfStar = averageRating % 1 >= 0.5;
+
+    for (let i = 0; i < 5; i++) {
+      if (i < fullStars) {
+        stars.push(<Star key={i} size={16} className="text-yellow-400 fill-yellow-400" />);
+      } else if (i === fullStars && hasHalfStar) {
+        stars.push(
+          <div key={i} className="relative">
+            <Star size={16} className="text-gray-300" />
+            <Star 
+              size={16} 
+              className="text-yellow-400 fill-yellow-400 absolute top-0 left-0" 
+              style={{ clipPath: 'inset(0 50% 0 0)' }}
+            />
+          </div>
+        );
+      } else {
+        stars.push(<Star key={i} size={16} className="text-gray-300" />);
+      }
+    }
+    return stars;
   };
 
   return (
@@ -123,14 +178,23 @@ const ProductQuickViewModal = ({
               </div>
             </div>
 
-            {/* Rating & Reviews */}
+            {/* ✅ CẬP NHẬT: Rating & Reviews từ database */}
             <div className="flex items-center justify-center gap-2">
               <div className="flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star key={star} size={16} className="text-yellow-400 fill-yellow-400" />
-                ))}
+                {renderStars()}
               </div>
-              <span className="text-xs text-gray-600">(128 đánh giá)</span>
+              <span className="text-xs text-gray-600">
+                {totalReviews > 0 ? (
+                  <>({totalReviews} đánh giá)</>
+                ) : (
+                  <span className="text-gray-400">(Chưa có đánh giá)</span>
+                )}
+              </span>
+              {averageRating > 0 && (
+                <span className="text-xs font-semibold text-yellow-600">
+                  {averageRating.toFixed(1)}
+                </span>
+              )}
             </div>
           </div>
 
@@ -161,46 +225,33 @@ const ProductQuickViewModal = ({
               </div>
             </div>
 
-            {/* Description */}
-            <div className="mb-4">
-              <h3 className="font-semibold text-gray-700 flex items-center gap-2 text-sm mb-1">
-                <span className="w-1 h-4 bg-primary-500 rounded-full"></span>
-                Mô tả sản phẩm
-              </h3>
-              <p className="text-gray-600 text-xs leading-relaxed line-clamp-2">
-                {productDescription}
-              </p>
-            </div>
-
-            {/* Quantity Selector */}
+            {/* Quantity Selector - ✅ SỬA ICON ĐÚNG: MINUS VÀ PLUS */}
             <div className="mb-4">
               <label className="font-semibold text-gray-700 flex items-center gap-2 text-xs mb-2">
                 <Package size={14} />
                 Số lượng
               </label>
               <div className="flex items-center gap-3">
-                <div className="flex items-center border-2 border-gray-200 rounded-lg overflow-hidden">
+                {/* Quantity Selector với gradient hồng */}
+                <div className="flex items-center bg-gradient-to-r from-pink-50 to-rose-50 rounded-full border-2 border-pink-200">
                   <button
                     onClick={() => handleQuantityChange(quantity - 1)}
                     disabled={quantity <= 1}
-                    className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
+                    className="p-2 rounded-l-full hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    −
+                    <Minus size={16} className="text-pink-600" />
                   </button>
-                  <input
-                    type="number"
-                    value={quantity}
-                    onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
-                    className="w-14 text-center py-1.5 font-semibold text-sm focus:outline-none"
-                    min="1"
-                    max={productStock}
-                  />
+                  
+                  <div className="w-16 text-center font-bold text-lg text-gray-800">
+                    {quantity}
+                  </div>
+                  
                   <button
                     onClick={() => handleQuantityChange(quantity + 1)}
                     disabled={quantity >= productStock}
-                    className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
+                    className="p-2 rounded-r-full hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    +
+                    <Plus size={16} className="text-pink-600" />
                   </button>
                 </div>
                 <span className="text-xs text-gray-500">

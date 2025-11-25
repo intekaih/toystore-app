@@ -17,13 +17,32 @@ module.exports = (sequelize, Sequelize) => {
         key: 'ID'
       }
     },
+    ThuongHieuID: {  // Tên cột trong DB là "ThuongHieuID"
+      type: Sequelize.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'ThuongHieu',
+        key: 'ID'
+      }
+    },
     GiaBan: {
-      type: Sequelize.DECIMAL(15, 0),
+      type: Sequelize.DECIMAL(18, 2), // ✅ ĐÃ SỬA: (15,0) → (18,2)
       allowNull: false
     },
-    Ton: {  // Tên cột trong DB là "Ton"
+    SoLuongTon: {  // Tên cột trong DB là "SoLuongTon"
       type: Sequelize.INTEGER,
-      defaultValue: 0
+      defaultValue: 0,
+      field: 'SoLuongTon'
+    },
+    // ✅ THÊM: Alias Ton để tương thích với code cũ
+    Ton: {
+      type: Sequelize.VIRTUAL,
+      get() {
+        return this.getDataValue('SoLuongTon');
+      },
+      set(value) {
+        this.setDataValue('SoLuongTon', value);
+      }
     },
     MoTa: {
       type: Sequelize.TEXT,  // ntext trong SQL
@@ -38,9 +57,20 @@ module.exports = (sequelize, Sequelize) => {
       allowNull: true,
       defaultValue: Sequelize.literal('GETDATE()') // Sử dụng GETDATE() của SQL Server
     },
-    Enable: {  // Tên cột trong DB là "Enable"
+    TrangThai: {  // Tên cột trong DB là "TrangThai"
       type: Sequelize.BOOLEAN,
-      defaultValue: true
+      defaultValue: true,
+      field: 'TrangThai'
+    },
+    TongSoDanhGia: {  // Tên cột trong DB là "TongSoDanhGia"
+      type: Sequelize.INTEGER,
+      defaultValue: 0,
+      field: 'TongSoDanhGia'
+    },
+    DiemTrungBinh: {  // Tên cột trong DB là "DiemTrungBinh"
+      type: Sequelize.DECIMAL(3, 2),
+      defaultValue: 0.00,
+      field: 'DiemTrungBinh'
     }
   }, {
     tableName: 'SanPham',

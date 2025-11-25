@@ -17,7 +17,7 @@ module.exports = (sequelize) => {
     },
     HoaDonID: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: false, // ✅ THAY ĐỔI: Không cho phép NULL vì theo logic mới, chỉ lưu khi có HoaDonID
       references: {
         model: 'HoaDon',
         key: 'ID'
@@ -39,19 +39,18 @@ module.exports = (sequelize) => {
     },
     NgaySuDung: {
       type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW
-    },
-    Enable: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true
+      allowNull: false,
+      // ✅ BỎ defaultValue trong Sequelize - để SQL Server tự xử lý với DEFAULT GETDATE() trong DB
+      comment: 'Thời điểm sử dụng voucher - DB tự set với DEFAULT GETDATE()'
     }
   }, {
     tableName: 'LichSuSuDungVoucher',
-    timestamps: false,
+    timestamps: false, // Không dùng createdAt/updatedAt của Sequelize
     indexes: [
       { fields: ['VoucherID'] },
       { fields: ['HoaDonID'] },
-      { fields: ['TaiKhoanID'] }
+      { fields: ['TaiKhoanID'] },
+      { fields: ['NgaySuDung'] }
     ]
   });
 

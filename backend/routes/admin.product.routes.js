@@ -12,11 +12,11 @@ router.use(requireAdmin);
 router.get('/', adminProductController.getAllProducts);
 
 // POST /api/admin/products - Thêm sản phẩm mới với upload ảnh
-// upload.single('hinhAnh') - field name trong form-data phải là 'hinhAnh'
-router.post('/', upload.single('hinhAnh'), handleUploadError, adminProductController.createProduct);
+// upload.array('hinhAnh', 5) - field name trong form-data phải là 'hinhAnh', tối đa 5 ảnh
+router.post('/', upload.array('hinhAnh', 5), handleUploadError, adminProductController.createProduct);
 
 // PUT /api/admin/products/:id - Cập nhật sản phẩm
-router.put('/:id', upload.single('hinhAnh'), handleUploadError, adminProductController.updateProduct);
+router.put('/:id', upload.array('hinhAnh', 5), handleUploadError, adminProductController.updateProduct);
 
 // DELETE /api/admin/products/:id - Xóa sản phẩm (soft delete)
 router.delete('/:id', adminProductController.deleteProduct);

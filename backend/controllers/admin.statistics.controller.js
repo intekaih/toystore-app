@@ -4,7 +4,9 @@ const ChiTietHoaDon = db.ChiTietHoaDon;
 const KhachHang = db.KhachHang;
 const SanPham = db.SanPham;
 const TaiKhoan = db.TaiKhoan;
+const LoaiSP = db.LoaiSP;
 const { Op } = require('sequelize');
+const DTOMapper = require('../utils/DTOMapper');
 
 /**
  * GET /api/admin/statistics/dashboard
@@ -14,25 +16,29 @@ exports.getDashboardStats = async (req, res) => {
   try {
     console.log('📊 Admin - Lấy thống kê dashboard');
 
-    // 1. Tổng số sản phẩm
+    // 1. Tổng số sản phẩm - ✅ SỬA: Enable → TrangThai
     const tongSanPham = await SanPham.count({
-      where: { Enable: true }
+      where: { TrangThai: true }
     });
 
-    // 2. Đơn hàng mới (đơn có trạng thái "Chờ xử lý")
+    // 2. Đơn hàng mới (đơn có trạng thái "Chờ xử lý") - ✅ BỎ: Enable
     const donHangMoi = await HoaDon.count({
       where: { 
-        Enable: true,
         TrangThai: 'Chờ xử lý'
       }
     });
 
-    // 3. Tổng số người dùng
+    // 3. Tổng số người dùng - ✅ SỬA: Enable → TrangThai
     const nguoiDung = await TaiKhoan.count({
-      where: { Enable: true }
+      where: { TrangThai: true }
     });
 
-    // ✨ 4. Tổng doanh thu tháng hiện tại - TÍNH TẤT CẢ ĐƠN (TRỪ ĐÃ HỦY)
+    // ✅ 4. Tổng số danh mục - SỬA: Enable → TrangThai
+    const tongDanhMuc = await LoaiSP.count({
+      where: { TrangThai: true }
+    });
+
+    // ✨ 5. Tổng doanh thu tháng hiện tại - BỎ Enable, TÍNH TẤT CẢ ĐƠN (TRỪ ĐÃ HỦY)
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
     const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01 00:00:00`;
@@ -40,10 +46,9 @@ exports.getDashboardStats = async (req, res) => {
     const endDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')} 23:59:59`;
 
     const doanhThuResult = await db.sequelize.query(`
-      SELECT ISNULL(SUM(TongTien), 0) AS tongDoanhThu
+      SELECT ISNULL(SUM(ThanhTien), 0) AS tongDoanhThu
       FROM HoaDon
-      WHERE Enable = 1 
-        AND TrangThai != N'Đã hủy'
+      WHERE TrangThai != N'Đã hủy'
         AND CAST(NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)
     `, {
       replacements: { startDate, endDate },
@@ -56,18 +61,23 @@ exports.getDashboardStats = async (req, res) => {
       tongSanPham,
       donHangMoi,
       nguoiDung,
+      tongDanhMuc,
       doanhThu
+    });
+
+    // ✅ SỬ DỤNG DTOMapper - dù data đơn giản nhưng vẫn consistent
+    const statsDTO = DTOMapper.toCamelCase({
+      TongSanPham: parseInt(tongSanPham),
+      DonHangMoi: parseInt(donHangMoi),
+      NguoiDung: parseInt(nguoiDung),
+      TongDanhMuc: parseInt(tongDanhMuc),
+      DoanhThu: parseFloat(doanhThu)
     });
 
     res.status(200).json({
       success: true,
       message: 'Lấy thống kê dashboard thành công',
-      data: {
-        tongSanPham: parseInt(tongSanPham),
-        donHangMoi: parseInt(donHangMoi),
-        nguoiDung: parseInt(nguoiDung),
-        doanhThu: parseFloat(doanhThu)
-      }
+      data: statsDTO
     });
 
   } catch (error) {
@@ -94,7 +104,6 @@ exports.getStatistics = async (req, res) => {
 
     // Tạo điều kiện lọc cơ bản - ✨ TÍNH TẤT CẢ ĐƠN (TRỪ ĐÃ HỦY)
     const whereCondition = {
-      Enable: true,
       TrangThai: { [Op.ne]: 'Đã hủy' } // ✅ Loại trừ đơn đã hủy
     };
 
@@ -121,7 +130,7 @@ exports.getStatistics = async (req, res) => {
     // ✨ 1. Tính tổng doanh thu và số đơn hàng - TÍNH TẤT CẢ ĐƠN (TRỪ ĐÃ HỦY)
     let totalStats = { tongDoanhThu: 0, soDonHang: 0 };
     try {
-      let whereClause = "WHERE Enable = 1 AND TrangThai != N'Đã hủy'"; // ✅ Loại trừ đơn đã hủy
+      let whereClause = "WHERE TrangThai != N'Đã hủy'"; // ✅ Loại trừ đơn đã hủy
       const params = {};
       
       if (startDate && endDate) {
@@ -132,7 +141,7 @@ exports.getStatistics = async (req, res) => {
 
       const result = await db.sequelize.query(`
         SELECT 
-          ISNULL(SUM(TongTien), 0) AS tongDoanhThu,
+          ISNULL(SUM(ThanhTien), 0) AS tongDoanhThu,
           COUNT(ID) AS soDonHang
         FROM HoaDon
         ${whereClause}
@@ -154,7 +163,7 @@ exports.getStatistics = async (req, res) => {
     // 2. Thống kê theo trạng thái đơn hàng - SỬA: Dùng CAST AS DATE
     let statusStats = [];
     try {
-      let whereClause = 'WHERE Enable = 1';
+      let whereClause = '';
       const params = {};
       
       if (startDate && endDate) {
@@ -167,8 +176,9 @@ exports.getStatistics = async (req, res) => {
         SELECT 
           TrangThai,
           COUNT(ID) AS soLuong,
-          ISNULL(SUM(TongTien), 0) AS tongTien
+          ISNULL(SUM(ThanhTien), 0) AS tongTien
         FROM HoaDon
+        WHERE 1=1
         ${whereClause}
         GROUP BY TrangThai
       `, {
@@ -183,7 +193,7 @@ exports.getStatistics = async (req, res) => {
     // ✨ 3. Thống kê theo tháng - TÍNH TẤT CẢ ĐƠN (TRỪ ĐÃ HỦY)
     let monthlyStats = [];
     try {
-      let whereClause = "WHERE Enable = 1 AND TrangThai != N'Đã hủy'"; // ✅ Loại trừ đơn đã hủy
+      let whereClause = "WHERE TrangThai != N'Đã hủy'"; // ✅ Loại trừ đơn đã hủy
       const params = {};
       
       if (startDate && endDate) {
@@ -199,7 +209,7 @@ exports.getStatistics = async (req, res) => {
         SELECT 
           FORMAT(NgayLap, 'yyyy-MM') as thang,
           COUNT(*) as soDonHang,
-          ISNULL(SUM(TongTien), 0) as doanhThu
+          ISNULL(SUM(ThanhTien), 0) as doanhThu
         FROM HoaDon
         ${whereClause}
         GROUP BY FORMAT(NgayLap, 'yyyy-MM')
@@ -221,7 +231,7 @@ exports.getStatistics = async (req, res) => {
         attributes: [
           'KhachHangID',
           [db.sequelize.fn('COUNT', db.sequelize.col('HoaDon.ID')), 'soDonHang'],
-          [db.sequelize.fn('SUM', db.sequelize.col('HoaDon.TongTien')), 'tongChiTieu']
+          [db.sequelize.fn('SUM', db.sequelize.col('HoaDon.ThanhTien')), 'tongChiTieu']
         ],
         include: [{
           model: KhachHang,
@@ -253,7 +263,7 @@ exports.getStatistics = async (req, res) => {
           {
             model: SanPham,
             as: 'sanPham',
-            attributes: ['ID', 'Ten', 'HinhAnhURL', 'GiaBan', 'Ton'],
+            attributes: ['ID', 'Ten', 'HinhAnhURL', 'GiaBan', 'SoLuongTon'], // ✅ SỬA: Ton → SoLuongTon
             required: false
           },
           {
@@ -264,10 +274,7 @@ exports.getStatistics = async (req, res) => {
             required: true
           }
         ],
-        where: {
-          Enable: true
-        },
-        group: ['ChiTietHoaDon.SanPhamID', 'sanPham.ID', 'sanPham.Ten', 'sanPham.HinhAnhURL', 'sanPham.GiaBan', 'sanPham.Ton'],
+        group: ['ChiTietHoaDon.SanPhamID', 'sanPham.ID', 'sanPham.Ten', 'sanPham.HinhAnhURL', 'sanPham.GiaBan', 'sanPham.SoLuongTon'], // ✅ SỬA: Ton → SoLuongTon
         order: [[db.sequelize.literal('tongSoLuongBan'), 'DESC']],
         limit: 5,
         subQuery: false
@@ -281,7 +288,7 @@ exports.getStatistics = async (req, res) => {
     let chartStats = [];
     try {
       const params = {};
-      let whereClause = "WHERE Enable = 1 AND TrangThai != N'Đã hủy'";
+      let whereClause = "WHERE TrangThai != N'Đã hủy'";
       let groupByClause = '';
       let orderByClause = '';
       
@@ -298,7 +305,7 @@ exports.getStatistics = async (req, res) => {
           SELECT 
             FORMAT(NgayLap, 'HH:00') as label,
             COUNT(*) as soDonHang,
-            ISNULL(SUM(TongTien), 0) as doanhThu
+            ISNULL(SUM(ThanhTien), 0) as doanhThu
           FROM HoaDon
           ${whereClause}
           GROUP BY FORMAT(NgayLap, 'HH:00')
@@ -314,7 +321,7 @@ exports.getStatistics = async (req, res) => {
             FORMAT(CAST(NgayLap AS DATE), 'dd/MM') as label,
             CAST(NgayLap AS DATE) as date,
             COUNT(*) as soDonHang,
-            ISNULL(SUM(TongTien), 0) as doanhThu
+            ISNULL(SUM(ThanhTien), 0) as doanhThu
           FROM HoaDon
           ${whereClause}
           GROUP BY CAST(NgayLap AS DATE)
@@ -330,7 +337,7 @@ exports.getStatistics = async (req, res) => {
             FORMAT(NgayLap, 'MM/yyyy') as label,
             FORMAT(NgayLap, 'yyyy-MM') as month,
             COUNT(*) as soDonHang,
-            ISNULL(SUM(TongTien), 0) as doanhThu
+            ISNULL(SUM(ThanhTien), 0) as doanhThu
           FROM HoaDon
           ${whereClause}
           GROUP BY FORMAT(NgayLap, 'yyyy-MM'), FORMAT(NgayLap, 'MM/yyyy')
@@ -346,59 +353,62 @@ exports.getStatistics = async (req, res) => {
       chartStats = [];
     }
 
-    // Format dữ liệu trả về
+    // ✅ Format dữ liệu với DTOMapper
     const statistics = {
-      // Tổng quan
       tongDoanhThu: parseFloat(totalStats?.tongDoanhThu || 0),
       soDonHang: parseInt(totalStats?.soDonHang || 0),
       doanhThuTrungBinh: (totalStats?.soDonHang && totalStats?.soDonHang > 0)
         ? parseFloat(totalStats.tongDoanhThu) / parseInt(totalStats.soDonHang) 
         : 0,
 
-      // Thống kê theo trạng thái
-      theoTrangThai: statusStats.map(stat => ({
-        trangThai: stat.TrangThai,
-        soLuong: parseInt(stat.soLuong),
-        tongTien: parseFloat(stat.tongTien || 0)
-      })),
+      theoTrangThai: statusStats.map(stat => 
+        DTOMapper.toCamelCase({
+          TrangThai: stat.TrangThai,
+          SoLuong: parseInt(stat.soLuong),
+          TongTien: parseFloat(stat.tongTien || 0)
+        })
+      ),
 
-      // Thống kê theo tháng
-      theoThang: monthlyStats.map(stat => ({
-        thang: stat.thang,
-        soDonHang: parseInt(stat.soDonHang),
-        doanhThu: parseFloat(stat.doanhThu || 0)
-      })),
+      theoThang: monthlyStats.map(stat => 
+        DTOMapper.toCamelCase({
+          Thang: stat.thang,
+          SoDonHang: parseInt(stat.soDonHang),
+          DoanhThu: parseFloat(stat.doanhThu || 0)
+        })
+      ),
 
-      // Top khách hàng
-      topKhachHang: topCustomers.map(item => ({
-        khachHangId: item.KhachHangID,
-        hoTen: item.khachHang?.HoTen || 'Không rõ',
-        email: item.khachHang?.Email || '',
-        dienThoai: item.khachHang?.DienThoai || '',
-        soDonHang: parseInt(item.dataValues.soDonHang || 0),
-        tongChiTieu: parseFloat(item.dataValues.tongChiTieu || 0)
-      })),
+      topKhachHang: topCustomers.map(item => 
+        DTOMapper.toCamelCase({
+          KhachHangId: item.KhachHangID,
+          HoTen: item.khachHang?.HoTen || 'Không rõ',
+          Email: item.khachHang?.Email || '',
+          DienThoai: item.khachHang?.DienThoai || '',
+          SoDonHang: parseInt(item.dataValues.soDonHang || 0),
+          TongChiTieu: parseFloat(item.dataValues.tongChiTieu || 0)
+        })
+      ),
 
-      // Top sản phẩm
-      topSanPham: topProducts.map(item => ({
-        sanPhamId: item.SanPhamID,
-        tenSanPham: item.sanPham?.Ten || 'Không rõ',
-        hinhAnh: item.sanPham?.HinhAnhURL || null,
-        giaBan: parseFloat(item.sanPham?.GiaBan || 0),
-        tonKho: item.sanPham?.Ton || 0,
-        tongSoLuongBan: parseInt(item.dataValues.tongSoLuongBan || 0),
-        tongDoanhThu: parseFloat(item.dataValues.tongDoanhThu || 0),
-        soLanMua: parseInt(item.dataValues.soLanMua || 0)
-      })),
+      topSanPham: topProducts.map(item => 
+        DTOMapper.toCamelCase({
+          SanPhamId: item.SanPhamID,
+          TenSanPham: item.sanPham?.Ten || 'Không rõ',
+          HinhAnh: item.sanPham?.HinhAnhURL || null,
+          GiaBan: parseFloat(item.sanPham?.GiaBan || 0),
+          TonKho: item.sanPham?.SoLuongTon || 0,
+          TongSoLuongBan: parseInt(item.dataValues.tongSoLuongBan || 0),
+          TongDoanhThu: parseFloat(item.dataValues.tongDoanhThu || 0),
+          SoLanMua: parseInt(item.dataValues.soLanMua || 0)
+        })
+      ),
 
-      // Thống kê biểu đồ theo viewMode
-      chartData: chartStats.map(stat => ({
-        label: stat.label,
-        soDonHang: parseInt(stat.soDonHang),
-        doanhThu: parseFloat(stat.doanhThu || 0)
-      })),
+      chartData: chartStats.map(stat => 
+        DTOMapper.toCamelCase({
+          Label: stat.label,
+          SoDonHang: parseInt(stat.soDonHang),
+          DoanhThu: parseFloat(stat.doanhThu || 0)
+        })
+      ),
 
-      // Thêm viewMode vào response
       viewMode: viewMode
     };
 
@@ -463,7 +473,6 @@ exports.getRevenueStatistics = async (req, res) => {
 
     // ✨ Tạo điều kiện lọc - CHỈ TÍNH ĐƠN ĐÃ THANH TOÁN
     const whereCondition = { 
-      Enable: true,
       TrangThai: 'Đã thanh toán' // ✅ THÊM ĐIỀU KIỆN NÀY
     };
     
@@ -495,13 +504,12 @@ exports.getRevenueStatistics = async (req, res) => {
       SELECT 
         FORMAT(NgayLap, '${groupFormat}') as period,
         COUNT(*) as soDonHang,
-        SUM(TongTien) as doanhThu,
-        AVG(TongTien) as doanhThuTrungBinh,
-        MIN(TongTien) as donHangThapNhat,
-        MAX(TongTien) as donHangCaoNhat
+        SUM(ThanhTien) as doanhThu,
+        AVG(ThanhTien) as doanhThuTrungBinh,
+        MIN(ThanhTien) as donHangThapNhat,
+        MAX(ThanhTien) as donHangCaoNhat
       FROM HoaDon
-      WHERE Enable = 1
-        AND TrangThai = N'Đã thanh toán'
+      WHERE TrangThai = N'Đã thanh toán'
         ${startDate && endDate ? `AND NgayLap BETWEEN '${startDate}' AND '${endDate}'` : ''}
       GROUP BY FORMAT(NgayLap, '${groupFormat}')
       ORDER BY FORMAT(NgayLap, '${groupFormat}') DESC
@@ -551,7 +559,6 @@ exports.getProductStatistics = async (req, res) => {
 
     // ✨ Tạo điều kiện lọc cho hóa đơn - CHỈ TÍNH ĐƠN ĐÃ THANH TOÁN
     const hoaDonCondition = { 
-      Enable: true,
       TrangThai: 'Đã thanh toán' // ✅ THÊM ĐIỀU KIỆN NÀY
     };
     
@@ -574,7 +581,7 @@ exports.getProductStatistics = async (req, res) => {
         {
           model: SanPham,
           as: 'sanPham',
-          attributes: ['ID', 'Ten', 'HinhAnhURL', 'GiaBan', 'Ton', 'LoaiID']
+          attributes: ['ID', 'Ten', 'HinhAnhURL', 'GiaBan', 'SoLuongTon', 'LoaiID']
         },
         {
           model: HoaDon,
@@ -583,10 +590,7 @@ exports.getProductStatistics = async (req, res) => {
           where: hoaDonCondition // ✅ ĐÃ CÓ TrangThai: 'Đã thanh toán'
         }
       ],
-      where: {
-        Enable: true
-      },
-      group: ['ChiTietHoaDon.SanPhamID', 'sanPham.ID', 'sanPham.Ten', 'sanPham.HinhAnhURL', 'sanPham.GiaBan', 'sanPham.Ton', 'sanPham.LoaiID'],
+      group: ['ChiTietHoaDon.SanPhamID', 'sanPham.ID', 'sanPham.Ten', 'sanPham.HinhAnhURL', 'sanPham.GiaBan', 'sanPham.SoLuongTon', 'sanPham.LoaiID'],
       order: [[db.sequelize.literal('tongDoanhThu'), 'DESC']],
       subQuery: false
     });
@@ -607,7 +611,7 @@ exports.getProductStatistics = async (req, res) => {
         tenSanPham: item.sanPham?.Ten,
         hinhAnh: item.sanPham?.HinhAnhURL,
         giaBan: parseFloat(item.sanPham?.GiaBan || 0),
-        tonKho: item.sanPham?.Ton,
+        tonKho: item.sanPham?.SoLuongTon,
         loaiId: item.sanPham?.LoaiID,
         tongSoLuongBan: soLuongBan,
         tongDoanhThu: doanhThu,

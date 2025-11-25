@@ -12,11 +12,6 @@ module.exports = (sequelize, Sequelize) => {
         model: 'TaiKhoan',
         key: 'ID'
       }
-    },
-    NgayTao: {
-      type: Sequelize.DATE,
-      allowNull: true
-      // Bỏ defaultValue - để SQL Server tự động gán DEFAULT GETDATE()
     }
   }, {
     tableName: 'GioHang',

@@ -13,7 +13,9 @@ db.sequelize = sequelize;
 // Import các models
 db.TaiKhoan = require('./TaiKhoan')(sequelize, Sequelize);
 db.SanPham = require('./SanPham')(sequelize, Sequelize);
+db.SanPhamHinhAnh = require('./SanPhamHinhAnh')(sequelize, Sequelize);
 db.LoaiSP = require('./LoaiSP')(sequelize, Sequelize);
+db.ThuongHieu = require('./ThuongHieu')(sequelize, Sequelize);
 db.GioHang = require('./GioHang')(sequelize, Sequelize);
 db.GioHangChiTiet = require('./GioHangChiTiet')(sequelize, Sequelize);
 db.GioHangKhachVangLai = require('./GioHangKhachVangLai')(sequelize, Sequelize);
@@ -21,10 +23,18 @@ db.HoaDon = require('./HoaDon')(sequelize, Sequelize);
 db.ChiTietHoaDon = require('./ChiTietHoaDon')(sequelize, Sequelize);
 db.KhachHang = require('./KhachHang')(sequelize, Sequelize);
 db.PhuongThucThanhToan = require('./PhuongThucThanhToan')(sequelize, Sequelize);
-// ✅ THÊM MODELS MỚI
 db.Voucher = require('./Voucher')(sequelize);
-db.PhiShip = require('./PhiShip')(sequelize);
+// ❌ XÓA: db.VoucherSanPham - Không cần áp dụng voucher theo từng sản phẩm
+// ❌ XÓA: db.VoucherLoaiSanPham - Không cần áp dụng voucher theo loại sản phẩm
 db.LichSuSuDungVoucher = require('./LichSuSuDungVoucher')(sequelize);
+db.DiaChiGiaoHangUser = require('./DiaChiGiaoHangUser')(sequelize, Sequelize);
+// ✅ THÊM: Import model DiaChiGiaoHang (địa chỉ cho từng hóa đơn)
+db.DiaChiGiaoHang = require('./DiaChiGiaoHang')(sequelize, Sequelize);
+// ✅ THÊM MỚI: Import model ThongTinVanChuyen
+db.ThongTinVanChuyen = require('./ThongTinVanChuyen')(sequelize, Sequelize);
+// ✅ THÊM MỚI: Import model LichSuTrangThaiDonHang
+db.LichSuTrangThaiDonHang = require('./LichSuTrangThaiDonHang')(sequelize, Sequelize);
+db.DanhGiaSanPham = require('./DanhGiaSanPham')(sequelize, Sequelize);
 
 // Định nghĩa quan hệ giữa các bảng
 // SanPham thuộc về một LoaiSP
@@ -37,6 +47,31 @@ db.SanPham.belongsTo(db.LoaiSP, {
 db.LoaiSP.hasMany(db.SanPham, {
   foreignKey: 'LoaiID',
   as: 'sanPhams'
+});
+
+// SanPham thuộc về một ThuongHieu
+db.SanPham.belongsTo(db.ThuongHieu, {
+  foreignKey: 'ThuongHieuID',
+  as: 'thuongHieu'
+});
+
+// ThuongHieu có nhiều SanPham
+db.ThuongHieu.hasMany(db.SanPham, {
+  foreignKey: 'ThuongHieuID',
+  as: 'sanPhams'
+});
+
+// === Quan hệ cho SanPhamHinhAnh ===
+// SanPham có nhiều SanPhamHinhAnh
+db.SanPham.hasMany(db.SanPhamHinhAnh, {
+  foreignKey: 'SanPhamID',
+  as: 'hinhAnhs'
+});
+
+// SanPhamHinhAnh thuộc về một SanPham
+db.SanPhamHinhAnh.belongsTo(db.SanPham, {
+  foreignKey: 'SanPhamID',
+  as: 'sanPham'
 });
 
 // TaiKhoan có một GioHang
@@ -150,10 +185,10 @@ db.SanPham.hasMany(db.GioHangKhachVangLai, {
 });
 
 // ============================================
-// ✅ QUAN HỆ CHO VOUCHER, PHÍ SHIP, LỊCH SỬ
+// ✅ QUAN HỆ CHO VOUCHER, LỊCH SỬ
 // ============================================
 
-// === Voucher ===
+// === HoaDon & Voucher ===
 // HoaDon thuộc về một Voucher (optional)
 db.HoaDon.belongsTo(db.Voucher, {
   foreignKey: 'VoucherID',
@@ -201,6 +236,89 @@ db.LichSuSuDungVoucher.belongsTo(db.TaiKhoan, {
 db.TaiKhoan.hasMany(db.LichSuSuDungVoucher, {
   foreignKey: 'TaiKhoanID',
   as: 'lichSuVoucher'
+});
+
+// ============================================
+// ✅ QUAN HỆ CHO ĐỊA CHỈ GIAO HÀNG
+// ============================================
+
+// TaiKhoan có nhiều DiaChiGiaoHangUser
+db.TaiKhoan.hasMany(db.DiaChiGiaoHangUser, {
+  foreignKey: 'TaiKhoanID',
+  as: 'diaChiGiaoHangs'
+});
+
+// DiaChiGiaoHangUser thuộc về một TaiKhoan
+db.DiaChiGiaoHangUser.belongsTo(db.TaiKhoan, {
+  foreignKey: 'TaiKhoanID',
+  as: 'taiKhoan'
+});
+
+// ✅ THÊM: Quan hệ giữa HoaDon và DiaChiGiaoHang (1-1)
+// HoaDon có một DiaChiGiaoHang
+db.HoaDon.hasOne(db.DiaChiGiaoHang, {
+  foreignKey: 'HoaDonID',
+  as: 'diaChiGiaoHang'
+});
+
+// DiaChiGiaoHang thuộc về một HoaDon
+db.DiaChiGiaoHang.belongsTo(db.HoaDon, {
+  foreignKey: 'HoaDonID',
+  as: 'hoaDon'
+});
+
+// ✅ THÊM MỚI: Quan hệ giữa HoaDon và ThongTinVanChuyen (1-1)
+// HoaDon có một ThongTinVanChuyen
+db.HoaDon.hasOne(db.ThongTinVanChuyen, {
+  foreignKey: 'HoaDonID',
+  as: 'thongTinVanChuyen'
+});
+
+// ThongTinVanChuyen thuộc về một HoaDon
+db.ThongTinVanChuyen.belongsTo(db.HoaDon, {
+  foreignKey: 'HoaDonID',
+  as: 'hoaDon'
+});
+
+// ✅ THÊM MỚI: Quan hệ giữa HoaDon và LichSuTrangThaiDonHang (1-nhiều)
+// HoaDon có nhiều LichSuTrangThaiDonHang
+db.HoaDon.hasMany(db.LichSuTrangThaiDonHang, {
+  foreignKey: 'HoaDonID',
+  as: 'lichSuTrangThai'
+});
+
+// LichSuTrangThaiDonHang thuộc về một HoaDon
+db.LichSuTrangThaiDonHang.belongsTo(db.HoaDon, {
+  foreignKey: 'HoaDonID',
+  as: 'hoaDon'
+});
+
+// ============================================
+// ✅ QUAN HỆ CHO ĐÁNH GIÁ SẢN PHẨM (MVP - 8 cột)
+// ============================================
+
+// DanhGiaSanPham thuộc về một SanPham
+db.DanhGiaSanPham.belongsTo(db.SanPham, {
+  foreignKey: 'SanPhamID',
+  as: 'sanPham'
+});
+
+// SanPham có nhiều DanhGiaSanPham
+db.SanPham.hasMany(db.DanhGiaSanPham, {
+  foreignKey: 'SanPhamID',
+  as: 'danhGias'
+});
+
+// DanhGiaSanPham thuộc về một TaiKhoan
+db.DanhGiaSanPham.belongsTo(db.TaiKhoan, {
+  foreignKey: 'TaiKhoanID',
+  as: 'taiKhoan'
+});
+
+// TaiKhoan có nhiều DanhGiaSanPham
+db.TaiKhoan.hasMany(db.DanhGiaSanPham, {
+  foreignKey: 'TaiKhoanID',
+  as: 'danhGias'
 });
 
 module.exports = db;

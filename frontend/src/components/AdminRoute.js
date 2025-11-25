@@ -31,20 +31,38 @@ const AdminRoute = ({ children }) => {
             animation: 'spin 1s linear infinite',
             margin: '0 auto 1rem'
           }}></div>
-          <p>Đang tải...</p>
+          <p>Đang kiểm tra quyền truy cập...</p>
         </div>
       </div>
     );
   }
 
-  // Chưa đăng nhập hoặc không phải admin
-  // Kiểm tra cả user.role và user.vaiTro để tương thích
-  if (!user || (user.role !== 'admin' && user.vaiTro !== 'admin')) {
-    console.log('❌ AdminRoute: User is not admin', user);
+  // Chưa đăng nhập
+  if (!user) {
+    console.log('❌ AdminRoute: Chưa đăng nhập, redirect to /admin/login');
     return <Navigate to="/admin/login" replace />;
   }
 
-  console.log('✅ AdminRoute: User is admin, allowing access', user);
+  // Kiểm tra role - hỗ trợ nhiều format khác nhau
+  const userRole = (user.role || user.vaiTro || user.VaiTro || '').toString().toLowerCase();
+  const isAdmin = userRole === 'admin' || userRole === 'administrator';
+
+  console.log('🔍 AdminRoute check:', {
+    user: user.tenDangNhap || user.email,
+    role: user.role,
+    vaiTro: user.vaiTro,
+    VaiTro: user.VaiTro,
+    normalizedRole: userRole,
+    isAdmin
+  });
+
+  // Không phải admin
+  if (!isAdmin) {
+    console.log('❌ AdminRoute: User không phải admin, redirect to /admin/login');
+    return <Navigate to="/admin/login" replace />;
+  }
+
+  console.log('✅ AdminRoute: User là admin, cho phép truy cập');
   // Là admin -> cho phép truy cập
   return children;
 };

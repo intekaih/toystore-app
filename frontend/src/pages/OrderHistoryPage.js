@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getOrderHistory, cancelOrder } from '../api/orderApi';
-import { Package, Clock, Truck, CheckCircle, XCircle, ShoppingBag, FileText } from 'lucide-react';
+import { orderService } from '../services'; // ✅ Sử dụng orderService
+import { Package, Clock, Truck, CheckCircle, XCircle, ShoppingBag, FileText, Star } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
 import { Button, Badge, Loading, Modal } from '../components/ui';
 import Toast from '../components/Toast';
@@ -70,20 +70,34 @@ const OrderHistoryPage = () => {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const response = await getOrderHistory(
-        currentPage,
-        ordersPerPage,
-        statusFilter || null
-      );
+      
+      // ✅ Sử dụng orderService thay vì getOrderHistory API
+      const response = await orderService.getMyOrders({
+        page: currentPage,
+        limit: ordersPerPage,
+        status: statusFilter || undefined
+      });
 
       if (response.success) {
-        setOrders(response.data.orders);
-        setTotalPages(response.data.pagination.totalPages);
-        setTotalOrders(response.data.pagination.totalOrders);
+        // ✅ Xử lý đúng cấu trúc response: response.data có thể là array hoặc object chứa array
+        const ordersData = Array.isArray(response.data) 
+          ? response.data 
+          : (response.data.orders || response.data.hoaDons || []);
+        
+        setOrders(ordersData);
+        
+        if (response.pagination) {
+          setTotalPages(response.pagination.totalPages);
+          setTotalOrders(response.pagination.total || response.pagination.totalOrders || 0);
+        } else if (response.data.pagination) {
+          setTotalPages(response.data.pagination.totalPages);
+          setTotalOrders(response.data.pagination.total || response.data.pagination.totalOrders || 0);
+        }
       }
     } catch (error) {
       console.error('Error loading orders:', error);
       showToast(error.message || 'Không thể tải danh sách đơn hàng', 'error');
+      setOrders([]); // ✅ Đảm bảo orders luôn là array khi có lỗi
     } finally {
       setLoading(false);
     }
@@ -93,10 +107,27 @@ const OrderHistoryPage = () => {
     setToast({ message, type, duration });
   };
 
+  // ✅ Helper function để format giá tiền an toàn
+  const formatPrice = (price) => {
+    try {
+      const numPrice = parseFloat(price);
+      if (isNaN(numPrice) || numPrice === null || numPrice === undefined) {
+        console.warn('Invalid price value:', price);
+        return '0 ₫';
+      }
+      return numPrice.toLocaleString('vi-VN') + ' ₫';
+    } catch (error) {
+      console.error('Error formatting price:', error, price);
+      return '0 ₫';
+    }
+  };
+
   const handleCancelOrder = async (orderId, orderCode) => {
     try {
       setCancelingOrderId(orderId);
-      const response = await cancelOrder(orderId);
+      
+      // ✅ Sử dụng orderService thay vì cancelOrder API
+      const response = await orderService.cancelOrder(orderId, 'Khách hàng yêu cầu hủy');
 
       if (response.success) {
         showToast(`Đã hủy đơn hàng ${orderCode} thành công`, 'success');
@@ -250,30 +281,32 @@ const OrderHistoryPage = () => {
 
                     {/* Order Products */}
                     <div className="p-4 space-y-3">
-                      {order.sanPhams.slice(0, 3).map((product) => (
+                      {/* ✅ FIX: Xử lý cả chiTiet và sanPhams, đảm bảo luôn có array */}
+                      {(order.chiTiet || order.sanPhams || []).slice(0, 3).map((product) => (
                         <div key={product.id} className="flex gap-4 items-center">
                           <img
-                            src={buildImageUrl(product.hinhAnh)}
-                            alt={product.tenSanPham}
+                            src={buildImageUrl(product.hinhAnh || product.sanPham?.hinhAnhURL)}
+                            alt={product.tenSanPham || product.sanPham?.ten}
                             className="w-16 h-16 object-cover rounded-cute flex-shrink-0"
                             onError={handleImageError}
                           />
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-gray-800 line-clamp-1">
-                              {product.tenSanPham}
+                              {product.tenSanPham || product.sanPham?.ten}
                             </div>
                             <div className="text-sm text-gray-600">
                               x{product.soLuong}
                             </div>
                           </div>
                           <div className="font-bold text-primary-600">
-                            {product.thanhTien.toLocaleString('vi-VN')} ₫
+                            {(product.thanhTien || 0).toLocaleString('vi-VN')} ₫
                           </div>
                         </div>
                       ))}
-                      {order.sanPhams.length > 3 && (
+                      {/* ✅ FIX: Xử lý cả chiTiet và sanPhams */}
+                      {(order.chiTiet || order.sanPhams || []).length > 3 && (
                         <div className="text-sm text-primary-600 font-medium text-center py-2 bg-primary-50 rounded-cute">
-                          +{order.sanPhams.length - 3} sản phẩm khác
+                          +{(order.chiTiet || order.sanPhams || []).length - 3} sản phẩm khác
                         </div>
                       )}
                     </div>
@@ -283,7 +316,7 @@ const OrderHistoryPage = () => {
                       <div>
                         <span className="text-gray-700 mr-2">Tổng tiền:</span>
                         <span className="text-2xl font-bold text-gradient-primary">
-                          {order.tongTien.toLocaleString('vi-VN')} ₫
+                          {formatPrice(order.tongTien || order.thanhTien)}
                         </span>
                       </div>
                       <div className="flex gap-3">
@@ -295,6 +328,20 @@ const OrderHistoryPage = () => {
                         >
                           Chi tiết
                         </Button>
+                        
+                        {/* ✅ MỚI: Nút đánh giá cho đơn hàng hoàn thành */}
+                        {order.trangThai === 'Hoàn thành' && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon={<Star size={16} />}
+                            onClick={() => navigate('/reviews/reviewable')}
+                            className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600"
+                          >
+                            Đánh giá
+                          </Button>
+                        )}
+                        
                         {canCancelOrder(order.trangThai) && (
                           <Button
                             variant="danger"

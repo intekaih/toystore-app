@@ -1,7 +1,47 @@
 const db = require('../models');
 const LoaiSP = db.LoaiSP;
 const SanPham = db.SanPham;
+const ThuongHieu = db.ThuongHieu; // ✅ THÊM import ThuongHieu
 const { Op } = require('sequelize');
+const DTOMapper = require('../utils/DTOMapper');
+
+/**
+ * GET /api/admin/categories/search?q=...
+ * Tìm kiếm danh mục để autocomplete
+ */
+exports.searchCategories = async (req, res) => {
+  try {
+    const query = req.query.q || '';
+    
+    const categories = await LoaiSP.findAll({
+      where: {
+        Ten: {
+          [Op.like]: `%${query.trim()}%`
+        },
+        TrangThai: true
+      },
+      order: [['Ten', 'ASC']],
+      limit: 10
+    });
+
+    const categoriesDTO = categories.map(cat => DTOMapper.toCamelCase({
+      ID: cat.ID,
+      Ten: cat.Ten
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: { categories: categoriesDTO }
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi tìm kiếm danh mục:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ'
+    });
+  }
+};
 
 /**
  * GET /api/admin/categories
@@ -11,42 +51,38 @@ exports.getAllCategories = async (req, res) => {
   try {
     console.log('📂 Admin - Lấy danh sách danh mục');
 
-    // Lấy tất cả danh mục kèm theo số lượng sản phẩm
+    // ✅ FIX: Query đơn giản hơn, không dùng group by phức tạp
     const categories = await LoaiSP.findAll({
-      attributes: [
-        'ID',
-        'Ten',
-        'MoTa',
-        'Enable',
-        [
-          db.sequelize.literal(`(
-            SELECT COUNT(*)
-            FROM SanPham
-            WHERE SanPham.LoaiID = LoaiSP.ID
-          )`),
-          'SoLuongSanPham' // ✅ Đếm TẤT CẢ sản phẩm, không quan tâm Enable
-        ]
-      ],
       order: [['ID', 'ASC']]
     });
 
+    // ✅ Đếm số lượng sản phẩm cho từng danh mục VÀ chuyển sang camelCase ngay
+    const categoriesWithCount = await Promise.all(
+      categories.map(async (cat) => {
+        const productCount = await SanPham.count({
+          where: { 
+            LoaiID: cat.ID
+            // ✅ Đếm TẤT CẢ sản phẩm (kể cả vô hiệu)
+          }
+        });
+
+        // ✅ Trả về camelCase đúng format
+        return {
+          id: cat.ID,  // ✅ "id" chữ thường hoàn toàn
+          ten: cat.Ten,
+          trangThai: cat.TrangThai,
+          soLuongSanPham: productCount
+        };
+      })
+    );
+
     console.log(`✅ Lấy ${categories.length} danh mục thành công`);
 
-    // ✅ Trả về dữ liệu với PascalCase - middleware sẽ tự động transform
     res.status(200).json({
       success: true,
       message: 'Lấy danh sách danh mục thành công',
       data: {
-        categories: categories.map(cat => {
-          const categoryData = cat.toJSON(); // Convert to plain object
-          return {
-            ID: categoryData.ID,
-            Ten: categoryData.Ten,
-            MoTa: categoryData.MoTa,
-            Enable: categoryData.Enable,
-            SoLuongSanPham: parseInt(categoryData.SoLuongSanPham) || 0
-          };
-        }),
+        categories: categoriesWithCount,  // ✅ Đã là camelCase rồi, không cần DTOMapper
         total: categories.length
       }
     });
@@ -79,7 +115,7 @@ exports.createCategory = async (req, res) => {
     console.log('➕ Admin - Tạo danh mục mới');
     console.log('📝 Dữ liệu nhận được:', req.body);
 
-    const { Ten, MoTa } = req.body;
+    const { Ten } = req.body; // ✅ Bỏ MoTa vì không có trong DB
 
     // Validate input - Tên là bắt buộc
     if (!Ten || !Ten.trim()) {
@@ -119,25 +155,24 @@ exports.createCategory = async (req, res) => {
       });
     }
 
-    // Tạo danh mục mới
+    // ✅ Tạo danh mục mới - chỉ có Ten và TrangThai
     const newCategory = await LoaiSP.create({
       Ten: Ten.trim(),
-      MoTa: MoTa ? MoTa.trim() : null,
-      Enable: true
+      TrangThai: true
     });
 
     console.log('✅ Tạo danh mục mới thành công:', newCategory.Ten);
 
+    // ✅ SỬ DỤNG DTOMapper - bỏ MoTa
     res.status(201).json({
       success: true,
       message: 'Tạo danh mục mới thành công',
       data: {
-        category: {
+        category: DTOMapper.toCamelCase({
           ID: newCategory.ID,
           Ten: newCategory.Ten,
-          MoTa: newCategory.MoTa,
-          Enable: newCategory.Enable
-        }
+          TrangThai: newCategory.TrangThai
+        })
       }
     });
 
@@ -185,7 +220,7 @@ exports.updateCategory = async (req, res) => {
       });
     }
 
-    const { Ten, MoTa, Enable } = req.body;
+    const { Ten, TrangThai } = req.body; // ✅ Bỏ MoTa
 
     // Validate dữ liệu đầu vào
     const errors = [];
@@ -200,11 +235,7 @@ exports.updateCategory = async (req, res) => {
       }
     }
 
-    if (MoTa !== undefined && MoTa && MoTa.length > 500) {
-      errors.push('Mô tả không được vượt quá 500 ký tự');
-    }
-
-    if (Enable !== undefined && typeof Enable !== 'boolean') {
+    if (TrangThai !== undefined && typeof TrangThai !== 'boolean') {
       errors.push('Trạng thái phải là true hoặc false');
     }
 
@@ -248,19 +279,15 @@ exports.updateCategory = async (req, res) => {
       }
     }
 
-    // Tạo object dữ liệu cần cập nhật
+    // ✅ Tạo object dữ liệu cần cập nhật - bỏ MoTa
     const updateData = {};
     
     if (Ten !== undefined) {
       updateData.Ten = Ten.trim();
     }
-    
-    if (MoTa !== undefined) {
-      updateData.MoTa = MoTa ? MoTa.trim() : null;
-    }
 
-    if (Enable !== undefined) {
-      updateData.Enable = Enable;
+    if (TrangThai !== undefined) {
+      updateData.TrangThai = TrangThai;
     }
 
     // Kiểm tra có dữ liệu để cập nhật không
@@ -279,16 +306,16 @@ exports.updateCategory = async (req, res) => {
 
     console.log('✅ Cập nhật danh mục thành công:', updatedCategory.Ten);
 
+    // ✅ SỬ DỤNG DTOMapper - bỏ MoTa
     res.status(200).json({
       success: true,
       message: 'Cập nhật danh mục thành công',
       data: {
-        category: {
+        category: DTOMapper.toCamelCase({
           ID: updatedCategory.ID,
           Ten: updatedCategory.Ten,
-          MoTa: updatedCategory.MoTa,
-          Enable: updatedCategory.Enable
-        }
+          TrangThai: updatedCategory.TrangThai
+        })
       }
     });
 
@@ -349,7 +376,7 @@ exports.deleteCategory = async (req, res) => {
     const productCount = await SanPham.count({
       where: {
         LoaiID: categoryId
-        // ✅ Bỏ điều kiện Enable: true để kiểm tra TẤT CẢ sản phẩm
+        // ✅ Bỏ điều kiện TrangThai: true để kiểm tra TẤT CẢ sản phẩm
       }
     });
 
@@ -371,14 +398,15 @@ exports.deleteCategory = async (req, res) => {
 
     console.log('✅ Xóa danh mục thành công:', categoryName);
 
+    // ✅ SỬ DỤNG DTOMapper
     res.status(200).json({
       success: true,
       message: 'Xóa danh mục thành công',
       data: {
-        deletedCategory: {
+        deletedCategory: DTOMapper.toCamelCase({
           ID: categoryId,
           Ten: categoryName
-        }
+        })
       }
     });
 
@@ -392,6 +420,112 @@ exports.deleteCategory = async (req, res) => {
       });
     }
 
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
+    });
+  }
+};
+
+// ============================================
+// 🌐 PUBLIC METHODS - Không cần authentication
+// ============================================
+
+/**
+ * GET /api/categories
+ * Lấy danh sách danh mục công khai (chỉ TrangThai = true)
+ */
+exports.getPublicCategories = async (req, res) => {
+  try {
+    console.log('📂 Public - Lấy danh sách danh mục');
+
+    const categories = await LoaiSP.findAll({
+      where: {
+        TrangThai: true  // ✅ Chỉ lấy danh mục đang hoạt động
+      },
+      order: [['Ten', 'ASC']]
+    });
+
+    // ✅ Đếm số lượng sản phẩm ĐANG BÁN cho từng danh mục
+    const categoriesWithCount = await Promise.all(
+      categories.map(async (cat) => {
+        const productCount = await SanPham.count({
+          where: { 
+            LoaiID: cat.ID,
+            TrangThai: true  // ✅ Chỉ đếm sản phẩm đang bán
+          }
+        });
+
+        return {
+          id: cat.ID,
+          ten: cat.Ten,
+          soLuongSanPham: productCount
+        };
+      })
+    );
+
+    console.log(`✅ Lấy ${categories.length} danh mục công khai thành công`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Lấy danh sách danh mục thành công',
+      data: categoriesWithCount
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi lấy danh sách danh mục công khai:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
+    });
+  }
+};
+
+/**
+ * GET /api/categories/brands
+ * Lấy danh sách thương hiệu công khai
+ */
+exports.getPublicBrands = async (req, res) => {
+  try {
+    console.log('🏷️ Public - Lấy danh sách thương hiệu');
+
+    const brands = await ThuongHieu.findAll({
+      where: {
+        TrangThai: true  // ✅ Chỉ lấy thương hiệu đang hoạt động
+      },
+      order: [['TenThuongHieu', 'ASC']]  // ✅ SỬA: 'Ten' → 'TenThuongHieu'
+    });
+
+    // ✅ Đếm số lượng sản phẩm ĐANG BÁN cho từng thương hiệu
+    const brandsWithCount = await Promise.all(
+      brands.map(async (brand) => {
+        const productCount = await SanPham.count({
+          where: { 
+            ThuongHieuID: brand.ID,
+            TrangThai: true  // ✅ Chỉ đếm sản phẩm đang bán
+          }
+        });
+
+        return {
+          id: brand.ID,
+          ten: brand.TenThuongHieu,  // ✅ SỬA: brand.Ten → brand.TenThuongHieu
+          soLuongSanPham: productCount
+        };
+      })
+    );
+
+    console.log(`✅ Lấy ${brands.length} thương hiệu công khai thành công`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Lấy danh sách thương hiệu thành công',
+      data: brandsWithCount
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi lấy danh sách thương hiệu công khai:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server nội bộ',

@@ -84,7 +84,10 @@ const LoginPage = () => {
         MatKhau: formData.MatKhau
       };
 
+      // ✅ useAuth hook đã sử dụng authService bên trong
+      // Không cần import authService trực tiếp ở đây
       await login(loginData);
+      
       setMessage('Đăng nhập thành công! Đang chuyển hướng...');
       
       setFormData({

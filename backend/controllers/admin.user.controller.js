@@ -2,6 +2,7 @@ const db = require('../models');
 const bcrypt = require('bcryptjs');
 const TaiKhoan = db.TaiKhoan;
 const { Op } = require('sequelize');
+const DTOMapper = require('../utils/DTOMapper');
 
 /**
  * GET /api/admin/users
@@ -81,15 +82,15 @@ exports.getAllUsers = async (req, res) => {
     }
 
     // Lọc theo vai trò
-    if (role && ['admin', 'user'].includes(role)) {
+    if (role && ['Admin', 'KhachHang', 'NhanVien'].includes(role)) {
       whereCondition.VaiTro = role;
     }
 
     // Lọc theo trạng thái
     if (status === 'active') {
-      whereCondition.Enable = true;
+      whereCondition.TrangThai = true;
     } else if (status === 'inactive') {
-      whereCondition.Enable = false;
+      whereCondition.TrangThai = false;
     }
 
     console.log('🔍 Điều kiện tìm kiếm:', whereCondition);
@@ -105,7 +106,7 @@ exports.getAllUsers = async (req, res) => {
         'DienThoai',
         'VaiTro',
         'NgayTao',
-        'Enable'
+        'TrangThai'
       ],
       limit: limit,
       offset: offset,
@@ -118,18 +119,25 @@ exports.getAllUsers = async (req, res) => {
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
 
-    // Format dữ liệu trả về
-    const users = rows.map(user => ({
-      id: user.ID,
-      tenDangNhap: user.TenDangNhap,
-      hoTen: user.HoTen,
-      email: user.Email,
-      dienThoai: user.DienThoai,
-      vaiTro: user.VaiTro,
-      ngayTao: user.NgayTao,
-      trangThai: user.Enable ? 'Hoạt động' : 'Bị khóa',
-      enable: user.Enable
-    }));
+    // ✅ SỬ DỤNG DTOMapper để format dữ liệu trả về
+    const users = rows.map(user => {
+      const userData = DTOMapper.toCamelCase({
+        ID: user.ID,
+        TenDangNhap: user.TenDangNhap,
+        HoTen: user.HoTen,
+        Email: user.Email,
+        DienThoai: user.DienThoai,
+        VaiTro: user.VaiTro,
+        NgayTao: user.NgayTao,
+        TrangThai: user.TrangThai
+      });
+      
+      return {
+        ...userData,
+        trangThai: user.TrangThai ? 'Hoạt động' : 'Bị khóa',
+        enable: user.TrangThai
+      };
+    });
 
     console.log(`✅ Lấy ${users.length}/${totalUsers} người dùng thành công`);
 
@@ -154,8 +162,8 @@ exports.getAllUsers = async (req, res) => {
         statistics: {
           totalActive: users.filter(u => u.enable).length,
           totalInactive: users.filter(u => !u.enable).length,
-          totalAdmin: users.filter(u => u.vaiTro === 'admin').length,
-          totalUser: users.filter(u => u.vaiTro === 'user').length
+          totalAdmin: users.filter(u => u.vaiTro === 'Admin').length,
+          totalUser: users.filter(u => u.vaiTro === 'KhachHang').length
         }
       }
     });
@@ -231,10 +239,10 @@ exports.createUser = async (req, res) => {
     }
 
     // Validate vai trò
-    if (VaiTro && !['admin', 'user'].includes(VaiTro)) {
+    if (VaiTro && !['Admin', 'KhachHang', 'NhanVien'].includes(VaiTro)) {
       return res.status(400).json({
         success: false,
-        message: 'Vai trò phải là "admin" hoặc "user"'
+        message: 'Vai trò phải là "Admin", "KhachHang" hoặc "NhanVien"'
       });
     }
 
@@ -274,25 +282,31 @@ exports.createUser = async (req, res) => {
       HoTen: HoTen.trim(),
       Email: Email ? Email.trim().toLowerCase() : null,
       DienThoai: DienThoai ? DienThoai.trim() : null,
-      VaiTro: VaiTro || 'user',
-      Enable: true
+      VaiTro: VaiTro || 'KhachHang',
+      TrangThai: true
     });
 
     console.log('✅ Tạo người dùng mới thành công:', newUser.TenDangNhap);
+
+    // ✅ SỬ DỤNG DTOMapper
+    const userDTO = DTOMapper.toCamelCase({
+      ID: newUser.ID,
+      TenDangNhap: newUser.TenDangNhap,
+      HoTen: newUser.HoTen,
+      Email: newUser.Email,
+      DienThoai: newUser.DienThoai,
+      VaiTro: newUser.VaiTro,
+      NgayTao: newUser.NgayTao,
+      TrangThai: newUser.TrangThai
+    });
 
     res.status(201).json({
       success: true,
       message: 'Tạo người dùng mới thành công',
       data: {
         user: {
-          id: newUser.ID,
-          tenDangNhap: newUser.TenDangNhap,
-          hoTen: newUser.HoTen,
-          email: newUser.Email,
-          dienThoai: newUser.DienThoai,
-          vaiTro: newUser.VaiTro,
-          ngayTao: newUser.NgayTao,
-          enable: newUser.Enable
+          ...userDTO,
+          enable: newUser.TrangThai
         }
       }
     });
@@ -363,8 +377,8 @@ exports.updateUser = async (req, res) => {
       errors.push('Định dạng email không hợp lệ');
     }
 
-    if (VaiTro !== undefined && !['admin', 'user'].includes(VaiTro)) {
-      errors.push('Vai trò phải là "admin" hoặc "user"');
+    if (VaiTro !== undefined && !['Admin', 'KhachHang', 'NhanVien'].includes(VaiTro)) {
+      errors.push('Vai trò phải là "Admin", "KhachHang" hoặc "NhanVien"');
     }
 
     if (errors.length > 0) {
@@ -391,6 +405,37 @@ exports.updateUser = async (req, res) => {
         success: false,
         message: 'Bạn không thể thay đổi vai trò của chính mình'
       });
+    }
+
+    // ⭐ KIỂM TRA: Ngăn hạ cấp admin cuối cùng xuống user
+    if (VaiTro !== undefined && user.VaiTro === 'Admin' && VaiTro !== 'Admin' && user.TrangThai === true) {
+      // Đếm số lượng admin đang hoạt động (không bao gồm user hiện tại)
+      const activeAdminCount = await TaiKhoan.count({
+        where: {
+          VaiTro: 'Admin',
+          TrangThai: true,
+          ID: { [Op.ne]: userId }
+        }
+      });
+
+      console.log('📊 Số admin đang hoạt động (không tính user này):', activeAdminCount);
+
+      // Nếu không còn admin nào khác đang hoạt động
+      if (activeAdminCount === 0) {
+        console.log('⚠️ Ngăn chặn hạ cấp admin cuối cùng!');
+        return res.status(403).json({
+          success: false,
+          message: 'Không thể hạ cấp tài khoản admin cuối cùng trong hệ thống. Vui lòng tạo thêm admin khác trước khi thực hiện thao tác này.',
+          detail: {
+            currentActiveAdmins: activeAdminCount,
+            currentRole: user.VaiTro,
+            newRole: VaiTro,
+            userName: user.TenDangNhap
+          }
+        });
+      }
+
+      console.log(`✅ Cho phép hạ cấp admin xuống user. Còn ${activeAdminCount} admin khác đang hoạt động.`);
     }
 
     // Kiểm tra email trùng lặp (nếu email được cập nhật)
@@ -442,24 +487,30 @@ exports.updateUser = async (req, res) => {
 
     // Lấy lại thông tin user đã cập nhật
     const updatedUser = await TaiKhoan.findByPk(userId, {
-      attributes: ['ID', 'TenDangNhap', 'HoTen', 'Email', 'DienThoai', 'VaiTro', 'NgayTao', 'Enable']
+      attributes: ['ID', 'TenDangNhap', 'HoTen', 'Email', 'DienThoai', 'VaiTro', 'NgayTao', 'TrangThai']
     });
 
     console.log('✅ Cập nhật người dùng thành công:', updatedUser.TenDangNhap);
+
+    // ✅ SỬ DỤNG DTOMapper
+    const userDTO = DTOMapper.toCamelCase({
+      ID: updatedUser.ID,
+      TenDangNhap: updatedUser.TenDangNhap,
+      HoTen: updatedUser.HoTen,
+      Email: updatedUser.Email,
+      DienThoai: updatedUser.DienThoai,
+      VaiTro: updatedUser.VaiTro,
+      NgayTao: updatedUser.NgayTao,
+      TrangThai: updatedUser.TrangThai
+    });
 
     res.status(200).json({
       success: true,
       message: 'Cập nhật thông tin người dùng thành công',
       data: {
         user: {
-          id: updatedUser.ID,
-          tenDangNhap: updatedUser.TenDangNhap,
-          hoTen: updatedUser.HoTen,
-          email: updatedUser.Email,
-          dienThoai: updatedUser.DienThoai,
-          vaiTro: updatedUser.VaiTro,
-          ngayTao: updatedUser.NgayTao,
-          enable: updatedUser.Enable
+          ...userDTO,
+          enable: updatedUser.TrangThai
         }
       }
     });
@@ -547,30 +598,66 @@ exports.updateUserStatus = async (req, res) => {
     }
 
     // Kiểm tra trạng thái hiện tại
-    if (user.Enable === enable) {
+    if (user.TrangThai === enable) {
       return res.status(400).json({
         success: false,
         message: `Tài khoản đã ${enable ? 'được mở' : 'bị khóa'} từ trước`
       });
     }
 
+    // ⭐ KIỂM TRA: Ngăn khóa admin cuối cùng
+    if (user.VaiTro === 'Admin' && enable === false) {
+      // Đếm số lượng admin đang hoạt động (không bao gồm user hiện tại)
+      const activeAdminCount = await TaiKhoan.count({
+        where: {
+          VaiTro: 'Admin',
+          TrangThai: true,
+          ID: { [Op.ne]: userId } // Không tính user đang bị khóa
+        }
+      });
+
+      console.log('📊 Số admin đang hoạt động (không tính user này):', activeAdminCount);
+
+      // Nếu không còn admin nào khác đang hoạt động
+      if (activeAdminCount === 0) {
+        console.log('⚠️ Ngăn chặn khóa admin cuối cùng!');
+        return res.status(403).json({
+          success: false,
+          message: 'Không thể khóa tài khoản admin cuối cùng trong hệ thống. Vui lòng tạo thêm admin khác trước khi thực hiện thao tác này.',
+          detail: {
+            currentActiveAdmins: activeAdminCount,
+            userRole: user.VaiTro,
+            userName: user.TenDangNhap
+          }
+        });
+      }
+
+      console.log(`✅ Cho phép khóa admin. Còn ${activeAdminCount} admin khác đang hoạt động.`);
+    }
+
     // Cập nhật trạng thái
-    await user.update({ Enable: enable });
+    await user.update({ TrangThai: enable });
 
     console.log(`✅ ${enable ? 'Mở khóa' : 'Khóa'} tài khoản thành công:`, user.TenDangNhap);
+
+    // ✅ SỬ DỤNG DTOMapper
+    const userDTO = DTOMapper.toCamelCase({
+      ID: user.ID,
+      TenDangNhap: user.TenDangNhap,
+      HoTen: user.HoTen,
+      Email: user.Email,
+      VaiTro: user.VaiTro,
+      TrangThai: user.TrangThai
+    });
 
     res.status(200).json({
       success: true,
       message: `${enable ? 'Mở khóa' : 'Khóa'} tài khoản thành công`,
       data: {
         user: {
-          id: user.ID,
-          tenDangNhap: user.TenDangNhap,
-          hoTen: user.HoTen,
-          email: user.Email,
-          vaiTro: user.VaiTro,
-          enable: user.Enable,
-          trangThai: user.Enable ? 'Hoạt động' : 'Bị khóa'
+          ...userDTO,
+          enable: user.TrangThai,
+          trangThai: user.TrangThai ? 'Hoạt động' : 'Bị khóa'
         }
       }
     });
@@ -621,14 +708,44 @@ exports.deleteUser = async (req, res) => {
       });
     }
 
+    // ⭐ KIỂM TRA: Ngăn xóa admin cuối cùng
+    if (user.VaiTro === 'Admin' && user.TrangThai === true) {
+      // Đếm số lượng admin đang hoạt động (không bao gồm user hiện tại)
+      const activeAdminCount = await TaiKhoan.count({
+        where: {
+          VaiTro: 'Admin',
+          TrangThai: true,
+          ID: { [Op.ne]: userId }
+        }
+      });
+
+      console.log('📊 Số admin đang hoạt động (không tính user này):', activeAdminCount);
+
+      // Nếu không còn admin nào khác đang hoạt động
+      if (activeAdminCount === 0) {
+        console.log('⚠️ Ngăn chặn xóa admin cuối cùng!');
+        return res.status(403).json({
+          success: false,
+          message: 'Không thể xóa tài khoản admin cuối cùng trong hệ thống. Vui lòng tạo thêm admin khác trước khi thực hiện thao tác này.',
+          detail: {
+            currentActiveAdmins: activeAdminCount,
+            userRole: user.VaiTro,
+            userName: user.TenDangNhap
+          }
+        });
+      }
+
+      console.log(`✅ Cho phép xóa admin. Còn ${activeAdminCount} admin khác đang hoạt động.`);
+    }
+
     // Lưu thông tin user trước khi xóa để trả về response
-    const deletedUserInfo = {
-      id: user.ID,
-      tenDangNhap: user.TenDangNhap,
-      hoTen: user.HoTen,
-      email: user.Email,
-      vaiTro: user.VaiTro
-    };
+    const deletedUserInfo = DTOMapper.toCamelCase({
+      ID: user.ID,
+      TenDangNhap: user.TenDangNhap,
+      HoTen: user.HoTen,
+      Email: user.Email,
+      VaiTro: user.VaiTro
+    });
 
     // Xóa tài khoản vĩnh viễn
     await user.destroy();
@@ -681,7 +798,7 @@ exports.getUserById = async (req, res) => {
 
     // Lấy thông tin user
     const user = await TaiKhoan.findByPk(userId, {
-      attributes: ['ID', 'TenDangNhap', 'HoTen', 'Email', 'DienThoai', 'VaiTro', 'NgayTao', 'Enable']
+      attributes: ['ID', 'TenDangNhap', 'HoTen', 'Email', 'DienThoai', 'VaiTro', 'NgayTao', 'TrangThai']
     });
 
     if (!user) {
@@ -693,20 +810,26 @@ exports.getUserById = async (req, res) => {
 
     console.log('✅ Lấy chi tiết người dùng thành công:', user.TenDangNhap);
 
+    // ✅ SỬ DỤNG DTOMapper
+    const userDTO = DTOMapper.toCamelCase({
+      ID: user.ID,
+      TenDangNhap: user.TenDangNhap,
+      HoTen: user.HoTen,
+      Email: user.Email,
+      DienThoai: user.DienThoai,
+      VaiTro: user.VaiTro,
+      NgayTao: user.NgayTao,
+      TrangThai: user.TrangThai
+    });
+
     res.status(200).json({
       success: true,
       message: 'Lấy chi tiết người dùng thành công',
       data: {
         user: {
-          id: user.ID,
-          tenDangNhap: user.TenDangNhap,
-          hoTen: user.HoTen,
-          email: user.Email,
-          dienThoai: user.DienThoai,
-          vaiTro: user.VaiTro,
-          ngayTao: user.NgayTao,
-          enable: user.Enable,
-          trangThai: user.Enable ? 'Hoạt động' : 'Bị khóa'
+          ...userDTO,
+          enable: user.TrangThai,
+          trangThai: user.TrangThai ? 'Hoạt động' : 'Bị khóa'
         }
       }
     });

@@ -3,6 +3,7 @@ const Decimal = require('decimal.js'); // ✅ Thêm Decimal.js cho tính toán c
 const GioHang = db.GioHang;
 const GioHangChiTiet = db.GioHangChiTiet;
 const SanPham = db.SanPham;
+const DTOMapper = require('../utils/DTOMapper');
 
 // Thêm sản phẩm vào giỏ hàng
 exports.addToCart = async (req, res) => {
@@ -29,7 +30,7 @@ exports.addToCart = async (req, res) => {
     const sanPham = await SanPham.findOne({
       where: {
         ID: sanPhamId,
-        Enable: true
+        TrangThai: true
       }
     });
 
@@ -40,10 +41,10 @@ exports.addToCart = async (req, res) => {
       });
     }
 
-    if (sanPham.Ton < soLuong) {
+    if (sanPham.SoLuongTon < soLuong) {
       return res.status(400).json({
         success: false,
-        message: `Sản phẩm chỉ còn ${sanPham.Ton} sản phẩm trong kho`
+        message: `Sản phẩm chỉ còn ${sanPham.SoLuongTon} sản phẩm trong kho`
       });
     }
 
@@ -74,10 +75,10 @@ exports.addToCart = async (req, res) => {
       const newSoLuong = existingItem.SoLuong + soLuong;
 
       // Kiểm tra số lượng mới có vượt quá tồn kho không
-      if (newSoLuong > sanPham.Ton) {
+      if (newSoLuong > sanPham.SoLuongTon) {
         return res.status(400).json({
           success: false,
-          message: `Không thể thêm. Tổng số lượng sẽ vượt quá số lượng tồn kho (${sanPham.Ton})`
+          message: `Không thể thêm. Tổng số lượng sẽ vượt quá số lượng tồn kho (${sanPham.SoLuongTon})`
         });
       }
 
@@ -101,14 +102,17 @@ exports.addToCart = async (req, res) => {
       include: [{
         model: SanPham,
         as: 'sanPham',
-        attributes: ['ID', 'Ten', 'GiaBan', 'HinhAnhURL', 'Ton']
+        attributes: ['ID', 'Ten', 'GiaBan', 'HinhAnhURL', 'SoLuongTon']
       }]
     });
+
+    // ✅ SỬ DỤNG DTOMapper
+    const resultDTO = DTOMapper.toCamelCase(result.toJSON());
 
     return res.status(200).json({
       success: true,
       message: existingItem ? 'Cập nhật số lượng thành công' : 'Thêm vào giỏ hàng thành công',
-      data: result
+      data: resultDTO
     });
 
   } catch (error) {
@@ -135,7 +139,7 @@ exports.getCart = async (req, res) => {
         include: [{
           model: SanPham,
           as: 'sanPham',
-          attributes: ['ID', 'Ten', 'GiaBan', 'HinhAnhURL', 'Ton', 'Enable']
+          attributes: ['ID', 'Ten', 'GiaBan', 'HinhAnhURL', 'SoLuongTon', 'TrangThai']
         }]
       }]
     });
@@ -151,13 +155,15 @@ exports.getCart = async (req, res) => {
       });
     }
 
-    // ✅ Tính tổng tiền bằng Decimal.js
+    // ✅ Tính tổng tiền và sử dụng DTOMapper
     let totalAmount = new Decimal(0);
     const items = gioHang.chiTiet.map(item => {
       const itemTotal = new Decimal(item.DonGia).times(item.SoLuong);
       totalAmount = totalAmount.plus(itemTotal);
+      
+      const itemData = DTOMapper.toCamelCase(item.toJSON());
       return {
-        ...item.toJSON(),
+        ...itemData,
         thanhTien: parseFloat(itemTotal.toFixed(2))
       };
     });
@@ -186,6 +192,7 @@ exports.updateCartItem = async (req, res) => {
   try {
     const { sanPhamId, soLuong } = req.body;
     const taiKhoanId = req.user.id;
+
 
     if (!sanPhamId) {
       return res.status(400).json({
@@ -221,7 +228,8 @@ exports.updateCartItem = async (req, res) => {
       },
       include: [{
         model: SanPham,
-        as: 'sanPham'
+        as: 'sanPham',
+        attributes: ['ID', 'Ten', 'GiaBan', 'SoLuongTon', 'TrangThai', 'HinhAnhURL']
       }]
     });
 
@@ -233,7 +241,7 @@ exports.updateCartItem = async (req, res) => {
     }
 
     // Kiểm tra sản phẩm còn tồn tại và còn kinh doanh không
-    if (!cartItem.sanPham || !cartItem.sanPham.Enable) {
+    if (!cartItem.sanPham || !cartItem.sanPham.TrangThai) {
       return res.status(400).json({
         success: false,
         message: 'Sản phẩm không còn tồn tại hoặc đã ngừng kinh doanh'
@@ -241,10 +249,10 @@ exports.updateCartItem = async (req, res) => {
     }
 
     // Kiểm tra tồn kho
-    if (soLuong > cartItem.sanPham.Ton) {
+    if (soLuong > cartItem.sanPham.SoLuongTon) {
       return res.status(400).json({
         success: false,
-        message: `Sản phẩm chỉ còn ${cartItem.sanPham.Ton} sản phẩm trong kho`
+        message: `Sản phẩm chỉ còn ${cartItem.sanPham.SoLuongTon} sản phẩm trong kho`
       });
     }
 
@@ -258,14 +266,17 @@ exports.updateCartItem = async (req, res) => {
       include: [{
         model: SanPham,
         as: 'sanPham',
-        attributes: ['ID', 'Ten', 'GiaBan', 'HinhAnhURL', 'Ton']
+        attributes: ['ID', 'Ten', 'GiaBan', 'HinhAnhURL', 'SoLuongTon']
       }]
     });
+
+    // ✅ SỬ DỤNG DTOMapper
+    const updatedItemDTO = DTOMapper.toCamelCase(updatedItem.toJSON());
 
     return res.status(200).json({
       success: true,
       message: 'Cập nhật số lượng thành công',
-      data: updatedItem
+      data: updatedItemDTO
     });
 
   } catch (error) {
@@ -451,7 +462,7 @@ exports.incrementCartItem = async (req, res) => {
       include: [{
         model: SanPham,
         as: 'sanPham',
-        attributes: ['ID', 'Ten', 'GiaBan', 'Ton', 'Enable', 'HinhAnhURL']
+        attributes: ['ID', 'Ten', 'GiaBan', 'SoLuongTon', 'TrangThai', 'HinhAnhURL']
       }]
     });
 
@@ -463,7 +474,7 @@ exports.incrementCartItem = async (req, res) => {
     }
 
     // Kiểm tra sản phẩm còn tồn tại và còn kinh doanh không
-    if (!cartItem.sanPham || !cartItem.sanPham.Enable) {
+    if (!cartItem.sanPham || !cartItem.sanPham.TrangThai) {
       return res.status(400).json({
         success: false,
         message: 'Sản phẩm không còn tồn tại hoặc đã ngừng kinh doanh'
@@ -473,13 +484,13 @@ exports.incrementCartItem = async (req, res) => {
     // Kiểm tra tồn kho trước khi tăng
     const newSoLuong = cartItem.SoLuong + 1;
     
-    if (newSoLuong > cartItem.sanPham.Ton) {
+    if (newSoLuong > cartItem.sanPham.SoLuongTon) {
       return res.status(400).json({
         success: false,
-        message: `Không thể tăng. Sản phẩm chỉ còn ${cartItem.sanPham.Ton} trong kho`,
+        message: `Không thể tăng. Sản phẩm chỉ còn ${cartItem.sanPham.SoLuongTon} trong kho`,
         data: {
           currentQuantity: cartItem.SoLuong,
-          stockAvailable: cartItem.sanPham.Ton
+          stockAvailable: cartItem.sanPham.SoLuongTon
         }
       });
     }
@@ -496,16 +507,20 @@ exports.incrementCartItem = async (req, res) => {
       include: [{
         model: SanPham,
         as: 'sanPham',
-        attributes: ['ID', 'Ten', 'GiaBan', 'HinhAnhURL', 'Ton', 'Enable']
+        attributes: ['ID', 'Ten', 'GiaBan', 'HinhAnhURL', 'SoLuongTon', 'TrangThai']
       }]
     });
+
+    // ✅ SỬ DỤNG DTOMapper
+    const updatedItemDTO = DTOMapper.toCamelCase(updatedItem.toJSON());
+    const itemTotal = new Decimal(updatedItem.DonGia).times(updatedItem.SoLuong);
 
     return res.status(200).json({
       success: true,
       message: 'Tăng số lượng thành công',
       data: {
-        ...updatedItem.toJSON(),
-        thanhTien: parseFloat(updatedItem.DonGia) * updatedItem.SoLuong
+        ...updatedItemDTO,
+        thanhTien: parseFloat(itemTotal.toFixed(2))
       }
     });
 
@@ -556,7 +571,7 @@ exports.decrementCartItem = async (req, res) => {
       include: [{
         model: SanPham,
         as: 'sanPham',
-        attributes: ['ID', 'Ten', 'GiaBan', 'Ton', 'Enable', 'HinhAnhURL']
+        attributes: ['ID', 'Ten', 'GiaBan', 'SoLuongTon', 'TrangThai', 'HinhAnhURL']
       }]
     });
 
@@ -596,16 +611,20 @@ exports.decrementCartItem = async (req, res) => {
       include: [{
         model: SanPham,
         as: 'sanPham',
-        attributes: ['ID', 'Ten', 'GiaBan', 'HinhAnhURL', 'Ton', 'Enable']
+        attributes: ['ID', 'Ten', 'GiaBan', 'HinhAnhURL', 'SoLuongTon', 'TrangThai']
       }]
     });
+
+    // ✅ SỬ DỤNG DTOMapper
+    const updatedItemDTO = DTOMapper.toCamelCase(updatedItem.toJSON());
+    const itemTotal = new Decimal(updatedItem.DonGia).times(updatedItem.SoLuong);
 
     return res.status(200).json({
       success: true,
       message: 'Giảm số lượng thành công',
       data: {
-        ...updatedItem.toJSON(),
-        thanhTien: parseFloat(updatedItem.DonGia) * updatedItem.SoLuong
+        ...updatedItemDTO,
+        thanhTien: parseFloat(itemTotal.toFixed(2))
       }
     });
 
@@ -645,26 +664,17 @@ exports.getGuestCart = async (req, res) => {
     // Lấy giỏ hàng từ DB
     const cartItems = await GioHangKhachVangLai.getCartBySession(sessionId, db);
 
-    // Tính tổng tiền
-    let totalAmount = 0;
+    // ✅ SỬA: Phải gọi .toJSON() trước khi dùng DTOMapper
+    let totalAmount = new Decimal(0);
     const items = cartItems.map(item => {
-      const itemTotal = item.SoLuong * parseFloat(item.DonGia);
-      totalAmount += itemTotal;
+      const itemTotal = new Decimal(item.DonGia).times(item.SoLuong);
+      totalAmount = totalAmount.plus(itemTotal);
+      
+      // ✅ QUAN TRỌNG: Gọi .toJSON() để convert Sequelize instance thành plain object
+      const itemData = DTOMapper.toCamelCase(item.toJSON());
       return {
-        id: item.ID,
-        sanPhamId: item.SanPhamID,
-        soLuong: item.SoLuong,
-        donGia: parseFloat(item.DonGia),
-        thanhTien: itemTotal,
-        ngayThem: item.NgayThem,
-        sanPham: item.sanPham ? {
-          id: item.sanPham.ID,
-          ten: item.sanPham.Ten,
-          giaBan: parseFloat(item.sanPham.GiaBan),
-          ton: item.sanPham.Ton,
-          hinhAnhURL: item.sanPham.HinhAnhURL,
-          loai: item.sanPham.loai
-        } : null
+        ...itemData,
+        thanhTien: parseFloat(itemTotal.toFixed(2))
       };
     });
 
@@ -675,7 +685,7 @@ exports.getGuestCart = async (req, res) => {
         sessionId: sessionId,
         items: items,
         totalItems: items.length,
-        totalAmount: totalAmount
+        totalAmount: parseFloat(totalAmount.toFixed(2))
       }
     });
 
@@ -725,7 +735,7 @@ exports.addToGuestCart = async (req, res) => {
     const sanPham = await SanPham.findOne({
       where: {
         ID: sanPhamId,
-        Enable: true
+        TrangThai: true
       }
     });
 
@@ -737,24 +747,23 @@ exports.addToGuestCart = async (req, res) => {
     }
 
     // Kiểm tra tồn kho
-    // ✅ SỬA: Tìm item BẤT KỂ Enable true/false để tránh tính sai tổng số lượng
+    // ✅ SỬA: Sử dụng MaPhien thay vì SessionID
     const existingItem = await GioHangKhachVangLai.findOne({
       where: {
-        SessionID: sessionId,
+        MaPhien: sessionId,
         SanPhamID: sanPhamId
-        // ❌ BỎ Enable: true - để tính đúng tổng số lượng
       }
     });
 
-    // Tính tổng số lượng (chỉ cộng nếu item đang active)
-    const totalQuantity = (existingItem && existingItem.Enable) 
+    // Tính tổng số lượng
+    const totalQuantity = existingItem 
       ? existingItem.SoLuong + soLuong 
       : soLuong;
 
-    if (totalQuantity > sanPham.Ton) {
+    if (totalQuantity > sanPham.SoLuongTon) {
       return res.status(400).json({
         success: false,
-        message: `Sản phẩm chỉ còn ${sanPham.Ton} trong kho`
+        message: `Sản phẩm chỉ còn ${sanPham.SoLuongTon} trong kho`
       });
     }
 
@@ -772,16 +781,19 @@ exports.addToGuestCart = async (req, res) => {
       include: [{
         model: SanPham,
         as: 'sanPham',
-        attributes: ['ID', 'Ten', 'GiaBan', 'HinhAnhURL', 'Ton']
+        attributes: ['ID', 'Ten', 'GiaBan', 'HinhAnhURL', 'SoLuongTon']
       }]
     });
 
     console.log('✅ Thêm vào giỏ hàng guest thành công');
 
+    // ✅ SỬ DỤNG DTOMapper
+    const resultDTO = DTOMapper.toCamelCase(result.toJSON());
+
     return res.status(200).json({
       success: true,
       message: 'Thêm vào giỏ hàng thành công',
-      data: result
+      data: resultDTO
     });
 
   } catch (error) {
@@ -810,17 +822,17 @@ exports.updateGuestCartItem = async (req, res) => {
 
     // Kiểm tra tồn kho
     const sanPham = await SanPham.findByPk(sanPhamId);
-    if (!sanPham || !sanPham.Enable) {
+    if (!sanPham || !sanPham.TrangThai) {
       return res.status(404).json({
         success: false,
         message: 'Sản phẩm không tồn tại'
       });
     }
 
-    if (soLuong > sanPham.Ton) {
+    if (soLuong > sanPham.SoLuongTon) {
       return res.status(400).json({
         success: false,
-        message: `Sản phẩm chỉ còn ${sanPham.Ton} trong kho`
+        message: `Sản phẩm chỉ còn ${sanPham.SoLuongTon} trong kho`
       });
     }
 
@@ -934,17 +946,17 @@ exports.incrementGuestCartItem = async (req, res) => {
       });
     }
 
+    // ✅ SỬA: Bỏ Enable vì không có trong database
     // Tìm item trong giỏ hàng
     const cartItem = await GioHangKhachVangLai.findOne({
       where: {
-        SessionID: sessionId,
-        SanPhamID: productId,
-        Enable: true
+        MaPhien: sessionId,
+        SanPhamID: productId
       },
       include: [{
         model: SanPham,
         as: 'sanPham',
-        attributes: ['ID', 'Ten', 'GiaBan', 'Ton', 'Enable']
+        attributes: ['ID', 'Ten', 'GiaBan', 'SoLuongTon', 'TrangThai']
       }]
     });
 
@@ -955,7 +967,7 @@ exports.incrementGuestCartItem = async (req, res) => {
       });
     }
 
-    if (!cartItem.sanPham || !cartItem.sanPham.Enable) {
+    if (!cartItem.sanPham || !cartItem.sanPham.TrangThai) {
       return res.status(400).json({
         success: false,
         message: 'Sản phẩm không còn tồn tại hoặc đã ngừng kinh doanh'
@@ -964,10 +976,10 @@ exports.incrementGuestCartItem = async (req, res) => {
 
     const newSoLuong = cartItem.SoLuong + 1;
 
-    if (newSoLuong > cartItem.sanPham.Ton) {
+    if (newSoLuong > cartItem.sanPham.SoLuongTon) {
       return res.status(400).json({
         success: false,
-        message: `Không thể tăng. Sản phẩm chỉ còn ${cartItem.sanPham.Ton} trong kho`
+        message: `Không thể tăng. Sản phẩm chỉ còn ${cartItem.sanPham.SoLuongTon} trong kho`
       });
     }
 
@@ -975,13 +987,17 @@ exports.incrementGuestCartItem = async (req, res) => {
     cartItem.SoLuong = newSoLuong;
     await cartItem.save();
 
+    // ✅ SỬ DỤNG DTOMapper
+    const itemTotal = new Decimal(cartItem.DonGia).times(cartItem.SoLuong);
+    const itemData = DTOMapper.toCamelCase({
+      soLuong: cartItem.SoLuong,
+      thanhTien: parseFloat(itemTotal.toFixed(2))
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Tăng số lượng thành công',
-      data: {
-        soLuong: cartItem.SoLuong,
-        thanhTien: cartItem.SoLuong * parseFloat(cartItem.DonGia)
-      }
+      data: itemData
     });
 
   } catch (error) {
@@ -1009,12 +1025,12 @@ exports.decrementGuestCartItem = async (req, res) => {
       });
     }
 
+    // ✅ SỬA: Bỏ Enable vì không có trong database
     // Tìm item trong giỏ hàng
     const cartItem = await GioHangKhachVangLai.findOne({
       where: {
-        SessionID: sessionId,
-        SanPhamID: productId,
-        Enable: true
+        MaPhien: sessionId,
+        SanPhamID: productId
       }
     });
 
@@ -1027,7 +1043,7 @@ exports.decrementGuestCartItem = async (req, res) => {
 
     // Nếu số lượng = 1, xóa sản phẩm
     if (cartItem.SoLuong <= 1) {
-      await cartItem.update({ Enable: false });
+      await cartItem.destroy();
       
       return res.status(200).json({
         success: true,
@@ -1043,13 +1059,17 @@ exports.decrementGuestCartItem = async (req, res) => {
     cartItem.SoLuong = cartItem.SoLuong - 1;
     await cartItem.save();
 
+    // ✅ SỬ DỤNG DTOMapper
+    const itemTotal = new Decimal(cartItem.DonGia).times(cartItem.SoLuong);
+    const itemData = DTOMapper.toCamelCase({
+      soLuong: cartItem.SoLuong,
+      thanhTien: parseFloat(itemTotal.toFixed(2))
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Giảm số lượng thành công',
-      data: {
-        soLuong: cartItem.SoLuong,
-        thanhTien: cartItem.SoLuong * parseFloat(cartItem.DonGia)
-      }
+      data: itemData
     });
 
   } catch (error) {
@@ -1104,7 +1124,7 @@ exports.restoreGuestCart = async (req, res) => {
 
         // Kiểm tra sản phẩm có tồn tại và còn kinh doanh
         const sanPham = await db.SanPham.findOne({
-          where: { ID: id, Enable: true }
+          where: { ID: id, TrangThai: true }
         });
 
         if (!sanPham) {
@@ -1113,10 +1133,10 @@ exports.restoreGuestCart = async (req, res) => {
         }
 
         // Kiểm tra tồn kho
-        if (sanPham.Ton < quantity) {
+        if (sanPham.SoLuongTon < quantity) {
           errors.push({ 
             productId: id, 
-            message: `Sản phẩm "${sanPham.Ten}" chỉ còn ${sanPham.Ton} trong kho` 
+            message: `Sản phẩm "${sanPham.Ten}" chỉ còn ${sanPham.SoLuongTon} trong kho` 
           });
           continue;
         }
@@ -1166,6 +1186,454 @@ exports.restoreGuestCart = async (req, res) => {
       success: false,
       message: 'Lỗi server nội bộ',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// =======================================
+// ✅ MỚI: CHỨC NĂNG CHỌN SẢN PHẨM TRONG GIỎ HÀNG (DaChon)
+// =======================================
+
+/**
+ * Cập nhật trạng thái chọn sản phẩm trong giỏ hàng (USER)
+ * PUT /api/cart/select/:productId
+ * Body: { selected: true/false }
+ */
+exports.toggleSelectItem = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { selected } = req.body;
+    const taiKhoanId = req.user.id;
+
+    console.log('☑️ Toggle chọn sản phẩm:', productId, '- Selected:', selected);
+
+    // Validate
+    if (!productId || isNaN(productId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID sản phẩm không hợp lệ'
+      });
+    }
+
+    if (typeof selected !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'Trạng thái chọn phải là true hoặc false'
+      });
+    }
+
+    // ✅ SỬA: Bỏ Enable vì không có trong database
+    // Tìm giỏ hàng của user
+    const gioHang = await GioHang.findOne({
+      where: { TaiKhoanID: taiKhoanId }
+    });
+
+    if (!gioHang) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy giỏ hàng'
+      });
+    }
+
+    // Tìm và cập nhật item
+    const cartItem = await GioHangChiTiet.findOne({
+      where: {
+        GioHangID: gioHang.ID,
+        SanPhamID: productId
+      }
+    });
+
+    if (!cartItem) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy sản phẩm trong giỏ hàng'
+      });
+    }
+
+    // Cập nhật trạng thái chọn
+    await cartItem.update({
+      DaChon: selected
+    });
+
+    console.log(`✅ Đã cập nhật trạng thái chọn: ${selected}`);
+
+    return res.status(200).json({
+      success: true,
+      message: `Đã ${selected ? 'chọn' : 'bỏ chọn'} sản phẩm`,
+      data: {
+        productId: parseInt(productId),
+        selected: selected
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi toggle chọn sản phẩm:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Cập nhật trạng thái chọn sản phẩm trong giỏ hàng (GUEST)
+ * PUT /api/cart/guest/select/:productId
+ * Body: { sessionId, selected: true/false }
+ */
+exports.toggleSelectGuestItem = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { sessionId, selected } = req.body;
+
+    console.log('☑️ Toggle chọn sản phẩm guest:', productId, '- Selected:', selected);
+
+    // Validate
+    if (!sessionId || sessionId.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Session ID không được để trống'
+      });
+    }
+
+    if (!productId || isNaN(productId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID sản phẩm không hợp lệ'
+      });
+    }
+
+    if (typeof selected !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'Trạng thái chọn phải là true hoặc false'
+      });
+    }
+
+    // ✅ SỬA: Bỏ Enable vì không có trong database
+    // Tìm và cập nhật item
+    const cartItem = await GioHangKhachVangLai.findOne({
+      where: {
+        MaPhien: sessionId,
+        SanPhamID: productId
+      }
+    });
+
+    if (!cartItem) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy sản phẩm trong giỏ hàng'
+      });
+    }
+
+    // Cập nhật trạng thái chọn
+    await cartItem.update({
+      DaChon: selected
+    });
+
+    console.log(`✅ Đã cập nhật trạng thái chọn guest: ${selected}`);
+
+    return res.status(200).json({
+      success: true,
+      message: `Đã ${selected ? 'chọn' : 'bỏ chọn'} sản phẩm`,
+      data: {
+        productId: parseInt(productId),
+        selected: selected
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi toggle chọn sản phẩm guest:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Chọn tất cả sản phẩm trong giỏ hàng (USER)
+ * PUT /api/cart/select-all
+ * Body: { selected: true/false }
+ */
+exports.toggleSelectAll = async (req, res) => {
+  try {
+    const { selected } = req.body;
+    const taiKhoanId = req.user.id;
+
+    console.log('☑️ Toggle chọn tất cả:', selected);
+
+    // Validate
+    if (typeof selected !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'Trạng thái chọn phải là true hoặc false'
+      });
+    }
+
+    // ✅ SỬA: Bỏ Enable vì không có trong database
+    // Tìm giỏ hàng của user
+    const gioHang = await GioHang.findOne({
+      where: { TaiKhoanID: taiKhoanId }
+    });
+
+    if (!gioHang) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy giỏ hàng'
+      });
+    }
+
+    // Cập nhật tất cả items
+    const [updatedCount] = await GioHangChiTiet.update(
+      { 
+        DaChon: selected
+      },
+      {
+        where: {
+          GioHangID: gioHang.ID
+        }
+      }
+    );
+
+    console.log(`✅ Đã cập nhật ${updatedCount} sản phẩm`);
+
+    return res.status(200).json({
+      success: true,
+      message: `Đã ${selected ? 'chọn' : 'bỏ chọn'} tất cả sản phẩm`,
+      data: {
+        updatedCount: updatedCount,
+        selected: selected
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi toggle chọn tất cả:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Chọn tất cả sản phẩm trong giỏ hàng (GUEST)
+ * PUT /api/cart/guest/select-all
+ * Body: { sessionId, selected: true/false }
+ */
+exports.toggleSelectAllGuest = async (req, res) => {
+  try {
+    const { sessionId, selected } = req.body;
+
+    console.log('☑️ Toggle chọn tất cả guest:', selected);
+
+    // Validate
+    if (!sessionId || sessionId.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Session ID không được để trống'
+      });
+    }
+
+    if (typeof selected !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'Trạng thái chọn phải là true hoặc false'
+      });
+    }
+
+    // ✅ SỬA: Bỏ Enable vì không có trong database
+    // Cập nhật tất cả items
+    const [updatedCount] = await GioHangKhachVangLai.update(
+      { 
+        DaChon: selected
+      },
+      {
+        where: {
+          MaPhien: sessionId
+        }
+      }
+    );
+
+    console.log(`✅ Đã cập nhật ${updatedCount} sản phẩm guest`);
+
+    return res.status(200).json({
+      success: true,
+      message: `Đã ${selected ? 'chọn' : 'bỏ chọn'} tất cả sản phẩm`,
+      data: {
+        updatedCount: updatedCount,
+        selected: selected
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi toggle chọn tất cả guest:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Lấy danh sách sản phẩm đã chọn (USER)
+ * GET /api/cart/selected
+ */
+exports.getSelectedItems = async (req, res) => {
+  try {
+    const taiKhoanId = req.user.id;
+
+    console.log('📦 Lấy danh sách sản phẩm đã chọn - User:', taiKhoanId);
+
+    // ✅ SỬA: Bỏ Enable vì không có trong database
+    // Tìm giỏ hàng của user
+    const gioHang = await GioHang.findOne({
+      where: { TaiKhoanID: taiKhoanId },
+      include: [{
+        model: GioHangChiTiet,
+        as: 'chiTiet',
+        where: { 
+          DaChon: true // ✅ CHỈ LẤY SẢN PHẨM ĐÃ CHỌN
+        },
+        required: false,
+        include: [{
+          model: SanPham,
+          as: 'sanPham',
+          where: { TrangThai: true },
+          required: true,
+          attributes: ['ID', 'Ten', 'GiaBan', 'HinhAnhURL', 'SoLuongTon', 'TrangThai']
+        }]
+      }]
+    });
+
+    if (!gioHang || !gioHang.chiTiet || gioHang.chiTiet.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'Chưa có sản phẩm nào được chọn',
+        data: {
+          items: [],
+          totalItems: 0,
+          totalAmount: 0
+        }
+      });
+    }
+
+    // Tính tổng tiền và sử dụng DTOMapper
+    let totalAmount = new Decimal(0);
+    const items = gioHang.chiTiet.map(item => {
+      const itemTotal = new Decimal(item.DonGia).times(item.SoLuong);
+      totalAmount = totalAmount.plus(itemTotal);
+      
+      const itemData = DTOMapper.toCamelCase(item.toJSON());
+      return {
+        ...itemData,
+        thanhTien: parseFloat(itemTotal.toFixed(2))
+      };
+    });
+
+    console.log(`✅ Tìm thấy ${items.length} sản phẩm đã chọn`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Lấy danh sách sản phẩm đã chọn thành công',
+      data: {
+        items: items,
+        totalItems: items.length,
+        totalAmount: parseFloat(totalAmount.toFixed(2))
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi lấy sản phẩm đã chọn:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Lấy danh sách sản phẩm đã chọn (GUEST)
+ * GET /api/cart/guest/selected?sessionId=xxx
+ */
+exports.getSelectedGuestItems = async (req, res) => {
+  try {
+    const { sessionId } = req.query;
+
+    console.log('📦 Lấy danh sách sản phẩm đã chọn - Guest:', sessionId);
+
+    // Validate
+    if (!sessionId || sessionId.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Session ID không được để trống'
+      });
+    }
+
+    // ✅ SỬA: Bỏ Enable vì không có trong database
+    // Lấy sản phẩm đã chọn
+    const cartItems = await GioHangKhachVangLai.findAll({
+      where: {
+        MaPhien: sessionId,
+        DaChon: true // ✅ CHỈ LẤY SẢN PHẨM ĐÃ CHỌN
+      },
+      include: [{
+        model: SanPham,
+        as: 'sanPham',
+        where: { TrangThai: true },
+        required: true,
+        attributes: ['ID', 'Ten', 'GiaBan', 'HinhAnhURL', 'SoLuongTon']
+      }]
+    });
+
+    if (!cartItems || cartItems.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'Chưa có sản phẩm nào được chọn',
+        data: {
+          items: [],
+          totalItems: 0,
+          totalAmount: 0
+        }
+      });
+    }
+
+    // ✅ Tính tổng tiền và sử dụng DTOMapper
+    let totalAmount = new Decimal(0);
+    const items = cartItems.map(item => {
+      const itemTotal = new Decimal(item.DonGia).times(item.SoLuong);
+      totalAmount = totalAmount.plus(itemTotal);
+      
+      const itemData = DTOMapper.toCamelCase(item.toJSON());
+      return {
+        ...itemData,
+        thanhTien: parseFloat(itemTotal.toFixed(2))
+      };
+    });
+
+    console.log(`✅ Tìm thấy ${items.length} sản phẩm đã chọn (guest)`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Lấy danh sách sản phẩm đã chọn thành công',
+      data: {
+        sessionId: sessionId,
+        items: items,
+        totalItems: items.length,
+        totalAmount: parseFloat(totalAmount.toFixed(2))
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi lấy sản phẩm đã chọn guest:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ',
+      error: error.message
     });
   }
 };

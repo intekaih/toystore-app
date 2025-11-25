@@ -8,6 +8,7 @@ import { Button, Badge, Loading } from '../components/ui';
 import Toast from '../components/Toast';
 import LogoutButton from '../components/LogoutButton';
 import { useAuth } from '../contexts/AuthContext';
+import { RoleChecker } from '../constants/roles';
 
 const EditProfilePage = () => {
   const { refreshUser } = useAuth(); // ✅ Gọi useAuth ở top level
@@ -59,7 +60,7 @@ const EditProfilePage = () => {
           hoTen: userData.HoTen || userData.hoTen,
           tenDangNhap: userData.TenDangNhap || userData.tenDangNhap,
           vaiTro: userData.VaiTro || userData.vaiTro,
-          enable: userData.Enable !== undefined ? userData.Enable : userData.enable
+          enable: userData.enable !== undefined ? userData.enable : true
         });
 
       } catch (error) {
@@ -191,6 +192,15 @@ const EditProfilePage = () => {
     navigate('/profile');
   };
 
+  // ✅ Lấy role display
+  const getRoleDisplay = () => {
+    if (!userInfo) return null;
+    const role = userInfo.vaiTro || userInfo.VaiTro || userInfo.role;
+    return RoleChecker.getDisplayInfo(role);
+  };
+
+  const roleDisplay = getRoleDisplay();
+
   if (loading) {
     return (
       <MainLayout>
@@ -220,9 +230,11 @@ const EditProfilePage = () => {
               </div>
               <div>
                 <h4 className="text-xl font-bold text-gray-800">@{userInfo.tenDangNhap}</h4>
-                <Badge variant={userInfo.vaiTro === 'admin' ? 'danger' : 'success'}>
-                  {userInfo.vaiTro === 'admin' ? '👑 Admin' : '👤 User'}
-                </Badge>
+                {roleDisplay && (
+                  <Badge variant={roleDisplay.color}>
+                    {roleDisplay.icon} {roleDisplay.label}
+                  </Badge>
+                )}
               </div>
             </div>
           </div>

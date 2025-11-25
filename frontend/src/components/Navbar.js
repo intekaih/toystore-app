@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.js';
-import { ShoppingCart, User, Home, Package, LogOut, Settings, Edit, Heart } from 'lucide-react';
+import { ShoppingCart, User, Home, Package, LogOut, Settings, Edit, Heart, Store } from 'lucide-react';
+import { RoleChecker } from '../constants/roles';
 
 /**
  * 🌸 Navbar - Thanh điều hướng với tone màu trắng hồng sữa
  */
 const Navbar = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin, isStaff, isAdminOrStaff } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -30,13 +31,22 @@ const Navbar = () => {
     return location.pathname.startsWith(path);
   };
 
+  // ✅ Lấy role display info
+  const getRoleDisplay = () => {
+    if (!user) return null;
+    const role = user.vaiTro || user.VaiTro || user.role;
+    return RoleChecker.getDisplayInfo(role);
+  };
+
+  const roleDisplay = getRoleDisplay();
+
   return (
     <nav className="bg-white border-b-2 border-primary-100 shadow-soft sticky top-0 z-50">
       <div className="container-cute">
-        <div className="flex items-center justify-between py-4">
+        <div className="flex items-center justify-between py-2">
           {/* Logo - Dễ thương */}
-          <Link to="/" className="flex items-center gap-2 text-2xl font-display font-bold text-gradient-primary hover:scale-105 transition-transform">
-            <span className="text-3xl animate-bounce-soft">🧸</span>
+          <Link to="/" className="flex items-center gap-2 text-xl font-display font-bold text-gradient-primary hover:scale-105 transition-transform">
+            <Store size={28} className="text-primary-500" />
             <span>ToyStore</span>
           </Link>
 
@@ -44,7 +54,7 @@ const Navbar = () => {
           <div className="hidden md:flex items-center gap-2">
             <Link 
               to="/" 
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold relative ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold relative ${
                 isActive('/') ? 'text-primary-600' : ''
               }`}
             >
@@ -56,7 +66,7 @@ const Navbar = () => {
             </Link>
             <Link 
               to="/products" 
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold relative ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold relative ${
                 isActive('/products') ? 'text-primary-600' : ''
               }`}
             >
@@ -68,7 +78,7 @@ const Navbar = () => {
             </Link>
             <Link 
               to="/cart" 
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold relative ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold relative ${
                 isActive('/cart') ? 'text-primary-600' : ''
               }`}
             >
@@ -80,7 +90,7 @@ const Navbar = () => {
             </Link>
             <Link 
               to={user ? "/orders" : "/order-lookup"}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold relative ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-cute text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-all font-semibold relative ${
                 isActive('/orders') || isActive('/order-lookup') ? 'text-primary-600' : ''
               }`}
             >
@@ -98,13 +108,12 @@ const Navbar = () => {
               <div>
                 <button
                   onClick={toggleUserMenu}
-                  className="flex items-center gap-3 px-4 py-2.5 bg-gradient-to-r from-primary-50 to-rose-50 border-2 border-primary-200 rounded-cute hover:shadow-soft transition-all"
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-50 to-rose-50 border-2 border-primary-200 rounded-cute hover:shadow-soft transition-all"
                 >
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary-400 to-rose-400 flex items-center justify-center text-white font-bold text-sm shadow-soft">
-                    {user.hoTen?.charAt(0).toUpperCase() || user.tenDangNhap?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                  <span className="font-semibold text-gray-700 hidden sm:block">
-                    {user.hoTen || user.tenDangNhap}
+                  <span className="text-xl">👋</span>
+                  <span className="font-semibold text-sm">
+                    <span className="text-gray-700">Xin chào </span>
+                    <span className="text-primary-600">{user.hoTen || user.tenDangNhap || 'Quản Trị Viên'}!</span>
                   </span>
                   <svg className={`w-4 h-4 text-primary-500 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -124,9 +133,21 @@ const Navbar = () => {
                           <div className="font-bold text-gray-800">{user.hoTen || user.tenDangNhap}</div>
                           <div className="text-sm text-gray-500">{user.email || 'No email'}</div>
                           <div className="mt-1">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-200 text-primary-700 rounded-full text-xs font-semibold">
-                              {user.role === 'admin' || user.vaiTro === 'admin' ? '👑 Admin' : '👤 User'}
-                            </span>
+                            {/* ✅ Hiển thị role badge với màu nền đúng - Admin màu hồng */}
+                            {roleDisplay && (
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                roleDisplay.color === 'purple' 
+                                  ? 'bg-pink-100 text-pink-700 border border-pink-200' 
+                                  : roleDisplay.color === 'blue'
+                                  ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                                  : roleDisplay.color === 'green'
+                                  ? 'bg-green-100 text-green-700 border border-green-200'
+                                  : 'bg-pink-100 text-pink-700 border border-pink-200'
+                              }`}>
+                                <span>{roleDisplay.icon}</span>
+                                <span>{roleDisplay.label}</span>
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -170,16 +191,19 @@ const Navbar = () => {
                         <span className="font-medium">Chỉnh sửa profile</span>
                       </Link>
                       
-                      {(user.role === 'admin' || user.vaiTro === 'admin') && (
+                      {/* ✅ Menu cho Admin và Nhân viên */}
+                      {isAdminOrStaff() && (
                         <>
                           <div className="my-2 border-t-2 border-primary-100"></div>
                           <Link 
-                            to="/admin/dashboard" 
+                            to={isAdmin() ? "/admin/dashboard" : "/staff/dashboard"} 
                             onClick={() => setShowUserMenu(false)}
                             className="flex items-center gap-3 px-5 py-3 hover:bg-primary-50 transition-colors text-gray-700 hover:text-primary-600"
                           >
                             <Settings size={18} className="text-primary-500" />
-                            <span className="font-medium">Quản trị hệ thống</span>
+                            <span className="font-medium">
+                              {isAdmin() ? 'Quản trị hệ thống' : 'Bảng điều khiển Nhân viên'}
+                            </span>
                           </Link>
                         </>
                       )}

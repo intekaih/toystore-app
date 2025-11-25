@@ -1,6 +1,7 @@
 // src/components/PaymentPieChart.jsx
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { BarChart3 } from 'lucide-react';
 
 const PaymentPieChart = ({ data, title = "Tỷ lệ thanh toán" }) => {
   // Màu sắc cho các phương thức thanh toán VÀ trạng thái đơn hàng
@@ -85,7 +86,9 @@ const PaymentPieChart = ({ data, title = "Tỷ lệ thanh toán" }) => {
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <h3 style={{ textAlign: 'center', marginBottom: '20px' }}>{title}</h3>
         <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
-          <p style={{ fontSize: '48px', margin: '0' }}>📊</p>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
+            <BarChart3 size={48} color="#999" />
+          </div>
           <p style={{ marginTop: '10px' }}>Không có dữ liệu</p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { orderService } from '../services'; // ✅ Sử dụng orderService
 import MainLayout from '../layouts/MainLayout';
 import { Button, Loading } from '../components/ui';
 import { Search } from 'lucide-react';
@@ -72,20 +73,19 @@ const OrderLookupPage = () => {
           navigate(`/order/${value}`);
         }, 1000);
       } else {
-        // Nếu là email/phone -> Gọi API lấy danh sách đơn hàng
-        const { getOrdersByContact } = await import('../api/orderApi');
-        const response = await getOrdersByContact({
+        // ✅ Sử dụng orderService thay vì import API trực tiếp
+        const response = await orderService.getOrdersByContact({
           email: type === 'email' ? value : undefined,
           phoneNumber: type === 'phone' ? value : undefined
         });
 
-        if (response.success && response.data.orders.length > 0) {
+        if (response.success && response.data && response.data.length > 0) {
           setSearchResults({
             type: type === 'email' ? 'Email' : 'Số điện thoại',
             value: value,
-            orders: response.data.orders
+            orders: response.data
           });
-          showToast(`Tìm thấy ${response.data.orders.length} đơn hàng`, 'success');
+          showToast(`Tìm thấy ${response.data.length} đơn hàng`, 'success');
         } else {
           showToast('Không tìm thấy đơn hàng nào', 'warning');
           setSearchResults(null);

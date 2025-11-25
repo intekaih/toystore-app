@@ -19,9 +19,9 @@ const ProductCard = ({
   const API_BASE_URL = config.API_BASE_URL;
   
   // Hỗ trợ cả 2 format: chữ hoa (ID, Ten) và chữ thường (id, ten)
-  const productId = product.ID || product.id || product.MaSP || product.maSP;
-  const productName = product.Ten || product.ten || product.tenSP || product.TenSP || 'Sản phẩm';
-  const productPrice = product.GiaBan || product.giaBan || product.donGia || product.DonGia || product.price || 0;
+  const productId = product.id || product.ID || product.maSP || product.MaSP;
+  const productName = product.ten || product.Ten || product.tenSP || product.TenSP || 'Sản phẩm';
+  const productPrice = product.giaBan || product.GiaBan || product.donGia || product.DonGia || product.price || 0;
   
   // Build full image URL
   const buildImageUrl = (imagePath) => {
@@ -45,19 +45,20 @@ const ProductCard = ({
     return '/barbie.jpg'; // Fallback
   };
   
-  const productImageRaw = product.HinhAnhURL || product.hinhAnhURL || product.hinhAnh || product.HinhAnh || product.image;
+  // ✅ SỬA: Hỗ trợ nhiều tên field để tương thích
+  const productImageRaw = product.hinhAnhUrl || product.hinhAnhURL || product.HinhAnhURL || product.hinhAnh || product.HinhAnh || product.image;
   const productImage = buildImageUrl(productImageRaw);
   
-  const productStock = product.Ton !== undefined ? product.Ton : 
+  const productStock = product.soLuongTon !== undefined ? product.soLuongTon : 
+                       product.SoLuongTon !== undefined ? product.SoLuongTon :
                        product.ton !== undefined ? product.ton :
-                       product.soLuongTon !== undefined ? product.soLuongTon : 
-                       product.SoLuongTon !== undefined ? product.SoLuongTon : 
+                       product.Ton !== undefined ? product.Ton : 
                        product.stock !== undefined ? product.stock : 0;
   
   // ✨ THÊM: Số lượng đã bán (dùng khi lọc bán chạy)
-  const productSold = product.SoLuongBan || product.soLuongBan || 0;
+  const productSold = product.soLuongBan || product.SoLuongBan || 0;
   
-  const productCategory = product.LoaiSP?.Ten || product.loaiSP?.Ten || product.loaiSP?.tenLoai || product.TenLoai || product.tenLoai || product.category || '';
+  const productCategory = product.loaiSP?.ten || product.loaiSP?.Ten || product.LoaiSP?.Ten || product.LoaiSP?.ten || product.tenLoai || product.TenLoai || product.category || '';
   
   // Format giá tiền
   const formatPrice = (price) => {

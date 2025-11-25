@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const db = require('../models');
 const { Op } = require('sequelize');
 const TaiKhoan = db.TaiKhoan;
+const DTOMapper = require('../utils/DTOMapper');
 
 // Import Singleton utilities
 const Logger = require('../utils/Logger');
@@ -89,14 +90,14 @@ exports.register = async (req, res) => {
       HoTen: HoTen.trim(),
       Email: (Email && Email.trim()) ? Email.trim().toLowerCase() : null,
       DienThoai: (DienThoai && DienThoai.trim()) ? DienThoai.trim() : null,
-      VaiTro: 'user',
-      Enable: true
+      VaiTro: 'KhachHang',  // Changed from 'user' to 'KhachHang'
+      TrangThai: true       // Changed from Enable to TrangThai
     });
 
     logger.success(`✅ Đăng ký thành công: ${newUser.TenDangNhap} (ID: ${newUser.ID})`);
 
-    // Trả về thông tin người dùng (không bao gồm mật khẩu)
-    const userResponse = {
+    // ✅ SỬ DỤNG DTOMapper
+    const userResponse = DTOMapper.toCamelCase({
       ID: newUser.ID,
       TenDangNhap: newUser.TenDangNhap,
       HoTen: newUser.HoTen,
@@ -104,8 +105,8 @@ exports.register = async (req, res) => {
       DienThoai: newUser.DienThoai,
       VaiTro: newUser.VaiTro,
       NgayTao: newUser.NgayTao,
-      Enable: newUser.Enable
-    };
+      TrangThai: newUser.TrangThai
+    });
 
     res.status(201).json({
       success: true,
@@ -170,7 +171,7 @@ exports.login = async (req, res) => {
     const user = await TaiKhoan.findOne({
       where: {
         TenDangNhap: TenDangNhap,
-        Enable: true
+        TrangThai: true  // Changed from Enable to TrangThai
       }
     });
 
@@ -202,7 +203,7 @@ exports.login = async (req, res) => {
       {
         userId: user.ID,
         username: user.TenDangNhap,
-        role: user.VaiTro || 'user'
+        role: user.VaiTro || 'KhachHang'  // Changed from 'user' to 'KhachHang'
       },
       jwtSecret,
       { expiresIn: jwtExpires }
@@ -210,22 +211,25 @@ exports.login = async (req, res) => {
 
     logger.success(`✅ Đăng nhập thành công: ${user.TenDangNhap} (${user.VaiTro})`);
 
+    // ✅ SỬ DỤNG DTOMapper
+    const userData = DTOMapper.toCamelCase({
+      ID: user.ID,
+      TenDangNhap: user.TenDangNhap,
+      VaiTro: user.VaiTro,
+      HoTen: user.HoTen,
+      Email: user.Email,
+      DienThoai: user.DienThoai,
+      NgayTao: user.NgayTao,
+      TrangThai: user.TrangThai
+    });
+
     // Trả về thông tin đăng nhập thành công
     res.status(200).json({
       success: true,
       message: 'Đăng nhập thành công',
       data: {
         token: token,
-        user: {
-          id: user.ID,
-          tenDangNhap: user.TenDangNhap,
-          vaiTro: user.VaiTro || 'user',
-          hoTen: user.HoTen || '',
-          email: user.Email || '',
-          dienThoai: user.DienThoai || '',
-          ngayTao: user.NgayTao,
-          enable: user.Enable
-        }
+        user: userData
       }
     });
 
@@ -259,8 +263,8 @@ exports.adminLogin = async (req, res) => {
     const user = await TaiKhoan.findOne({
       where: {
         TenDangNhap: username,
-        Enable: true,
-        VaiTro: 'admin'
+        TrangThai: true,  // Changed from Enable to TrangThai
+        VaiTro: 'Admin'   // Changed from 'admin' to 'Admin'
       }
     });
 
@@ -300,22 +304,25 @@ exports.adminLogin = async (req, res) => {
 
     logger.success(`✅ Đăng nhập admin thành công: ${user.TenDangNhap}`);
 
+    // ✅ SỬ DỤNG DTOMapper
+    const adminData = DTOMapper.toCamelCase({
+      ID: user.ID,
+      TenDangNhap: user.TenDangNhap,
+      VaiTro: user.VaiTro,
+      HoTen: user.HoTen,
+      Email: user.Email,
+      DienThoai: user.DienThoai,
+      NgayTao: user.NgayTao,
+      TrangThai: user.TrangThai
+    });
+
     // Trả về thông tin đăng nhập thành công
     res.status(200).json({
       success: true,
       message: 'Đăng nhập admin thành công',
       data: {
         token: token,
-        admin: {
-          id: user.ID,
-          username: user.TenDangNhap,
-          role: user.VaiTro,
-          hoTen: user.HoTen,
-          email: user.Email,
-          dienThoai: user.DienThoai || '',
-          ngayTao: user.NgayTao,
-          enable: user.Enable
-        }
+        admin: adminData
       }
     });
 

@@ -27,12 +27,15 @@ module.exports = (sequelize, Sequelize) => {
       defaultValue: 1
     },
     DonGia: {
-      type: Sequelize.DECIMAL(15, 0),
+      type: Sequelize.DECIMAL(18, 2),
       allowNull: false
     },
-    NgayThem: {
-      type: Sequelize.DATE,
-      allowNull: true
+    DaChon: {
+      type: Sequelize.BOOLEAN,
+      allowNull: true,
+      defaultValue: false,
+      field: 'DaChon',
+      comment: 'Đánh dấu sản phẩm được chọn để thanh toán'
     }
   }, {
     tableName: 'GioHangChiTiet',

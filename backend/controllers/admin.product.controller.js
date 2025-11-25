@@ -1,8 +1,10 @@
 const db = require('../models');
 const SanPham = db.SanPham;
+const SanPhamHinhAnh = db.SanPhamHinhAnh;
 const LoaiSP = db.LoaiSP;
 const { Op } = require('sequelize');
-const { deleteOldImage, renameFileByProductId } = require('../middlewares/upload.middleware');
+const { deleteOldImage, renameFileByProductId, moveFilesToProductFolder, deleteProductFolder, cleanupTempFiles } = require('../middlewares/upload.middleware');
+const DTOMapper = require('../utils/DTOMapper');
 
 /**
  * GET /api/admin/products
@@ -78,9 +80,9 @@ exports.getAllProducts = async (req, res) => {
 
     // Lọc theo trạng thái Enable
     if (enable === 'true') {
-      whereCondition.Enable = true;
+      whereCondition.TrangThai = true;
     } else if (enable === 'false') {
-      whereCondition.Enable = false;
+      whereCondition.TrangThai = false;
     }
     // Nếu enable === '', lấy tất cả
 
@@ -93,7 +95,19 @@ exports.getAllProducts = async (req, res) => {
         {
           model: LoaiSP,
           as: 'loaiSP',
-          attributes: ['ID', 'Ten', 'MoTa']
+          attributes: ['ID', 'Ten']
+        },
+        {
+          model: db.ThuongHieu,
+          as: 'thuongHieu',
+          attributes: ['ID', 'TenThuongHieu'],
+          required: false // ✅ LEFT JOIN để lấy cả sản phẩm không có thương hiệu
+        },
+        {
+          model: SanPhamHinhAnh,
+          as: 'hinhAnhs',
+          attributes: ['ID', 'DuongDanHinhAnh', 'ThuTu', 'LaMacDinh'],
+          required: false // ✅ LEFT JOIN để lấy cả sản phẩm không có hình
         }
       ],
       attributes: [
@@ -101,15 +115,19 @@ exports.getAllProducts = async (req, res) => {
         'Ten',
         'MoTa',
         'GiaBan',
-        'Ton',
+        'SoLuongTon',
         'HinhAnhURL',
         'LoaiID',
+        'ThuongHieuID', // ✅ Thêm ThuongHieuID
         'NgayTao',
-        'Enable'
+        'TrangThai'
       ],
       limit: limit,
       offset: offset,
-      order: [['NgayTao', 'DESC']],
+      order: [
+        ['NgayTao', 'DESC'],
+        [{ model: SanPhamHinhAnh, as: 'hinhAnhs' }, 'ThuTu', 'ASC']
+      ],
       distinct: true
     });
 
@@ -119,23 +137,39 @@ exports.getAllProducts = async (req, res) => {
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
 
-    // Format dữ liệu trả về
-    const products = rows.map(product => ({
-      id: product.ID,
-      ten: product.Ten,
-      moTa: product.MoTa,
-      giaBan: parseFloat(product.GiaBan),
-      ton: product.Ton,
-      hinhAnhURL: product.HinhAnhURL,
-      loaiID: product.LoaiID,
-      ngayTao: product.NgayTao,
-      enable: product.Enable,
-      loaiSP: product.loaiSP ? {
-        id: product.loaiSP.ID,
-        ten: product.loaiSP.Ten,
-        moTa: product.loaiSP.MoTa
-      } : null
-    }));
+    // ✅ Lấy base URL từ request
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    // ✅ SỬ DỤNG DTOMapper để format dữ liệu trả về
+    const products = rows.map(product => {
+      const productData = {
+        ID: product.ID,
+        Ten: product.Ten,
+        MoTa: product.MoTa,
+        GiaBan: parseFloat(product.GiaBan),
+        SoLuongTon: product.SoLuongTon,
+        HinhAnhURL: product.HinhAnhURL ? `${baseUrl}${product.HinhAnhURL}` : null, // ✅ Thêm base URL
+        LoaiID: product.LoaiID,
+        ThuongHieuID: product.ThuongHieuID, // ✅ Thêm ThuongHieuID
+        NgayTao: product.NgayTao,
+        TrangThai: product.TrangThai,
+        LoaiSP: product.loaiSP ? {
+          ID: product.loaiSP.ID,
+          Ten: product.loaiSP.Ten
+        } : null,
+        ThuongHieu: product.thuongHieu ? { // ✅ Thêm ThuongHieu
+          ID: product.thuongHieu.ID,
+          TenThuongHieu: product.thuongHieu.TenThuongHieu
+        } : null,
+        HinhAnhs: product.hinhAnhs ? product.hinhAnhs.map(img => ({
+          ID: img.ID,
+          DuongDanHinhAnh: `${baseUrl}${img.DuongDanHinhAnh}`, // ✅ Thêm base URL
+          ThuTu: img.ThuTu,
+          LaMacDinh: img.LaMacDinh
+        })) : []
+      };
+      return DTOMapper.toCamelCase(productData);
+    });
 
     console.log(`✅ Lấy ${products.length}/${totalProducts} sản phẩm thành công`);
 
@@ -181,15 +215,15 @@ exports.getAllProducts = async (req, res) => {
 
 /**
  * POST /api/admin/products
- * Thêm sản phẩm mới với upload ảnh
+ * Thêm sản phẩm mới với upload nhiều ảnh
  */
 exports.createProduct = async (req, res) => {
   try {
     console.log('➕ Admin - Tạo sản phẩm mới');
     console.log('📝 Body data:', req.body);
-    console.log('📁 File uploaded:', req.file);
+    console.log('📁 Files uploaded:', req.files);
 
-    const { Ten, MoTa, GiaBan, Ton, LoaiID } = req.body;
+    const { Ten, MoTa, GiaBan, Ton, LoaiID, ThuongHieuID } = req.body;
 
     // Validate input - Tên, GiaBan, Ton, LoaiID là bắt buộc
     const errors = [];
@@ -225,9 +259,8 @@ exports.createProduct = async (req, res) => {
     }
 
     if (errors.length > 0) {
-      // Xóa file đã upload nếu có lỗi validation
-      if (req.file) {
-        deleteOldImage(req.file.filename);
+      if (req.files && req.files.length > 0) {
+        cleanupTempFiles(req.files);
       }
       return res.status(400).json({
         success: false,
@@ -240,14 +273,13 @@ exports.createProduct = async (req, res) => {
     const loaiSP = await LoaiSP.findOne({
       where: {
         ID: parseInt(LoaiID),
-        Enable: true
+        TrangThai: true
       }
     });
 
     if (!loaiSP) {
-      // Xóa file đã upload nếu loại sản phẩm không tồn tại
-      if (req.file) {
-        deleteOldImage(req.file.filename);
+      if (req.files && req.files.length > 0) {
+        cleanupTempFiles(req.files);
       }
       return res.status(404).json({
         success: false,
@@ -264,9 +296,8 @@ exports.createProduct = async (req, res) => {
     });
 
     if (existingProduct) {
-      // Xóa file đã upload nếu tên trùng
-      if (req.file) {
-        deleteOldImage(req.file.filename);
+      if (req.files && req.files.length > 0) {
+        cleanupTempFiles(req.files);
       }
       return res.status(409).json({
         success: false,
@@ -274,68 +305,109 @@ exports.createProduct = async (req, res) => {
       });
     }
 
-    // Tạo sản phẩm mới TRƯỚC (để có ID)
-    const newProduct = await SanPham.create({
+    // ✅ Tạo object dữ liệu sản phẩm
+    const productData = {
       Ten: Ten.trim(),
       MoTa: MoTa ? MoTa.trim() : null,
       GiaBan: parseFloat(GiaBan),
-      Ton: parseInt(Ton),
+      SoLuongTon: parseInt(Ton),
       LoaiID: parseInt(LoaiID),
-      HinhAnhURL: null, // Tạm thời null, sẽ update sau
-      Enable: true
-    });
+      HinhAnhURL: null, // Sẽ lưu URL ảnh chính (ảnh đầu tiên)
+      TrangThai: true
+    };
 
-    // Rename file theo ID sản phẩm và cập nhật HinhAnhURL
-    let hinhAnhURL = null;
-    if (req.file) {
-      const newFilename = renameFileByProductId(req.file.filename, newProduct.ID);
-      hinhAnhURL = `/uploads/${newFilename}`;
+    // ✅ Thêm ThuongHieuID nếu có
+    if (ThuongHieuID && parseInt(ThuongHieuID) > 0) {
+      productData.ThuongHieuID = parseInt(ThuongHieuID);
+    }
+
+    // Tạo sản phẩm mới
+    const newProduct = await SanPham.create(productData);
+
+    // ✅ Xử lý upload nhiều ảnh vào bảng SanPhamHinhAnh
+    if (req.files && req.files.length > 0) {
+      const imageUrls = moveFilesToProductFolder(req.files, newProduct.ID);
       
-      // Cập nhật HinhAnhURL vào database
-      await newProduct.update({ HinhAnhURL: hinhAnhURL });
+      if (imageUrls) {
+        const urlArray = JSON.parse(imageUrls);
+        
+        // Lưu từng ảnh vào bảng SanPhamHinhAnh
+        const imageRecords = urlArray.map((url, index) => ({
+          SanPhamID: newProduct.ID,
+          DuongDanHinhAnh: url,
+          ThuTu: index,
+          LaMacDinh: index === 0 // Ảnh đầu tiên là ảnh chính
+        }));
+        
+        await SanPhamHinhAnh.bulkCreate(imageRecords);
+        
+        // Cập nhật HinhAnhURL của sản phẩm = ảnh chính (ảnh đầu tiên)
+        await newProduct.update({ HinhAnhURL: urlArray[0] });
+        
+        console.log(`✅ Đã lưu ${urlArray.length} ảnh cho sản phẩm ${newProduct.ID}`);
+      }
     }
 
     console.log('✅ Tạo sản phẩm mới thành công:', newProduct.Ten);
 
-    // Lấy lại thông tin sản phẩm với loại sản phẩm
+    // Lấy lại thông tin sản phẩm với loại sản phẩm và hình ảnh
     const productDetail = await SanPham.findOne({
       where: { ID: newProduct.ID },
-      include: [{
-        model: LoaiSP,
-        as: 'loaiSP',
-        attributes: ['ID', 'Ten', 'MoTa']
-      }]
+      include: [
+        {
+          model: LoaiSP,
+          as: 'loaiSP',
+          attributes: ['ID', 'Ten']
+        },
+        {
+          model: SanPhamHinhAnh,
+          as: 'hinhAnhs',
+          attributes: ['ID', 'DuongDanHinhAnh', 'ThuTu', 'LaMacDinh'],
+          order: [['ThuTu', 'ASC']]
+        }
+      ]
+    });
+
+    // ✅ Lấy base URL từ request
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    // ✅ SỬ DỤNG DTOMapper với base URL đầy đủ
+    const productDTO = DTOMapper.toCamelCase({
+      ID: productDetail.ID,
+      Ten: productDetail.Ten,
+      MoTa: productDetail.MoTa,
+      GiaBan: parseFloat(productDetail.GiaBan),
+      SoLuongTon: productDetail.SoLuongTon,
+      HinhAnhURL: productDetail.HinhAnhURL ? `${baseUrl}${productDetail.HinhAnhURL}` : null, // ✅ Thêm base URL
+      LoaiID: productDetail.LoaiID,
+      ThuongHieuID: productDetail.ThuongHieuID,
+      NgayTao: productDetail.NgayTao,
+      TrangThai: productDetail.TrangThai,
+      LoaiSP: productDetail.loaiSP ? {
+        ID: productDetail.loaiSP.ID,
+        Ten: productDetail.loaiSP.Ten
+      } : null,
+      HinhAnhs: productDetail.hinhAnhs ? productDetail.hinhAnhs.map(img => ({
+        ID: img.ID,
+        DuongDanHinhAnh: `${baseUrl}${img.DuongDanHinhAnh}`, // ✅ Thêm base URL
+        ThuTu: img.ThuTu,
+        LaMacDinh: img.LaMacDinh
+      })) : []
     });
 
     res.status(201).json({
       success: true,
       message: 'Tạo sản phẩm mới thành công',
       data: {
-        product: {
-          id: productDetail.ID,
-          ten: productDetail.Ten,
-          moTa: productDetail.MoTa,
-          giaBan: parseFloat(productDetail.GiaBan),
-          ton: productDetail.Ton,
-          hinhAnhURL: productDetail.HinhAnhURL,
-          loaiID: productDetail.LoaiID,
-          ngayTao: productDetail.NgayTao,
-          enable: productDetail.Enable,
-          loaiSP: productDetail.loaiSP ? {
-            id: productDetail.loaiSP.ID,
-            ten: productDetail.loaiSP.Ten,
-            moTa: productDetail.loaiSP.MoTa
-          } : null
-        }
+        product: productDTO
       }
     });
 
   } catch (error) {
     console.error('❌ Lỗi tạo sản phẩm:', error);
 
-    // Xóa file đã upload nếu có lỗi
-    if (req.file) {
-      deleteOldImage(req.file.filename);
+    if (req.files && req.files.length > 0) {
+      cleanupTempFiles(req.files);
     }
 
     if (error.name === 'SequelizeValidationError') {
@@ -449,7 +521,7 @@ exports.updateProduct = async (req, res) => {
       const loaiSP = await LoaiSP.findOne({
         where: {
           ID: parseInt(LoaiID),
-          Enable: true
+          TrangThai: true
         }
       });
 
@@ -505,7 +577,7 @@ exports.updateProduct = async (req, res) => {
     }
 
     if (Ton !== undefined) {
-      updateData.Ton = parseInt(Ton);
+      updateData.SoLuongTon = parseInt(Ton);
     }
 
     if (LoaiID !== undefined) {
@@ -513,7 +585,7 @@ exports.updateProduct = async (req, res) => {
     }
 
     if (Enable !== undefined) {
-      updateData.Enable = Enable === 'true' || Enable === true;
+      updateData.TrangThai = Enable === 'true' || Enable === true;
     }
 
     // Xử lý upload ảnh mới
@@ -545,32 +617,34 @@ exports.updateProduct = async (req, res) => {
       include: [{
         model: LoaiSP,
         as: 'loaiSP',
-        attributes: ['ID', 'Ten', 'MoTa']
+        attributes: ['ID', 'Ten'] // ✅ Bỏ 'MoTa'
       }]
     });
 
     console.log('✅ Cập nhật sản phẩm thành công:', updatedProduct.Ten);
 
+    // ✅ SỬ DỤNG DTOMapper
+    const productDTO = DTOMapper.toCamelCase({
+      ID: updatedProduct.ID,
+      Ten: updatedProduct.Ten,
+      MoTa: updatedProduct.MoTa,
+      GiaBan: parseFloat(updatedProduct.GiaBan),
+      SoLuongTon: updatedProduct.SoLuongTon,
+      HinhAnhURL: updatedProduct.HinhAnhURL,
+      LoaiID: updatedProduct.LoaiID,
+      NgayTao: updatedProduct.NgayTao,
+      TrangThai: updatedProduct.TrangThai,
+      LoaiSP: updatedProduct.loaiSP ? {
+        ID: updatedProduct.loaiSP.ID,
+        Ten: updatedProduct.loaiSP.Ten
+      } : null
+    });
+
     res.status(200).json({
       success: true,
       message: 'Cập nhật sản phẩm thành công',
       data: {
-        product: {
-          id: updatedProduct.ID,
-          ten: updatedProduct.Ten,
-          moTa: updatedProduct.MoTa,
-          giaBan: parseFloat(updatedProduct.GiaBan),
-          ton: updatedProduct.Ton,
-          hinhAnhURL: updatedProduct.HinhAnhURL,
-          loaiID: updatedProduct.LoaiID,
-          ngayTao: updatedProduct.NgayTao,
-          enable: updatedProduct.Enable,
-          loaiSP: updatedProduct.loaiSP ? {
-            id: updatedProduct.loaiSP.ID,
-            ten: updatedProduct.loaiSP.Ten,
-            moTa: updatedProduct.loaiSP.MoTa
-          } : null
-        }
+        product: productDTO
       }
     });
 
@@ -626,7 +700,7 @@ exports.deleteProduct = async (req, res) => {
     }
 
     // Kiểm tra sản phẩm đã bị xóa chưa
-    if (!product.Enable) {
+    if (!product.TrangThai) {
       return res.status(400).json({
         success: false,
         message: 'Sản phẩm đã bị vô hiệu hóa trước đó'
@@ -638,12 +712,10 @@ exports.deleteProduct = async (req, res) => {
     const productImage = product.HinhAnhURL;
 
     // Soft delete - set Enable = false
-    await product.update({ Enable: false });
+    await product.update({ TrangThai: false });
 
-    // Xóa ảnh vật lý nếu muốn (tùy chọn)
-    // if (productImage) {
-    //   deleteOldImage(productImage);
-    // }
+    // ✅ Xóa toàn bộ thư mục sản phẩm
+    deleteProductFolder(productId);
 
     console.log('✅ Vô hiệu hóa sản phẩm thành công:', productName);
 
