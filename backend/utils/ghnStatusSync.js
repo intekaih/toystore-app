@@ -131,7 +131,7 @@ async function syncGHNStatusToOrder(hoaDon, ghnStatus, transaction = null, reaso
     additionalData.NguoiThayDoi = 'Hệ thống';
     additionalData.LyDo = reason || `Đồng bộ từ trạng thái GHN: ${ghnStatus}`;
     
-    // Chuyển trạng thái (OrderStateContext sẽ tự động ghi LichSuTrangThaiDonHang)
+    // Chuyển trạng thái (chỉ cập nhật HoaDon.TrangThai)
     await orderState.transitionTo(targetOrderStatus, transaction, additionalData);
     
     return {
@@ -151,37 +151,13 @@ async function syncGHNStatusToOrder(hoaDon, ghnStatus, transaction = null, reaso
 }
 
 /**
- * Cập nhật lịch sử trạng thái đơn hàng
- * @param {number} hoaDonId - ID đơn hàng
- * @param {string} oldStatus - Trạng thái cũ
- * @param {string} newStatus - Trạng thái mới
- * @param {string} nguoiThayDoi - Người thay đổi
- * @param {string} lyDo - Lý do
- * @param {Object} transaction - Database transaction
+ * ✅ REMOVED: Không dùng LichSuTrangThaiDonHang nữa, chỉ dùng HoaDon.TrangThai
+ * Function này không làm gì nữa, chỉ để tương thích với code cũ
  */
 async function updateOrderStatusHistory(hoaDonId, oldStatus, newStatus, nguoiThayDoi = 'Hệ thống', lyDo = null, transaction = null) {
-  try {
-    // Kiểm tra xem model có tồn tại không
-    const LichSuTrangThaiDonHang = db.LichSuTrangThaiDonHang;
-    
-    if (!LichSuTrangThaiDonHang) {
-      console.warn('⚠️ Model LichSuTrangThaiDonHang không tồn tại, bỏ qua ghi lịch sử');
-      return;
-    }
-    
-    await LichSuTrangThaiDonHang.create({
-      HoaDonID: hoaDonId,
-      TrangThaiCu: oldStatus,
-      TrangThaiMoi: newStatus,
-      NguoiThayDoi: nguoiThayDoi,
-      LyDo: lyDo || `Đồng bộ từ trạng thái GHN`
-    }, { transaction });
-    
-    console.log(`✅ Đã ghi lịch sử trạng thái: ${oldStatus} → ${newStatus}`);
-  } catch (error) {
-    console.error('❌ Lỗi ghi lịch sử trạng thái:', error);
-    // Không throw error để không làm gián đoạn flow chính
-  }
+  // ✅ REMOVED: Không ghi lịch sử nữa
+  console.log(`ℹ️ [updateOrderStatusHistory] Đã bỏ qua ghi lịch sử (chỉ dùng HoaDon.TrangThai): ${oldStatus} → ${newStatus}`);
+  return;
 }
 
 module.exports = {

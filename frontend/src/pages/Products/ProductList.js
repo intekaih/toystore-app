@@ -32,21 +32,27 @@ const ProductList = () => {
   const [searchParams] = useSearchParams();
 
   // ✅ FILTER STATE - Đầy đủ các trường
-  const [filters, setFilters] = useState({
-    page: 1,
-    limit: 12,
-    search: searchParams.get('search') || '',
-    sortBy: searchParams.get('sortBy') || 'newest',
-    minPrice: searchParams.get('minPrice') ? parseFloat(searchParams.get('minPrice')) : null,
-    maxPrice: searchParams.get('maxPrice') ? parseFloat(searchParams.get('maxPrice')) : null,
-    loaiId: searchParams.get('category') ? parseInt(searchParams.get('category')) : null,
-    thuongHieuId: searchParams.get('brand') ? parseInt(searchParams.get('brand')) : null
-  });
+  const getInitialFilters = () => {
+    const categoryParam = searchParams.get('categoryId') || searchParams.get('category');
+    const brandParam = searchParams.get('brandId') || searchParams.get('brand');
+    return {
+      page: 1,
+      limit: 12,
+      search: searchParams.get('search') || '',
+      sortBy: searchParams.get('sortBy') || searchParams.get('filter') || 'newest',
+      minPrice: searchParams.get('minPrice') ? parseFloat(searchParams.get('minPrice')) : null,
+      maxPrice: searchParams.get('maxPrice') ? parseFloat(searchParams.get('maxPrice')) : null,
+      loaiId: categoryParam ? parseInt(categoryParam) : null,
+      thuongHieuId: brandParam ? parseInt(brandParam) : null
+    };
+  };
+
+  const [filters, setFilters] = useState(getInitialFilters());
 
   // ✅ EXPANDED STATES cho accordion filters
   const [expandedSections, setExpandedSections] = useState({
-    category: true,
-    brand: true,
+    category: false,
+    brand: false,
     price: true,
     rating: false
   });
@@ -54,6 +60,43 @@ const ProductList = () => {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  // ✅ Sync filters với URL search params khi chúng thay đổi (từ navbar, links, etc.)
+  useEffect(() => {
+    const search = searchParams.get('search') || '';
+    const sortBy = searchParams.get('sortBy') || searchParams.get('filter') || 'newest';
+    const minPrice = searchParams.get('minPrice') ? parseFloat(searchParams.get('minPrice')) : null;
+    const maxPrice = searchParams.get('maxPrice') ? parseFloat(searchParams.get('maxPrice')) : null;
+    const categoryParam = searchParams.get('categoryId') || searchParams.get('category');
+    const brandParam = searchParams.get('brandId') || searchParams.get('brand');
+    const loaiId = categoryParam ? parseInt(categoryParam) : null;
+    const thuongHieuId = brandParam ? parseInt(brandParam) : null;
+
+    // Chỉ update nếu có thay đổi thực sự
+    setFilters(prev => {
+      const newFilters = {
+        page: 1, // Reset về trang 1 khi filter thay đổi
+        limit: prev.limit,
+        search,
+        sortBy,
+        minPrice,
+        maxPrice,
+        loaiId,
+        thuongHieuId
+      };
+
+      // Kiểm tra xem có thay đổi không
+      const hasChanged = 
+        prev.search !== newFilters.search ||
+        prev.sortBy !== newFilters.sortBy ||
+        prev.minPrice !== newFilters.minPrice ||
+        prev.maxPrice !== newFilters.maxPrice ||
+        prev.loaiId !== newFilters.loaiId ||
+        prev.thuongHieuId !== newFilters.thuongHieuId;
+
+      return hasChanged ? newFilters : prev;
+    });
+  }, [searchParams]);
 
   useEffect(() => {
     loadProducts();
@@ -251,55 +294,6 @@ const ProductList = () => {
     <MainLayout>
       <div className="bg-gradient-to-b from-pink-50/30 to-white min-h-screen">
         <div className="container-cute py-4">
-          {/* ✅ HEADER - Compact hơn */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <Package className="text-pink-500" size={28} />
-              <div>
-                <h1 className="text-2xl font-display font-bold text-gray-800">Sản phẩm</h1>
-                <p className="text-sm text-gray-600">
-                  <span className="font-bold text-pink-600">{totalProducts}</span> sản phẩm
-                </p>
-              </div>
-            </div>
-
-            {/* Mobile Filter Toggle */}
-            <button
-              onClick={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
-              className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-pink-200 rounded-xl font-semibold text-gray-700 hover:bg-pink-50 transition-all relative"
-            >
-              <SlidersHorizontal size={18} className="text-pink-500" />
-              <span>Bộ lọc</span>
-              {activeFiltersCount > 0 && (
-                <Badge variant="danger" size="sm" className="absolute -top-2 -right-2">
-                  {activeFiltersCount}
-                </Badge>
-              )}
-            </button>
-          </div>
-
-          {/* ✅ SEARCH BAR - Inline với toolbar */}
-          <div className="mb-4">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-400" size={20} />
-              <input
-                type="text"
-                placeholder="Tìm kiếm sản phẩm... 🔍"
-                value={filters.search}
-                onChange={handleSearch}
-                className="w-full pl-12 pr-12 py-3 rounded-xl border-2 border-pink-200 focus:border-pink-400 focus:ring-2 focus:ring-pink-100 transition-all text-gray-700"
-              />
-              {filters.search && (
-                <button
-                  onClick={() => handleFilterChange('search', '')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-pink-100 rounded-full transition-colors"
-                >
-                  <X size={16} className="text-pink-500" />
-                </button>
-              )}
-            </div>
-          </div>
-
           {/* ✅ LAYOUT 2 CỘT: Tỷ lệ tốt hơn */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
             {/* ========== SIDEBAR FILTERS (Trái - 3 cột) ========== */}
@@ -567,26 +561,154 @@ const ProductList = () => {
                 </div>
               ) : products.length > 0 ? (
                 <>
-                  <div className={viewMode === 'grid' 
-                    ? 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4' 
-                    : 'space-y-4'
-                  }>
-                    {products.map((product, index) => (
-                      <div
-                        key={product.id}
-                        className="animate-fade-in"
-                        style={{ animationDelay: `${index * 0.03}s` }}
-                      >
-                        <ProductCard
-                          product={product}
-                          onAddToCart={handleAddToCart}
-                          onQuickView={handleQuickView}
-                          onFavorite={handleFavorite}
-                          viewMode={viewMode}
-                        />
+                  {viewMode === 'grid' ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {products.map((product, index) => (
+                        <div
+                          key={product.id}
+                          className="animate-fade-in"
+                          style={{ animationDelay: `${index * 0.03}s` }}
+                        >
+                          <ProductCard
+                            product={product}
+                            onAddToCart={handleAddToCart}
+                            onQuickView={handleQuickView}
+                            onFavorite={handleFavorite}
+                            viewMode={viewMode}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden">
+                      {/* Table Header */}
+                      <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-50 border-b-2 border-gray-200 font-semibold text-sm text-gray-700">
+                        <div className="col-span-2">Ảnh</div>
+                        <div className="col-span-4">Tên sản phẩm</div>
+                        <div className="col-span-2">Đánh giá</div>
+                        <div className="col-span-2">Giá</div>
+                        <div className="col-span-2">Thao tác</div>
                       </div>
-                    ))}
-                  </div>
+                      
+                      {/* Table Body */}
+                      <div className="divide-y divide-gray-200">
+                        {products.map((product, index) => {
+                          const productId = product.id || product.ID || product.maSP || product.MaSP;
+                          const productName = product.ten || product.Ten || product.tenSP || product.TenSP || 'Sản phẩm';
+                          const productPrice = product.giaBan || product.GiaBan || product.donGia || product.DonGia || product.price || 0;
+                          const productCategory = product.loaiSP?.ten || product.loaiSP?.Ten || product.LoaiSP?.Ten || product.LoaiSP?.ten || product.tenLoai || product.TenLoai || product.category || product.danhMuc || '';
+                          const averageRating = product.DiemTrungBinh || product.diemTrungBinh || product.averageRating || 0;
+                          const totalReviews = product.TongSoDanhGia || product.tongSoDanhGia || product.totalReviews || 0;
+                          
+                          // Build image URL
+                          const buildImageUrl = (imagePath) => {
+                            if (!imagePath) return '/barbie.jpg';
+                            if (imagePath.startsWith('http')) return imagePath;
+                            const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+                            if (imagePath.startsWith('/uploads/')) return `${API_BASE_URL}${imagePath}`;
+                            if (!imagePath.startsWith('/')) return `${API_BASE_URL}/uploads/${imagePath}`;
+                            return '/barbie.jpg';
+                          };
+                          const productImageRaw = product.hinhAnhUrl || product.hinhAnhURL || product.HinhAnhURL || product.hinhAnh || product.HinhAnh || product.image;
+                          const productImage = buildImageUrl(productImageRaw);
+                          
+                          // Format price
+                          const formatPrice = (price) => {
+                            const numPrice = Number(price);
+                            if (isNaN(numPrice)) return '0 ₫';
+                            return numPrice.toLocaleString('vi-VN') + ' ₫';
+                          };
+                          
+                          // Render stars
+                          const renderStars = () => {
+                            const stars = [];
+                            const fullStars = Math.floor(averageRating);
+                            const hasHalfStar = averageRating % 1 >= 0.5;
+                            
+                            for (let i = 0; i < 5; i++) {
+                              if (i < fullStars) {
+                                stars.push(<Star key={i} size={16} className="text-yellow-400 fill-yellow-400" />);
+                              } else if (i === fullStars && hasHalfStar) {
+                                stars.push(<Star key={i} size={16} className="text-yellow-400 fill-yellow-400 fill-opacity-50" />);
+                              } else {
+                                stars.push(<Star key={i} size={16} className="text-gray-300" />);
+                              }
+                            }
+                            return stars;
+                          };
+                          
+                          return (
+                            <div
+                              key={productId}
+                              className="grid grid-cols-12 gap-4 px-4 py-4 hover:bg-gray-50 transition-colors animate-fade-in"
+                              style={{ animationDelay: `${index * 0.03}s` }}
+                            >
+                              {/* Ảnh */}
+                              <div className="col-span-2">
+                                <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden bg-gray-100">
+                                  <img
+                                    src={productImage}
+                                    alt={productName}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.target.src = '/barbie.jpg';
+                                    }}
+                                    loading="lazy"
+                                    decoding="async"
+                                  />
+                                </div>
+                              </div>
+                              
+                              {/* Tên sản phẩm + Loại */}
+                              <div className="col-span-4 flex flex-col justify-center">
+                                <h3 
+                                  onClick={() => handleProductClick(productId)}
+                                  className="text-base font-semibold text-gray-800 mb-1 line-clamp-2 cursor-pointer hover:text-primary-600 transition-colors"
+                                >
+                                  {productName}
+                                </h3>
+                                {productCategory && (
+                                  <p className="text-sm text-gray-500">
+                                    {productCategory}
+                                  </p>
+                                )}
+                              </div>
+                              
+                              {/* Đánh giá */}
+                              <div className="col-span-2 flex items-center gap-2">
+                                <div className="flex items-center gap-0.5">
+                                  {renderStars()}
+                                </div>
+                                {averageRating > 0 && (
+                                  <span className="text-sm text-gray-600">
+                                    {averageRating.toFixed(1)}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {/* Giá */}
+                              <div className="col-span-2 flex items-center">
+                                <p className="text-lg font-bold text-primary-600">
+                                  {formatPrice(productPrice)}
+                                </p>
+                              </div>
+                              
+                              {/* Thao tác */}
+                              <div className="col-span-2 flex items-center gap-2">
+                                <button
+                                  onClick={() => handleAddToCart(product)}
+                                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold text-sm transition-colors"
+                                >
+                                  <Package size={16} />
+                                  Thêm vào giỏ
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Pagination */}
                   {totalPages > 1 && (

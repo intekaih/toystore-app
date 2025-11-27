@@ -89,7 +89,7 @@ class ConfigService {
     // ========== UPLOAD CONFIG ==========
     this.#configs.upload = {
       directory: path.join(__dirname, '../uploads'),
-      maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024, // 5MB
+      maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024, // 10MB
       allowedTypes: ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'],
       imageUrl: process.env.IMAGE_URL || 'http://localhost:5000/uploads'
     };
@@ -126,6 +126,13 @@ class ConfigService {
       enableFile: process.env.LOG_FILE === 'true' || true
     };
 
+    // ========== GOOGLE OAUTH CONFIG ==========
+    this.#configs.google = {
+      clientId: process.env.GOOGLE_CLIENT_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      callbackUrl: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/auth/google/callback'
+    };
+
     // Validation các config bắt buộc
     this.#validateConfigs();
   }
@@ -149,6 +156,11 @@ class ConfigService {
     // Kiểm tra VNPay config
     if (!this.#configs.vnpay.tmnCode || !this.#configs.vnpay.hashSecret) {
       logger.warn('⚠️ VNPay config chưa được cấu hình! Thanh toán VNPay sẽ không hoạt động');
+    }
+
+    // Kiểm tra Google OAuth config
+    if (!this.#configs.google.clientId || !this.#configs.google.clientSecret) {
+      logger.warn('⚠️ Google OAuth config chưa được cấu hình! Đăng nhập Google sẽ không hoạt động');
     }
 
     logger.success('✅ Validation config hoàn tất');

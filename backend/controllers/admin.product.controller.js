@@ -20,6 +20,8 @@ exports.getAllProducts = async (req, res) => {
     const limitParam = req.query.limit;
     const search = req.query.search || '';
     const loaiId = req.query.loaiId || '';
+    const thuongHieuId = req.query.thuongHieuId || '';
+    const stockFilter = req.query.stockFilter || '';
     const enable = req.query.enable || '';
 
     // Validate và parse page parameter
@@ -76,6 +78,30 @@ exports.getAllProducts = async (req, res) => {
     // Lọc theo loại sản phẩm
     if (loaiId && parseInt(loaiId) > 0) {
       whereCondition.LoaiID = parseInt(loaiId);
+    }
+
+    // Lọc theo thương hiệu
+    if (thuongHieuId && parseInt(thuongHieuId) > 0) {
+      whereCondition.ThuongHieuID = parseInt(thuongHieuId);
+    }
+
+    // Lọc theo tồn kho
+    if (stockFilter) {
+      if (stockFilter === 'in-stock') {
+        // Còn hàng: SoLuongTon > 0
+        whereCondition.SoLuongTon = {
+          [Op.gt]: 0
+        };
+      } else if (stockFilter === 'out-of-stock') {
+        // Hết hàng: SoLuongTon = 0
+        whereCondition.SoLuongTon = 0;
+      } else if (stockFilter === 'low-stock') {
+        // Sắp hết: SoLuongTon > 0 và SoLuongTon < 10
+        whereCondition.SoLuongTon = {
+          [Op.gt]: 0,
+          [Op.lt]: 10
+        };
+      }
     }
 
     // Lọc theo trạng thái Enable
@@ -326,7 +352,7 @@ exports.createProduct = async (req, res) => {
 
     // ✅ Xử lý upload nhiều ảnh vào bảng SanPhamHinhAnh
     if (req.files && req.files.length > 0) {
-      const imageUrls = moveFilesToProductFolder(req.files, newProduct.ID);
+      const imageUrls = await moveFilesToProductFolder(req.files, newProduct.ID);
       
       if (imageUrls) {
         const urlArray = JSON.parse(imageUrls);
@@ -435,12 +461,12 @@ exports.updateProduct = async (req, res) => {
     const productId = parseInt(req.params.id);
     console.log('✏️ Admin - Cập nhật sản phẩm ID:', productId);
     console.log('📝 Body data:', req.body);
-    console.log('📁 File uploaded:', req.file);
+    console.log('📁 Files uploaded:', req.files);
 
     // Validate productId
     if (!productId || productId < 1) {
-      if (req.file) {
-        deleteOldImage(req.file.filename);
+      if (req.files && req.files.length > 0) {
+        cleanupTempFiles(req.files);
       }
       return res.status(400).json({
         success: false,
@@ -493,8 +519,8 @@ exports.updateProduct = async (req, res) => {
     }
 
     if (errors.length > 0) {
-      if (req.file) {
-        deleteOldImage(req.file.filename);
+      if (req.files && req.files.length > 0) {
+        cleanupTempFiles(req.files);
       }
       return res.status(400).json({
         success: false,
@@ -507,8 +533,8 @@ exports.updateProduct = async (req, res) => {
     const product = await SanPham.findByPk(productId);
 
     if (!product) {
-      if (req.file) {
-        deleteOldImage(req.file.filename);
+      if (req.files && req.files.length > 0) {
+        cleanupTempFiles(req.files);
       }
       return res.status(404).json({
         success: false,
@@ -526,8 +552,8 @@ exports.updateProduct = async (req, res) => {
       });
 
       if (!loaiSP) {
-        if (req.file) {
-          deleteOldImage(req.file.filename);
+        if (req.files && req.files.length > 0) {
+          cleanupTempFiles(req.files);
         }
         return res.status(404).json({
           success: false,
@@ -551,8 +577,8 @@ exports.updateProduct = async (req, res) => {
       });
 
       if (existingProduct) {
-        if (req.file) {
-          deleteOldImage(req.file.filename);
+        if (req.files && req.files.length > 0) {
+          cleanupTempFiles(req.files);
         }
         return res.status(409).json({
           success: false,
@@ -588,16 +614,44 @@ exports.updateProduct = async (req, res) => {
       updateData.TrangThai = Enable === 'true' || Enable === true;
     }
 
-    // Xử lý upload ảnh mới
-    if (req.file) {
-      // Xóa ảnh cũ nếu có
-      if (product.HinhAnhURL) {
-        deleteOldImage(product.HinhAnhURL);
+    // ✅ Xử lý upload nhiều ảnh mới vào bảng SanPhamHinhAnh
+    if (req.files && req.files.length > 0) {
+      // Xóa tất cả ảnh cũ của sản phẩm
+      const oldImages = await SanPhamHinhAnh.findAll({
+        where: { SanPhamID: productId }
+      });
+      
+      // Xóa files cũ
+      for (const oldImage of oldImages) {
+        deleteOldImage(oldImage.DuongDanHinhAnh);
       }
       
-      // Rename file theo ID sản phẩm
-      const newFilename = renameFileByProductId(req.file.filename, productId);
-      updateData.HinhAnhURL = `/uploads/${newFilename}`;
+      // Xóa records cũ trong database
+      await SanPhamHinhAnh.destroy({
+        where: { SanPhamID: productId }
+      });
+      
+      // Xử lý và lưu ảnh mới (với xử lý vuông 1:1)
+      const imageUrls = await moveFilesToProductFolder(req.files, productId);
+      
+      if (imageUrls) {
+        const urlArray = JSON.parse(imageUrls);
+        
+        // Lưu từng ảnh vào bảng SanPhamHinhAnh
+        const imageRecords = urlArray.map((url, index) => ({
+          SanPhamID: productId,
+          DuongDanHinhAnh: url,
+          ThuTu: index,
+          LaMacDinh: index === 0 // Ảnh đầu tiên là ảnh chính
+        }));
+        
+        await SanPhamHinhAnh.bulkCreate(imageRecords);
+        
+        // Cập nhật HinhAnhURL của sản phẩm = ảnh chính (ảnh đầu tiên)
+        updateData.HinhAnhURL = urlArray[0];
+        
+        console.log(`✅ Đã cập nhật ${urlArray.length} ảnh cho sản phẩm ${productId}`);
+      }
     }
 
     // Kiểm tra có dữ liệu để cập nhật không
@@ -651,9 +705,9 @@ exports.updateProduct = async (req, res) => {
   } catch (error) {
     console.error('❌ Lỗi cập nhật sản phẩm:', error);
 
-    // Xóa file mới upload nếu có lỗi
-    if (req.file) {
-      deleteOldImage(req.file.filename);
+    // Xóa files mới upload nếu có lỗi
+    if (req.files && req.files.length > 0) {
+      cleanupTempFiles(req.files);
     }
 
     if (error.name === 'SequelizeValidationError') {

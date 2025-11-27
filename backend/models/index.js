@@ -35,6 +35,7 @@ db.ThongTinVanChuyen = require('./ThongTinVanChuyen')(sequelize, Sequelize);
 // ✅ THÊM MỚI: Import model LichSuTrangThaiDonHang
 db.LichSuTrangThaiDonHang = require('./LichSuTrangThaiDonHang')(sequelize, Sequelize);
 db.DanhGiaSanPham = require('./DanhGiaSanPham')(sequelize, Sequelize);
+db.Banner = require('./Banner')(sequelize, Sequelize);
 
 // Định nghĩa quan hệ giữa các bảng
 // SanPham thuộc về một LoaiSP
@@ -280,18 +281,7 @@ db.ThongTinVanChuyen.belongsTo(db.HoaDon, {
   as: 'hoaDon'
 });
 
-// ✅ THÊM MỚI: Quan hệ giữa HoaDon và LichSuTrangThaiDonHang (1-nhiều)
-// HoaDon có nhiều LichSuTrangThaiDonHang
-db.HoaDon.hasMany(db.LichSuTrangThaiDonHang, {
-  foreignKey: 'HoaDonID',
-  as: 'lichSuTrangThai'
-});
-
-// LichSuTrangThaiDonHang thuộc về một HoaDon
-db.LichSuTrangThaiDonHang.belongsTo(db.HoaDon, {
-  foreignKey: 'HoaDonID',
-  as: 'hoaDon'
-});
+// ✅ REMOVED: Không dùng LichSuTrangThaiDonHang nữa, chỉ dùng HoaDon.TrangThai
 
 // ============================================
 // ✅ QUAN HỆ CHO ĐÁNH GIÁ SẢN PHẨM (MVP - 8 cột)

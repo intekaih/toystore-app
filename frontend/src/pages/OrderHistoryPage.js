@@ -80,9 +80,34 @@ const OrderHistoryPage = () => {
 
       if (response.success) {
         // ✅ Xử lý đúng cấu trúc response: response.data có thể là array hoặc object chứa array
-        const ordersData = Array.isArray(response.data) 
+        let ordersData = Array.isArray(response.data) 
           ? response.data 
           : (response.data.orders || response.data.hoaDons || []);
+        
+        // ✅ Normalize dữ liệu chiTiet cho mỗi order
+        ordersData = ordersData.map(order => {
+          // Đảm bảo chiTiet luôn là array và có cấu trúc đúng
+          const chiTiet = order.chiTiet || order.ChiTiet || [];
+          
+          // Normalize từng item trong chiTiet
+          const normalizedChiTiet = chiTiet.map(item => ({
+            id: item.id || item.ID,
+            soLuong: item.soLuong || item.SoLuong || 0,
+            donGia: item.donGia || item.DonGia || 0,
+            thanhTien: item.thanhTien || item.ThanhTien || 0,
+            sanPham: {
+              id: item.sanPham?.id || item.sanPham?.ID,
+              ten: item.sanPham?.ten || item.sanPham?.Ten || item.tenSanPham || 'Sản phẩm không xác định',
+              hinhAnhUrl: item.sanPham?.hinhAnhUrl || item.sanPham?.hinhAnhURL || item.sanPham?.hinhAnh || item.sanPham?.HinhAnhURL || item.sanPham?.HinhAnh || '',
+              giaBan: item.sanPham?.giaBan || item.sanPham?.GiaBan || item.donGia || 0
+            }
+          }));
+          
+          return {
+            ...order,
+            chiTiet: normalizedChiTiet
+          };
+        });
         
         setOrders(ordersData);
         
@@ -281,34 +306,60 @@ const OrderHistoryPage = () => {
 
                     {/* Order Products */}
                     <div className="p-4 space-y-3">
-                      {/* ✅ FIX: Xử lý cả chiTiet và sanPhams, đảm bảo luôn có array */}
-                      {(order.chiTiet || order.sanPhams || []).slice(0, 3).map((product) => (
-                        <div key={product.id} className="flex gap-4 items-center">
-                          <img
-                            src={buildImageUrl(product.hinhAnh || product.sanPham?.hinhAnhURL)}
-                            alt={product.tenSanPham || product.sanPham?.ten}
-                            className="w-16 h-16 object-cover rounded-cute flex-shrink-0"
-                            onError={handleImageError}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-gray-800 line-clamp-1">
-                              {product.tenSanPham || product.sanPham?.ten}
+                      {/* ✅ FIX: Xử lý đúng cấu trúc chiTiet từ backend */}
+                      {(() => {
+                        const chiTiet = order.chiTiet || order.sanPhams || [];
+                        
+                        if (!chiTiet || chiTiet.length === 0) {
+                          return (
+                            <div className="text-center text-gray-500 py-4">
+                              <Package size={32} className="mx-auto mb-2 text-gray-400" />
+                              <p>Không có thông tin sản phẩm</p>
                             </div>
-                            <div className="text-sm text-gray-600">
-                              x{product.soLuong}
-                            </div>
-                          </div>
-                          <div className="font-bold text-primary-600">
-                            {(product.thanhTien || 0).toLocaleString('vi-VN')} ₫
-                          </div>
-                        </div>
-                      ))}
-                      {/* ✅ FIX: Xử lý cả chiTiet và sanPhams */}
-                      {(order.chiTiet || order.sanPhams || []).length > 3 && (
-                        <div className="text-sm text-primary-600 font-medium text-center py-2 bg-primary-50 rounded-cute">
-                          +{(order.chiTiet || order.sanPhams || []).length - 3} sản phẩm khác
-                        </div>
-                      )}
+                          );
+                        }
+                        
+                        return (
+                          <>
+                            {chiTiet.slice(0, 3).map((item, index) => {
+                              // ✅ Normalize dữ liệu sản phẩm
+                              const product = item.sanPham || item;
+                              const productName = product.ten || product.Ten || product.tenSanPham || 'Sản phẩm không xác định';
+                              const productImage = product.hinhAnhUrl || product.hinhAnhURL || product.hinhAnh || product.HinhAnhURL || product.HinhAnh || '';
+                              const quantity = item.soLuong || item.SoLuong || 0;
+                              const totalPrice = item.thanhTien || item.ThanhTien || 0;
+                              
+                              return (
+                                <div key={item.id || index} className="flex gap-4 items-center">
+                                  <img
+                                    src={buildImageUrl(productImage)}
+                                    alt={productName}
+                                    className="w-16 h-16 object-cover rounded-cute flex-shrink-0"
+                                    onError={handleImageError}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-gray-800 line-clamp-1">
+                                      {productName}
+                                    </div>
+                                    <div className="text-sm text-gray-600">
+                                      x{quantity}
+                                    </div>
+                                  </div>
+                                  <div className="font-bold text-primary-600">
+                                    {totalPrice.toLocaleString('vi-VN')} ₫
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {/* ✅ FIX: Xử lý cả chiTiet và sanPhams */}
+                            {chiTiet.length > 3 && (
+                              <div className="text-sm text-primary-600 font-medium text-center py-2 bg-primary-50 rounded-cute">
+                                +{chiTiet.length - 3} sản phẩm khác
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Order Footer */}

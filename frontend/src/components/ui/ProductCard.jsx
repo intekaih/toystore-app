@@ -3,6 +3,7 @@ import { ShoppingCart, Heart, Eye } from 'lucide-react';
 import Badge from './Badge';
 import { Link } from 'react-router-dom';
 import config from '../../config';
+import OptimizedImage from './OptimizedImage';
 
 /**
  * 🧸 ProductCard Component - Card sản phẩm dễ thương
@@ -105,102 +106,63 @@ const ProductCard = ({
   const stockStatus = getStockStatus();
 
   return (
-    <div className={`product-card-cute group ${className}`}>
-      {/* Product Image */}
-      <div className="product-image-wrapper relative">
-        <img 
-          src={productImage} 
-          alt={productName}
-          className="w-full h-full object-cover"
-          onError={handleImageError}
-          loading="lazy"
-        />
-        
-        {/* Image Placeholder - hiển thị khi ảnh lỗi */}
-        <div 
-          className="image-placeholder absolute inset-0 bg-gray-100 flex flex-col items-center justify-center text-gray-400 text-sm"
-          style={{ display: 'none' }}
-        >
-          <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center mb-2">
-            <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <span>Không có ảnh</span>
-        </div>
-        
-        {/* Stock Badge */}
-        <div className="absolute top-3 right-3">
-          <Badge variant={stockStatus.variant} size="sm">
-            {stockStatus.icon && <span className="mr-1">{stockStatus.icon}</span>}
-            {stockStatus.text}
-          </Badge>
-        </div>
-
-        {/* Category Badge */}
-        {productCategory && (
-          <div className="absolute top-3 left-3">
-            <Badge variant="primary" size="sm">
-              {productCategory}
-            </Badge>
-          </div>
-        )}
-
-        {/* Hover Overlay với Quick Actions */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-2 px-4">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onQuickView && onQuickView(product);
-              }}
-              className="p-2 bg-white rounded-full text-primary-500 hover:bg-primary-500 hover:text-white transition-colors shadow-soft"
-              title="Xem nhanh"
-            >
-              <Eye size={18} />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onFavorite && onFavorite(product);
-              }}
-              className="p-2 bg-white rounded-full text-rose-500 hover:bg-rose-500 hover:text-white transition-colors shadow-soft"
-              title="Yêu thích"
-            >
-              <Heart size={18} />
-            </button>
-          </div>
+    <div className={`bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-all group ${className}`}>
+      {/* Product Image - với padding để lộ viền nền */}
+      <div className="p-3">
+        <div className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden">
+          <OptimizedImage
+            src={productImage}
+            alt={productName}
+            aspectRatio="1"
+            objectFit="cover"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            priority={false}
+            className="rounded-lg"
+            fallback="/barbie.jpg"
+            onError={handleImageError}
+          />
         </div>
       </div>
 
       {/* Product Info */}
-      <div className="p-4 space-y-3">
+      <div className="px-3 pb-3 relative">
         {/* Product Name */}
-        <h3 className="font-bold text-gray-800 line-clamp-2 min-h-[3rem] leading-6">
+        <h3 
+          onClick={() => window.location.href = `/products/${productId}`}
+          className="font-semibold text-gray-800 mb-1 line-clamp-2 cursor-pointer hover:text-primary-600 transition-colors"
+        >
           {productName}
         </h3>
 
-        {/* Price */}
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold text-gradient-primary">
+        {/* Category Text - Below Name */}
+        {productCategory && (
+          <p className="text-sm text-gray-500 mb-3">
+            {productCategory}
+          </p>
+        )}
+
+        {/* Price and Add to Cart - Bottom Row */}
+        <div className="flex items-center justify-between">
+          {/* Price - Bottom Left */}
+          <span className="text-xl font-bold text-gray-800">
             {formatPrice(productPrice)}
           </span>
-        </div>
 
-        {/* Add to Cart Button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            if (onAddToCart) {
-              onAddToCart(product);
-            }
-          }}
-          disabled={productStock === 0}
-          className="w-full py-2.5 px-4 bg-gradient-to-r from-primary-400 to-primary-500 text-white font-semibold rounded-cute shadow-soft hover:shadow-cute hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-2"
-        >
-          <ShoppingCart size={18} />
-          {productStock === 0 ? 'Hết hàng' : 'Thêm vào giỏ'}
-        </button>
+          {/* Add to Cart Button - Bottom Right (Circular) */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onAddToCart) {
+                onAddToCart(product);
+              }
+            }}
+            disabled={productStock === 0}
+            className="w-10 h-10 bg-primary-200 hover:bg-primary-300 text-white rounded-full flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            title="Thêm vào giỏ"
+          >
+            <ShoppingCart size={18} />
+          </button>
+        </div>
       </div>
     </div>
   );

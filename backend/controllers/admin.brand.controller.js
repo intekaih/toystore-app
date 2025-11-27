@@ -2,6 +2,7 @@ const db = require('../models');
 const ThuongHieu = db.ThuongHieu;
 const { Op } = require('sequelize');
 const DTOMapper = require('../utils/DTOMapper');
+const { deleteOldBrandLogo } = require('../middlewares/upload.middleware');
 
 /**
  * GET /api/admin/brands
@@ -88,9 +89,20 @@ exports.createBrand = async (req, res) => {
       });
     }
 
+    // Xử lý logo: nếu có file upload thì dùng file, nếu không thì dùng URL từ body
+    let logoUrl = null;
+    if (req.file) {
+      // Có file upload
+      logoUrl = `/uploads/brands/${req.file.filename}`;
+      console.log('✅ Đã upload logo:', logoUrl);
+    } else if (Logo && Logo.trim()) {
+      // Sử dụng URL từ body (link bên ngoài)
+      logoUrl = Logo.trim();
+    }
+
     const newBrand = await ThuongHieu.create({
       TenThuongHieu: TenThuongHieu.trim(),
-      Logo: Logo ? Logo.trim() : null,
+      Logo: logoUrl,
       TrangThai: true
     });
 
@@ -182,9 +194,37 @@ exports.updateBrand = async (req, res) => {
       }
     }
 
+    // Xử lý logo: nếu có file upload thì dùng file, nếu không thì dùng URL từ body
+    let logoUrl = brand.Logo; // Giữ logo cũ nếu không thay đổi
+    
+    if (req.file) {
+      // Xóa logo cũ nếu có (chỉ xóa file trong uploads/brands)
+      if (brand.Logo && brand.Logo.startsWith('/uploads/brands/')) {
+        deleteOldBrandLogo(brand.Logo);
+      }
+      // Có file upload mới
+      logoUrl = `/uploads/brands/${req.file.filename}`;
+      console.log('✅ Đã upload logo mới:', logoUrl);
+    } else if (Logo !== undefined) {
+      // Có thay đổi URL (có thể là null để xóa logo)
+      if (Logo && Logo.trim()) {
+        // Xóa logo cũ nếu là file local
+        if (brand.Logo && brand.Logo.startsWith('/uploads/brands/')) {
+          deleteOldBrandLogo(brand.Logo);
+        }
+        logoUrl = Logo.trim();
+      } else {
+        // Xóa logo
+        if (brand.Logo && brand.Logo.startsWith('/uploads/brands/')) {
+          deleteOldBrandLogo(brand.Logo);
+        }
+        logoUrl = null;
+      }
+    }
+
     await brand.update({
       TenThuongHieu: TenThuongHieu.trim(),
-      Logo: Logo ? Logo.trim() : null
+      Logo: logoUrl
     });
 
     const brandDTO = DTOMapper.toCamelCase({

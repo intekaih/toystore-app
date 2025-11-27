@@ -21,6 +21,7 @@ export { default as cartService } from './cartService';
 export { default as orderService } from './orderService';
 export { default as paymentService } from './paymentService';
 export { default as voucherService } from './voucherService'; // ✅ Added
+export { default as bannerService } from './bannerService'; // ✅ Added
 
 // Reviews & Feedback
 export { default as shippingService } from './shippingService';

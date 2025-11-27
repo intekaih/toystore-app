@@ -142,13 +142,18 @@ const safeCommit = async (transaction, order = null, expectedStatus = null, cont
 exports.getAllOrders = async (req, res) => {
   try {
     console.log('📦 Admin - Lấy danh sách tất cả đơn hàng');
-    console.log('📝 Query params:', req.query);
+    console.log('📝 Query params:', JSON.stringify(req.query, null, 2));
 
     // Lấy query parameters
     const pageParam = req.query.page;
     const limitParam = req.query.limit;
     const trangThai = req.query.trangThai || null;
     const search = req.query.search || '';
+    const tuNgay = req.query.tuNgay || null;
+    const denNgay = req.query.denNgay || null;
+    const phuongThucThanhToan = req.query.phuongThucThanhToan || null;
+    const khachHangId = req.query.khachHangId || null; // ✅ ID khách hàng
+    const khachHang = req.query.khachHang || null; // Tên khách hàng (giữ lại để tương thích)
 
     // Validate và parse page parameter
     let page = 1;
@@ -196,16 +201,71 @@ exports.getAllOrders = async (req, res) => {
     // Thêm điều kiện lọc theo trạng thái nếu có
     if (trangThai) {
       whereCondition.TrangThai = trangThai;
+      console.log('✅ [getAllOrders] Filter by status:', trangThai);
+    } else {
+      console.log('⚠️ [getAllOrders] No status filter - showing all orders');
     }
 
-    // Thêm điều kiện tìm kiếm theo mã hóa đơn nếu có
+    // ✅ THÊM: Lọc theo ngày (từ ngày và đến ngày)
+    if (tuNgay || denNgay) {
+      const dateCondition = {};
+      if (tuNgay) {
+        // ✅ SỬA: Format date đúng cho SQL Server - sử dụng literal với format chuẩn
+        // Format: YYYY-MM-DD HH:mm:ss (không có timezone)
+        const tuNgayFormatted = `${tuNgay} 00:00:00`;
+        dateCondition[Op.gte] = db.sequelize.literal(`CAST('${tuNgayFormatted}' AS DATETIME)`);
+      }
+      if (denNgay) {
+        // ✅ SỬA: Format date đúng cho SQL Server
+        const denNgayFormatted = `${denNgay} 23:59:59`;
+        dateCondition[Op.lte] = db.sequelize.literal(`CAST('${denNgayFormatted}' AS DATETIME)`);
+      }
+      whereCondition.NgayLap = dateCondition;
+    }
+
+    // ✅ THÊM: Lọc theo phương thức thanh toán
+    if (phuongThucThanhToan) {
+      whereCondition.PhuongThucThanhToanID = parseInt(phuongThucThanhToan);
+    }
+
+    // ✅ THÊM: Tìm kiếm theo mã hóa đơn HOẶC tên khách hàng
     if (search.trim()) {
-      whereCondition.MaHD = {
-        [Op.like]: `%${search.trim()}%`
-      };
+      whereCondition[Op.or] = [
+        { MaHD: { [Op.like]: `%${search.trim()}%` } }
+      ];
     }
 
-    console.log('🔍 Điều kiện tìm kiếm:', whereCondition);
+    // ✅ THÊM: Lọc theo ID khách hàng (ưu tiên) hoặc tên khách hàng
+    const khachHangWhere = {};
+    if (khachHangId) {
+      // ✅ Lọc theo ID khách hàng
+      whereCondition.KhachHangID = parseInt(khachHangId);
+    } else if (khachHang && khachHang.trim()) {
+      // ✅ Lọc theo tên khách hàng HOẶC số điện thoại
+      khachHangWhere[Op.or] = [
+        { HoTen: { [Op.like]: `%${khachHang.trim()}%` } },
+        { DienThoai: { [Op.like]: `%${khachHang.trim()}%` } }
+      ];
+    }
+
+    // ✅ THÊM: Nếu search có giá trị, tìm theo mã đơn hàng, tên khách hàng, HOẶC số điện thoại
+    if (search.trim() && whereCondition[Op.or]) {
+      whereCondition[Op.or].push(
+        {
+          '$khachHang.HoTen$': {
+            [Op.like]: `%${search.trim()}%`
+          }
+        },
+        {
+          '$khachHang.DienThoai$': {
+            [Op.like]: `%${search.trim()}%`
+          }
+        }
+      );
+    }
+
+    console.log('🔍 Điều kiện tìm kiếm:', JSON.stringify(whereCondition, null, 2));
+    console.log('🔍 Điều kiện khách hàng:', JSON.stringify(khachHangWhere, null, 2));
 
     // Lấy danh sách đơn hàng với phân trang
     const { count, rows } = await HoaDon.findAndCountAll({
@@ -214,7 +274,12 @@ exports.getAllOrders = async (req, res) => {
         {
           model: KhachHang,
           as: 'khachHang',
-          attributes: ['ID', 'HoTen', 'Email', 'DienThoai']
+          attributes: ['ID', 'HoTen', 'Email', 'DienThoai'],
+          where: Object.keys(khachHangWhere).length > 0 ? khachHangWhere : undefined,
+          required: (khachHangId ? false : Object.keys(khachHangWhere).length > 0) || (search.trim() && whereCondition[Op.or] && whereCondition[Op.or].some(cond => {
+            if (!cond || typeof cond !== 'object') return false;
+            return '$khachHang.HoTen$' in cond || '$khachHang.DienThoai$' in cond;
+          }))
         },
         {
           model: PhuongThucThanhToan,
@@ -328,7 +393,11 @@ exports.getAllOrders = async (req, res) => {
         },
         filter: {
           trangThai: trangThai || 'Tất cả',
-          search: search.trim() || null
+          search: search.trim() || null,
+          tuNgay: tuNgay || null,
+          denNgay: denNgay || null,
+          phuongThucThanhToan: phuongThucThanhToan || null,
+          khachHang: khachHang || null
         },
         summary: {
           tongTienTatCaDonHang: orders.reduce((sum, order) => sum + order.thanhTien, 0),
@@ -339,6 +408,62 @@ exports.getAllOrders = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Lỗi lấy danh sách đơn hàng:', error);
+
+    if (error.name === 'SequelizeDatabaseError') {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi cơ sở dữ liệu',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Database Error'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server nội bộ',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
+    });
+  }
+};
+
+/**
+ * GET /api/admin/orders/customers
+ * Lấy danh sách khách hàng đã mua hàng (bao gồm cả khách vãng lai)
+ */
+exports.getCustomersFromOrders = async (req, res) => {
+  try {
+    console.log('👥 Admin - Lấy danh sách khách hàng từ đơn hàng');
+
+    // ✅ Lấy danh sách khách hàng distinct từ đơn hàng (sử dụng raw query để đơn giản)
+    const [results] = await db.sequelize.query(`
+      SELECT DISTINCT 
+        k.ID as id,
+        k.HoTen as hoTen,
+        k.DienThoai as dienThoai,
+        k.Email as email
+      FROM HoaDon h
+      INNER JOIN KhachHang k ON h.KhachHangID = k.ID
+      WHERE k.DienThoai IS NOT NULL AND k.DienThoai != ''
+      ORDER BY k.HoTen ASC
+    `);
+
+    // Format dữ liệu
+    const customersList = results.map(row => ({
+      id: row.id,
+      hoTen: row.hoTen || '',
+      dienThoai: row.dienThoai || '',
+      email: row.email || ''
+    }));
+
+    console.log(`✅ Lấy ${customersList.length} khách hàng từ đơn hàng`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Lấy danh sách khách hàng thành công',
+      data: customersList
+    });
+
+  } catch (error) {
+    console.error('❌ Lỗi lấy danh sách khách hàng:', error);
 
     if (error.name === 'SequelizeDatabaseError') {
       return res.status(500).json({
@@ -389,13 +514,6 @@ exports.getOrderById = async (req, res) => {
           model: PhuongThucThanhToan,
           as: 'phuongThucThanhToan',
           attributes: ['ID', 'Ten'] // ✅ BỎ: MoTa (không tồn tại trong DB)
-        },
-        // ✅ THÊM: Include bảng LichSuTrangThaiDonHang
-        {
-          model: db.LichSuTrangThaiDonHang,
-          as: 'lichSuTrangThai',
-          attributes: ['ID', 'TrangThaiCu', 'TrangThaiMoi', 'NguoiThayDoi', 'LyDo', 'NgayThayDoi'],
-          order: [['NgayThayDoi', 'ASC']]
         },
         {
           model: ChiTietHoaDon,
@@ -449,21 +567,10 @@ exports.getOrderById = async (req, res) => {
       }))
     });
 
-    // ✅ THÊM: Lịch sử trạng thái đơn hàng
-    const lichSuTrangThai = hoaDon.lichSuTrangThai ? hoaDon.lichSuTrangThai.map(item => ({
-      id: item.ID,
-      trangThaiCu: item.TrangThaiCu,
-      trangThaiMoi: item.TrangThaiMoi,
-      nguoiThayDoi: item.NguoiThayDoi,
-      lyDo: item.LyDo,
-      ngayThayDoi: item.NgayThayDoi
-    })) : [];
-
     const result = {
       ...orderDetail,
       tongSoLuongSanPham: hoaDon.chiTiet.reduce((sum, item) => sum + item.SoLuong, 0),
-      soLoaiSanPham: hoaDon.chiTiet.length,
-      lichSuTrangThai: lichSuTrangThai
+      soLoaiSanPham: hoaDon.chiTiet.length
     };
 
     console.log('✅ Lấy chi tiết đơn hàng thành công:', hoaDon.MaHD);

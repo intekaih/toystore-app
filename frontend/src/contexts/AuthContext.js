@@ -169,6 +169,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     setUser: updateUser,
+    updateUser, // Alias để tương thích với code cũ
     login,
     logout,
     refreshUser, // Thêm hàm refresh để component có thể gọi khi cần

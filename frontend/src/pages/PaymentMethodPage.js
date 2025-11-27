@@ -39,6 +39,7 @@ const PaymentMethodPage = () => {
   const location = useLocation();
 
   const customerInfo = location.state?.customerInfo;
+  const [ghiChu, setGhiChu] = useState('');
 
   useEffect(() => {
     if (!customerInfo) {
@@ -46,6 +47,7 @@ const PaymentMethodPage = () => {
       setTimeout(() => navigate('/checkout'), 1500);
       return;
     }
+    setGhiChu(customerInfo.ghiChu || '');
     loadCart();
   }, [customerInfo]);
 
@@ -232,7 +234,7 @@ const PaymentMethodPage = () => {
           maQuanID: customerInfo.maQuanID,
           maPhuongXa: customerInfo.maPhuongXa,
           phuongThucThanhToanId: selectedMethod === 'cod' ? 1 : 2,
-          ghiChu: customerInfo.ghiChu || '',
+          ghiChu: ghiChu || '',
           // ✅ FIX: Gửi mã voucher dưới dạng string, không phải null
           maVoucher: appliedVoucher?.maVoucher || ''
         };
@@ -251,7 +253,7 @@ const PaymentMethodPage = () => {
           maQuanID: customerInfo.maQuanID,
           maPhuongXa: customerInfo.maPhuongXa,
           phuongThucThanhToanId: selectedMethod === 'cod' ? 1 : 2,
-          ghiChu: customerInfo.ghiChu || '',
+          ghiChu: ghiChu || '',
           // ✅ FIX: Gửi mã voucher dưới dạng string, không phải null
           maVoucher: appliedVoucher?.maVoucher || ''
         };
@@ -366,32 +368,17 @@ const PaymentMethodPage = () => {
           <span className="text-gray-700 font-medium">Phương thức thanh toán</span>
         </div>
 
-        {/* Info Banner */}
-        <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <div className="text-2xl">🔒</div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-green-900 mb-1">Thanh toán an toàn & bảo mật</h3>
-              <ul className="text-sm text-green-800 space-y-1">
-                <li>• Thông tin thanh toán được mã hóa SSL 256-bit</li>
-                <li>• Không lưu trữ thông tin thẻ của bạn</li>
-                <li>• Hỗ trợ đổi trả trong vòng 7 ngày nếu có lỗi từ nhà sản xuất</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Title */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
-            3
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800">Phương Thức Thanh Toán</h1>
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Phương thức thanh toán bên trái */}
           <div>
+            {/* Title */}
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                3
+              </div>
+              <h1 className="text-2xl font-bold text-gray-800">Phương Thức Thanh Toán</h1>
+            </div>
+
             {/* Thông tin giao hàng đã nhập */}
             {customerInfo && (
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-300 rounded-lg p-4 mb-6 shadow-sm">
@@ -427,18 +414,26 @@ const PaymentMethodPage = () => {
                         {customerInfo.diaChi}, {customerInfo.phuongXa}, {customerInfo.quanHuyen}, {customerInfo.tinhThanh}
                       </span>
                     </p>
-                    {customerInfo.ghiChu && (
-                      <p className="flex items-start gap-2 bg-yellow-50 p-2 rounded border border-yellow-200">
-                        <span className="font-semibold min-w-[100px]">📝 Ghi chú:</span>
-                        <span className="text-gray-600 italic">{customerInfo.ghiChu}</span>
-                      </p>
-                    )}
                   </div>
+                </div>
+                
+                {/* Ghi chú */}
+                <div className="mt-3">
+                  <label className="block text-sm text-gray-700 mb-2 font-medium">
+                    📝 Ghi chú (tùy chọn)
+                  </label>
+                  <textarea
+                    value={ghiChu}
+                    onChange={(e) => setGhiChu(e.target.value)}
+                    placeholder="Nhập ghi chú cho đơn hàng (ví dụ: Giao hàng vào buổi sáng, gọi trước khi giao...)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    rows={3}
+                  />
                 </div>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form id="payment-form" onSubmit={handleSubmit} className="space-y-4">
               <div className="bg-white border-2 border-gray-200 rounded-lg p-5">
                 <h3 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
                   <span className="text-xl">💳</span>
@@ -478,17 +473,6 @@ const PaymentMethodPage = () => {
                           </div>
                         </div>
                       </div>
-                      <div className="bg-white rounded-lg p-3 border border-green-200">
-                        <p className="text-sm text-gray-700 mb-2">
-                          <strong>Thanh toán bằng tiền mặt</strong> khi nhận hàng tại địa chỉ của bạn
-                        </p>
-                        <ul className="text-xs text-gray-600 space-y-1">
-                          <li>• Kiểm tra hàng trước khi thanh toán</li>
-                          <li>• Không cần tài khoản ngân hàng</li>
-                          <li>• Phù hợp cho mọi đối tượng</li>
-                          <li>• Shipper sẽ thu tiền khi giao hàng</li>
-                        </ul>
-                      </div>
                     </div>
                   </label>
 
@@ -523,21 +507,6 @@ const PaymentMethodPage = () => {
                           <div className="text-xs text-blue-600 font-medium mt-1">Thanh toán online an toàn</div>
                         </div>
                       </div>
-                      <div className="bg-white rounded-lg p-3 border border-blue-200">
-                        <p className="text-sm text-gray-700 mb-2">
-                          <strong>Thanh toán trực tuyến</strong> qua cổng thanh toán VNPay
-                        </p>
-                        <ul className="text-xs text-gray-600 space-y-1 mb-2">
-                          <li>• Thẻ ATM nội địa (Internet Banking)</li>
-                          <li>• Thẻ Visa, MasterCard, JCB</li>
-                          <li>• Ví điện tử VNPay</li>
-                          <li>• Quét mã QR thanh toán</li>
-                        </ul>
-                        <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 p-2 rounded border border-green-200">
-                          <span>🎁</span>
-                          <span className="font-medium">Giảm 2% phí giao dịch khi thanh toán online</span>
-                        </div>
-                      </div>
                     </div>
                   </label>
 
@@ -565,11 +534,6 @@ const PaymentMethodPage = () => {
                             <div className="text-xs text-gray-500 mt-1">Tạm thời không khả dụng</div>
                           </div>
                         </div>
-                        <div className="bg-white rounded-lg p-3 border border-gray-200">
-                          <p className="text-sm text-gray-500">
-                            Phương thức thanh toán này đang được bảo trì và sẽ sớm có mặt trở lại.
-                          </p>
-                        </div>
                       </div>
                     </label>
                     <div className="absolute top-2 right-2 bg-gray-400 text-white text-xs px-2 py-1 rounded-full font-semibold">
@@ -578,57 +542,6 @@ const PaymentMethodPage = () => {
                   </div>
                 </div>
 
-                {/* Payment Security Info */}
-                <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs text-blue-900 font-medium mb-2 flex items-center gap-2">
-                    <span>🔐</span>
-                    <span>Bảo mật thanh toán:</span>
-                  </p>
-                  <ul className="text-xs text-blue-800 space-y-1">
-                    <li>• Tất cả giao dịch được mã hóa SSL/TLS</li>
-                    <li>• Tuân thủ tiêu chuẩn bảo mật PCI DSS</li>
-                    <li>• Không lưu trữ thông tin thẻ thanh toán</li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Buttons */}
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => navigate('/checkout')}
-                  className="px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
-                  disabled={submitting}
-                >
-                  <span>←</span> Quay lại
-                </button>
-                
-                <button
-                  type="submit"
-                  className={`flex-1 px-6 py-3 text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl ${
-                    selectedMethod === 'cod'
-                      ? 'bg-gradient-to-r from-green-400 to-green-500 hover:from-green-500 hover:to-green-600'
-                      : 'bg-gradient-to-r from-blue-400 to-blue-500 hover:from-blue-500 hover:to-blue-600'
-                  }`}
-                  disabled={submitting}
-                >
-                  {submitting ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="animate-spin">⏳</span>
-                      Đang xử lý...
-                    </span>
-                  ) : selectedMethod === 'cod' ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span>✅</span>
-                      Hoàn tất đặt hàng (COD)
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-2">
-                      <span>💳</span>
-                      Thanh toán ngay ({total.toLocaleString('vi-VN')}₫)
-                    </span>
-                  )}
-                </button>
               </div>
 
               {/* Order Confirmation Note */}
@@ -828,20 +741,55 @@ const PaymentMethodPage = () => {
               </div>
 
               {/* Tổng cộng */}
-              <div className="pt-4 border-t-2 border-gray-300 bg-gradient-to-r from-red-50 to-pink-50 -mx-5 -mb-5 px-5 pb-5 rounded-b-lg">
-                <div className="flex justify-between items-center mb-3">
+              <div className="pt-3 border-t-2 border-gray-300 bg-white -mx-5 -mb-5 px-5 pb-3 rounded-b-lg">
+                <div className="flex justify-between items-center">
                   <span className="text-lg font-bold text-gray-800">Tổng thanh toán:</span>
                   <div className="text-right">
-                    <div className="text-xs text-gray-500 mb-1">VND</div>
                     <div className="text-3xl font-bold text-red-600">
                       {total.toLocaleString('vi-VN')} ₫
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-xs text-gray-600 bg-white/50 p-2 rounded">
-                  <span>Bao gồm VAT (nếu có)</span>
-                  <span className="font-medium">✓ Đã bao gồm</span>
-                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => navigate('/checkout')}
+                  className="px-6 py-3 border-2 border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
+                  disabled={submitting}
+                >
+                  <span>←</span> Quay lại
+                </button>
+                
+                <button
+                  type="submit"
+                  form="payment-form"
+                  className={`flex-1 px-6 py-3 text-white font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl ${
+                    selectedMethod === 'cod'
+                      ? 'bg-gradient-to-r from-green-400 to-green-500 hover:from-green-500 hover:to-green-600'
+                      : 'bg-gradient-to-r from-blue-400 to-blue-500 hover:from-blue-500 hover:to-blue-600'
+                  }`}
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="animate-spin">⏳</span>
+                      Đang xử lý...
+                    </span>
+                  ) : selectedMethod === 'cod' ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span>✅</span>
+                      Hoàn tất đặt hàng (COD)
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <span>💳</span>
+                      Thanh toán ngay ({total.toLocaleString('vi-VN')}₫)
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
           </div>

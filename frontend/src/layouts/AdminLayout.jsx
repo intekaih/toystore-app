@@ -123,9 +123,6 @@ const AdminLayout = ({ children, isStaffView = false }) => {
                   onClick={toggleUserMenu}
                   className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-primary-50 to-rose-50 border-2 border-primary-200 rounded-cute hover:shadow-soft transition-all"
                 >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-rose-400 flex items-center justify-center text-white font-bold text-sm shadow-soft">
-                    {user?.HoTen?.charAt(0).toUpperCase() || user?.hoTen?.charAt(0).toUpperCase() || 'K'}
-                  </div>
                   <span className="font-semibold text-gray-700 hidden lg:block">
                     {user?.HoTen || user?.hoTen || 'Khả Ái'}
                   </span>
@@ -140,9 +137,7 @@ const AdminLayout = ({ children, isStaffView = false }) => {
                     {/* Menu Header */}
                     <div className="bg-gradient-to-r from-primary-50 to-rose-50 p-5 border-b-2 border-primary-100">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-400 to-rose-400 flex items-center justify-center text-white font-bold text-lg shadow-soft">
-                          {user?.HoTen?.charAt(0).toUpperCase() || user?.hoTen?.charAt(0).toUpperCase() || 'K'}
-                        </div>
+                        {/* ✅ LOẠI BỎ: Avatar element */}
                         <div className="flex-1">
                           <div className="font-bold text-gray-800">{user?.HoTen || user?.hoTen || 'Khả Ái'}</div>
                           <div className="text-sm text-gray-500">{user?.Email || user?.email || 'admin@toystore.com'}</div>

@@ -4,7 +4,7 @@ import { productService, cartService } from '../../services'; // ✅ Sử dụng
 import { useAuth } from '../../contexts/AuthContext.js';
 import { ArrowLeft, ShoppingCart, Package, Shield, RefreshCw, Truck, Minus, Plus, Heart, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import MainLayout from '../../layouts/MainLayout';
-import { Button, Badge, Loading } from '../../components/ui';
+import { Button, Badge, Loading, OptimizedImage } from '../../components/ui';
 import Toast from '../../components/Toast.js';
 import config from '../../config';
 import ReviewList from '../../components/ReviewList';
@@ -206,6 +206,7 @@ const ProductDetail = () => {
   const productImages = product.hinhAnhs && product.hinhAnhs.length > 0 ? product.hinhAnhs : (product.hinhAnhURL ? [{ duongDanHinhAnh: product.hinhAnhURL, thuTu: 0, laMacDinh: true }] : []);
   const productDescription = product.moTa || 'Không có mô tả';
   const productCategory = product.loaiSP;
+  const productBrand = product.thuongHieu || product.ThuongHieu; // Hỗ trợ cả 2 format
   const productOriginalPrice = product.giaBanGoc;
   const currentImage = productImages[currentImageIndex]?.duongDanHinhAnh || '/barbie.jpg';
 
@@ -254,11 +255,15 @@ const ProductDetail = () => {
               {/* Main Image */}
               <div className="flex-1 bg-gradient-to-br from-primary-50 to-rose-50 rounded-bubble overflow-hidden shadow-soft border-2 border-primary-100 sticky top-24">
                 <div className="relative aspect-square">
-                  <img
+                  <OptimizedImage
                     src={currentImage}
                     alt={productName}
-                    className="w-full h-full object-contain p-4 transition-transform duration-500"
-                    loading="lazy"
+                    aspectRatio="1"
+                    objectFit="contain"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    priority={true}
+                    className="p-4 transition-transform duration-500"
+                    fallback="/barbie.jpg"
                   />
                   
                   {/* Out of Stock Badge */}
@@ -307,7 +312,7 @@ const ProductDetail = () => {
               </div>
             </div>
 
-            {/* Stock & Category Info */}
+            {/* Stock & Category & Brand Info */}
             <div className="flex flex-wrap items-center gap-4">
               {/* Stock Status */}
               <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border-2 border-gray-100">
@@ -323,6 +328,17 @@ const ProductDetail = () => {
                   <span className="text-sm">🏷️</span>
                   <span className="text-sm font-semibold text-gray-700">Danh mục:</span>
                   <span className="text-sm font-bold text-pink-600">{productCategory.ten}</span>
+                </div>
+              )}
+
+              {/* Brand - Chỉ hiển thị nếu có thương hiệu */}
+              {productBrand && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-xl border-2 border-blue-200">
+                  <span className="text-sm">🏭</span>
+                  <span className="text-sm font-semibold text-gray-700">Thương hiệu:</span>
+                  <span className="text-sm font-bold text-blue-600">
+                    {productBrand.tenThuongHieu || productBrand.TenThuongHieu || productBrand.ten}
+                  </span>
                 </div>
               )}
             </div>

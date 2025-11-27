@@ -42,8 +42,8 @@ const ReviewForm = ({
         setError('Vui lòng chọn file hình ảnh');
         return;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        setError('Kích thước ảnh không được vượt quá 5MB');
+      if (file.size > 10 * 1024 * 1024) {
+        setError('Kích thước ảnh không được vượt quá 10MB');
         return;
       }
 
@@ -201,7 +201,7 @@ const ReviewForm = ({
                   <span className="font-semibold">Click để tải ảnh</span> hoặc kéo thả
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
-                  PNG, JPG tối đa 5MB
+                  PNG, JPG tối đa 10MB
                 </p>
               </div>
               <input

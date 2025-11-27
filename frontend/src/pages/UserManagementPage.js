@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Plus, Search, RotateCcw } from 'lucide-react';
+import { Users, Plus, RotateCcw } from 'lucide-react';
 import { adminService } from '../services';
 import UserTable from '../components/UserTable';
 import UserModal from '../components/UserModal';
@@ -234,32 +234,27 @@ const UserManagementPage = () => {
               <p className="text-sm text-gray-600">Tổng số người dùng</p>
               <p className="text-2xl font-bold text-gray-800">{pagination.totalUsers}</p>
             </div>
-            
-            <div className="text-center">
-              <p className="text-sm text-gray-600">Trang hiện tại</p>
-              <p className="text-2xl font-bold text-gray-800">{pagination.currentPage}</p>
-            </div>
-            
-            <div className="text-center">
-              <p className="text-sm text-gray-600">Tổng số trang</p>
-              <p className="text-2xl font-bold text-gray-800">{pagination.totalPages}</p>
-            </div>
           </div>
         </div>
       </div>
 
       {/* Filters & Actions */}
-      <div className="mb-6 bg-gradient-to-r from-pink-50 via-rose-50 to-pink-50 rounded-2xl p-5 shadow-sm border border-pink-100">
-        {/* Dòng 1: Tìm kiếm */}
-        <form onSubmit={handleSearch} className="flex gap-3 items-stretch mb-4">
-          {/* Ô tìm kiếm */}
-          <div className="flex-1">
+      <div className="mb-6">
+        <div className="flex flex-wrap gap-3 items-center">
+          {/* Ô tìm kiếm - Bên trái */}
+          <div className="flex-1 min-w-[250px]">
             <input
               type="text"
               name="search"
               placeholder="Tìm kiếm theo tên, email, tên đăng nhập..."
               value={filters.search}
               onChange={handleFilterChange}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  fetchUsers(1);
+                }
+              }}
               className="w-full px-4 py-2.5 bg-white border-2 border-pink-200 rounded-xl 
                        text-gray-700 font-medium text-sm placeholder-gray-400
                        focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400
@@ -267,72 +262,53 @@ const UserManagementPage = () => {
             />
           </div>
 
-          {/* Nút tìm kiếm */}
-          <button
-            type="submit"
-            className="px-6 bg-gradient-to-r from-pink-400 to-rose-400 
-                     text-white font-semibold text-sm rounded-xl
-                     hover:from-pink-500 hover:to-rose-500
-                     focus:outline-none focus:ring-2 focus:ring-pink-300
-                     transition-all duration-200 shadow-md hover:shadow-lg
-                     flex items-center gap-2 whitespace-nowrap h-[42px]"
+          {/* Dropdown Vai trò */}
+          <select
+            name="role"
+            value={filters.role}
+            onChange={handleFilterChange}
+            className="px-4 py-2.5 bg-white border-2 border-pink-200 rounded-xl 
+                     text-gray-700 font-medium text-sm
+                     focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400
+                     hover:border-pink-300 transition-all duration-200 shadow-sm
+                     min-w-[150px] h-[42px] cursor-pointer"
           >
-            <Search size={18} />
-            Tìm kiếm
+            <option value="">Tất cả vai trò</option>
+            <option value="Admin">Admin</option>
+            <option value="KhachHang">Khách hàng</option>
+            <option value="NhanVien">Nhân viên</option>
+          </select>
+
+          {/* Dropdown Trạng thái */}
+          <select
+            name="status"
+            value={filters.status}
+            onChange={handleFilterChange}
+            className="px-4 py-2.5 bg-white border-2 border-pink-200 rounded-xl 
+                     text-gray-700 font-medium text-sm
+                     focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400
+                     hover:border-pink-300 transition-all duration-200 shadow-sm
+                     min-w-[150px] h-[42px] cursor-pointer"
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="active">Hoạt động</option>
+            <option value="inactive">Bị khóa</option>
+          </select>
+
+          {/* Nút Reset */}
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            className="px-5 bg-white border-2 border-pink-300 
+                     text-pink-600 font-semibold text-sm rounded-xl
+                     hover:bg-pink-50 hover:border-pink-400
+                     focus:outline-none focus:ring-2 focus:ring-pink-300
+                     transition-all duration-200 shadow-sm
+                     flex items-center gap-2 h-[42px] whitespace-nowrap"
+          >
+            <RotateCcw size={18} />
+            Reset
           </button>
-        </form>
-
-        {/* Dòng 2: Filters & Actions */}
-        <div className="flex flex-wrap gap-3 items-center justify-between">
-          <div className="flex flex-wrap gap-3">
-            {/* Dropdown Vai trò */}
-            <select
-              name="role"
-              value={filters.role}
-              onChange={handleFilterChange}
-              className="px-4 py-2.5 bg-white border-2 border-pink-200 rounded-xl 
-                       text-gray-700 font-medium text-sm
-                       focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400
-                       hover:border-pink-300 transition-all duration-200 shadow-sm
-                       min-w-[150px] h-[42px] cursor-pointer"
-            >
-              <option value="">Tất cả vai trò</option>
-              <option value="Admin">Admin</option>
-              <option value="KhachHang">Khách hàng</option>
-              <option value="NhanVien">Nhân viên</option>
-            </select>
-
-            {/* Dropdown Trạng thái */}
-            <select
-              name="status"
-              value={filters.status}
-              onChange={handleFilterChange}
-              className="px-4 py-2.5 bg-white border-2 border-pink-200 rounded-xl 
-                       text-gray-700 font-medium text-sm
-                       focus:outline-none focus:ring-2 focus:ring-pink-300 focus:border-pink-400
-                       hover:border-pink-300 transition-all duration-200 shadow-sm
-                       min-w-[150px] h-[42px] cursor-pointer"
-            >
-              <option value="">Tất cả trạng thái</option>
-              <option value="active">Hoạt động</option>
-              <option value="inactive">Bị khóa</option>
-            </select>
-
-            {/* Nút Reset */}
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="px-5 bg-white border-2 border-pink-300 
-                       text-pink-600 font-semibold text-sm rounded-xl
-                       hover:bg-pink-50 hover:border-pink-400
-                       focus:outline-none focus:ring-2 focus:ring-pink-300
-                       transition-all duration-200 shadow-sm
-                       flex items-center gap-2 h-[42px]"
-            >
-              <RotateCcw size={18} />
-              Reset
-            </button>
-          </div>
 
           {/* Nút Thêm mới */}
           <button

@@ -5,6 +5,7 @@ const KhachHang = db.KhachHang;
 const SanPham = db.SanPham;
 const TaiKhoan = db.TaiKhoan;
 const LoaiSP = db.LoaiSP;
+const DanhGiaSanPham = db.DanhGiaSanPham;
 const { Op } = require('sequelize');
 const DTOMapper = require('../utils/DTOMapper');
 
@@ -126,6 +127,8 @@ exports.getStatistics = async (req, res) => {
         console.log(`📅 Lọc theo năm ${yearInt}`);
       }
     }
+    
+    console.log('📋 Where condition:', JSON.stringify(whereCondition, null, 2));
 
     // ✨ 1. Tính tổng doanh thu và số đơn hàng - TÍNH TẤT CẢ ĐƠN (TRỪ ĐÃ HỦY)
     let totalStats = { tongDoanhThu: 0, soDonHang: 0 };
@@ -223,64 +226,152 @@ exports.getStatistics = async (req, res) => {
       monthlyStats = [];
     }
 
-    // 4. Top 5 khách hàng mua nhiều nhất - SỬ DỤNG whereCondition ĐÃ CÓ ĐIỀU KIỆN
+    // 4. Top 5 khách hàng mua nhiều nhất - SỬ DỤNG RAW QUERY để đảm bảo chính xác
     let topCustomers = [];
     try {
-      topCustomers = await HoaDon.findAll({
-        where: whereCondition,
-        attributes: [
-          'KhachHangID',
-          [db.sequelize.fn('COUNT', db.sequelize.col('HoaDon.ID')), 'soDonHang'],
-          [db.sequelize.fn('SUM', db.sequelize.col('HoaDon.ThanhTien')), 'tongChiTieu']
-        ],
-        include: [{
-          model: KhachHang,
-          as: 'khachHang',
-          attributes: ['ID', 'HoTen', 'Email', 'DienThoai'],
-          required: false
-        }],
-        group: ['HoaDon.KhachHangID', 'khachHang.ID', 'khachHang.HoTen', 'khachHang.Email', 'khachHang.DienThoai'],
-        order: [[db.sequelize.literal('tongChiTieu'), 'DESC']],
-        limit: 5,
-        subQuery: false
+      const params = {};
+      let whereClause = "WHERE hd.TrangThai != N'Đã hủy'";
+      
+      // Thêm điều kiện thời gian nếu có
+      if (startDate && endDate) {
+        whereClause += ' AND CAST(hd.NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)';
+        params.startDate = startDate;
+        params.endDate = endDate;
+      } else if (year && !startDate) {
+        whereClause += ' AND YEAR(hd.NgayLap) = :year';
+        params.year = parseInt(year);
+      }
+      
+      // Sử dụng raw query để đảm bảo tính chính xác
+      const customerResults = await db.sequelize.query(`
+        SELECT TOP 5
+          hd.KhachHangID as KhachHangID,
+          kh.ID as KhachHang_ID,
+          kh.HoTen as HoTen,
+          kh.Email as Email,
+          kh.DienThoai as DienThoai,
+          COUNT(hd.ID) as soDonHang,
+          ISNULL(SUM(hd.ThanhTien), 0) as tongChiTieu
+        FROM HoaDon hd
+        INNER JOIN KhachHang kh ON hd.KhachHangID = kh.ID
+        ${whereClause}
+        GROUP BY hd.KhachHangID, kh.ID, kh.HoTen, kh.Email, kh.DienThoai
+        ORDER BY tongChiTieu DESC
+      `, {
+        replacements: params,
+        type: db.sequelize.QueryTypes.SELECT
       });
+      
+      // Map kết quả về format giống như Sequelize
+      topCustomers = customerResults.map(row => ({
+        KhachHangID: row.KhachHangID,
+        dataValues: {
+          soDonHang: parseInt(row.soDonHang || 0),
+          tongChiTieu: parseFloat(row.tongChiTieu || 0)
+        },
+        khachHang: {
+          ID: row.KhachHang_ID,
+          HoTen: row.HoTen,
+          Email: row.Email,
+          DienThoai: row.DienThoai
+        }
+      }));
+      
+      console.log(`✅ Top customers found: ${topCustomers.length}`);
+      if (topCustomers.length > 0) {
+        console.log('👥 Sample customer:', {
+          id: topCustomers[0].KhachHangID,
+          name: topCustomers[0].khachHang?.HoTen,
+          orders: topCustomers[0].dataValues.soDonHang,
+          total: topCustomers[0].dataValues.tongChiTieu
+        });
+      }
     } catch (error) {
       console.error('⚠️ Lỗi query topCustomers:', error.message);
+      console.error('Stack:', error.stack);
       topCustomers = [];
     }
 
-    // 5. Top 5 sản phẩm bán chạy nhất - SỬ DỤNG whereCondition ĐÃ CÓ ĐIỀU KIỆN
+    // 5. Top 5 sản phẩm bán chạy nhất - SỬ DỤNG RAW QUERY để đảm bảo chính xác
     let topProducts = [];
     try {
-      topProducts = await ChiTietHoaDon.findAll({
-        attributes: [
-          'SanPhamID',
-          [db.sequelize.fn('SUM', db.sequelize.col('SoLuong')), 'tongSoLuongBan'],
-          [db.sequelize.fn('SUM', db.sequelize.col('ThanhTien')), 'tongDoanhThu'],
-          [db.sequelize.fn('COUNT', db.sequelize.col('ChiTietHoaDon.ID')), 'soLanMua']
-        ],
-        include: [
-          {
-            model: SanPham,
-            as: 'sanPham',
-            attributes: ['ID', 'Ten', 'HinhAnhURL', 'GiaBan', 'SoLuongTon'], // ✅ SỬA: Ton → SoLuongTon
-            required: false
-          },
-          {
-            model: HoaDon,
-            as: 'hoaDon',
-            attributes: [],
-            where: whereCondition,
-            required: true
-          }
-        ],
-        group: ['ChiTietHoaDon.SanPhamID', 'sanPham.ID', 'sanPham.Ten', 'sanPham.HinhAnhURL', 'sanPham.GiaBan', 'sanPham.SoLuongTon'], // ✅ SỬA: Ton → SoLuongTon
-        order: [[db.sequelize.literal('tongSoLuongBan'), 'DESC']],
-        limit: 5,
-        subQuery: false
+      const params = {};
+      let whereClause = "WHERE hd.TrangThai != N'Đã hủy'";
+      
+      // Thêm điều kiện thời gian nếu có
+      if (startDate && endDate) {
+        whereClause += ' AND CAST(hd.NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)';
+        params.startDate = startDate;
+        params.endDate = endDate;
+      } else if (year && !startDate) {
+        whereClause += ' AND YEAR(hd.NgayLap) = :year';
+        params.year = parseInt(year);
+      }
+      
+      // Sử dụng raw query để đảm bảo tính chính xác, bao gồm đánh giá và danh mục
+      const productResults = await db.sequelize.query(`
+        SELECT TOP 5
+          cthd.SanPhamID as SanPhamID,
+          sp.ID as SanPham_ID,
+          sp.Ten as TenSanPham,
+          sp.HinhAnhURL as HinhAnh,
+          sp.GiaBan as GiaBan,
+          sp.SoLuongTon as SoLuongTon,
+          sp.DiemTrungBinh as DiemTrungBinh,
+          sp.TongSoDanhGia as TongSoDanhGia,
+          sp.LoaiID as LoaiID,
+          ls.Ten as TenLoai,
+          SUM(cthd.SoLuong) as tongSoLuongBan,
+          ISNULL(SUM(cthd.ThanhTien), 0) as tongDoanhThu,
+          COUNT(DISTINCT cthd.HoaDonID) as soLanMua
+        FROM ChiTietHoaDon cthd
+        INNER JOIN HoaDon hd ON cthd.HoaDonID = hd.ID
+        INNER JOIN SanPham sp ON cthd.SanPhamID = sp.ID
+        LEFT JOIN LoaiSP ls ON sp.LoaiID = ls.ID
+        ${whereClause}
+        GROUP BY cthd.SanPhamID, sp.ID, sp.Ten, sp.HinhAnhURL, sp.GiaBan, sp.SoLuongTon, 
+                 sp.DiemTrungBinh, sp.TongSoDanhGia, sp.LoaiID, ls.Ten
+        ORDER BY tongSoLuongBan DESC
+      `, {
+        replacements: params,
+        type: db.sequelize.QueryTypes.SELECT
       });
+      
+      // Map kết quả về format giống như Sequelize
+      topProducts = productResults.map(row => ({
+        SanPhamID: row.SanPhamID,
+        dataValues: {
+          tongSoLuongBan: parseInt(row.tongSoLuongBan || 0),
+          tongDoanhThu: parseFloat(row.tongDoanhThu || 0),
+          soLanMua: parseInt(row.soLanMua || 0)
+        },
+        sanPham: {
+          ID: row.SanPham_ID,
+          Ten: row.TenSanPham,
+          HinhAnhURL: row.HinhAnh,
+          GiaBan: parseFloat(row.GiaBan || 0),
+          SoLuongTon: parseInt(row.SoLuongTon || 0),
+          DiemTrungBinh: parseFloat(row.DiemTrungBinh || 0),
+          TongSoDanhGia: parseInt(row.TongSoDanhGia || 0),
+          LoaiID: row.LoaiID,
+          loaiSP: row.TenLoai ? {
+            Ten: row.TenLoai
+          } : null
+        }
+      }));
+      
+      console.log(`✅ Top products found: ${topProducts.length}`);
+      if (topProducts.length > 0) {
+        console.log('📦 Sample product:', {
+          id: topProducts[0].SanPhamID,
+          name: topProducts[0].sanPham?.Ten,
+          sold: topProducts[0].dataValues.tongSoLuongBan,
+          revenue: topProducts[0].dataValues.tongDoanhThu
+        });
+      }
     } catch (error) {
       console.error('⚠️ Lỗi query topProducts:', error.message);
+      console.error('Stack:', error.stack);
       topProducts = [];
     }
 
@@ -353,6 +444,292 @@ exports.getStatistics = async (req, res) => {
       chartStats = [];
     }
 
+    // ✨ 7. Top 5 sản phẩm bán ế nhất (ít bán nhất)
+    let worstProducts = [];
+    try {
+      worstProducts = await ChiTietHoaDon.findAll({
+        attributes: [
+          'SanPhamID',
+          [db.sequelize.fn('SUM', db.sequelize.col('SoLuong')), 'tongSoLuongBan'],
+          [db.sequelize.fn('SUM', db.sequelize.col('ThanhTien')), 'tongDoanhThu'],
+          [db.sequelize.fn('COUNT', db.sequelize.col('ChiTietHoaDon.ID')), 'soLanMua']
+        ],
+        include: [
+          {
+            model: SanPham,
+            as: 'sanPham',
+            attributes: ['ID', 'Ten', 'HinhAnhURL', 'GiaBan', 'SoLuongTon'],
+            required: false
+          },
+          {
+            model: HoaDon,
+            as: 'hoaDon',
+            attributes: [],
+            where: whereCondition,
+            required: true
+          }
+        ],
+        group: ['ChiTietHoaDon.SanPhamID', 'sanPham.ID', 'sanPham.Ten', 'sanPham.HinhAnhURL', 'sanPham.GiaBan', 'sanPham.SoLuongTon'],
+        order: [[db.sequelize.literal('tongSoLuongBan'), 'ASC']],
+        limit: 5,
+        subQuery: false
+      });
+    } catch (error) {
+      console.error('⚠️ Lỗi query worstProducts:', error.message);
+      worstProducts = [];
+    }
+
+    // ✨ 8. Sản phẩm có đánh giá xấu (số sao <= 3) với đánh giá chi tiết
+    let badRatedProducts = [];
+    try {
+      const params = {};
+      let dateFilter = '';
+      
+      if (startDate && endDate) {
+        dateFilter = ' AND CAST(dg.NgayTao AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)';
+        params.startDate = startDate;
+        params.endDate = endDate;
+      }
+
+      // Lấy danh sách sản phẩm có đánh giá xấu
+      const badProductsList = await db.sequelize.query(`
+        SELECT TOP 10
+          sp.ID as SanPhamID,
+          sp.Ten as TenSanPham,
+          sp.HinhAnhURL as HinhAnh,
+          sp.GiaBan,
+          sp.SoLuongTon as TonKho,
+          AVG(CAST(dg.SoSao AS FLOAT)) as diemTrungBinh,
+          COUNT(dg.ID) as soLuongDanhGia,
+          SUM(CASE WHEN dg.SoSao = 1 THEN 1 ELSE 0 END) as soDanhGia1Sao,
+          SUM(CASE WHEN dg.SoSao = 2 THEN 1 ELSE 0 END) as soDanhGia2Sao,
+          SUM(CASE WHEN dg.SoSao = 3 THEN 1 ELSE 0 END) as soDanhGia3Sao
+        FROM DanhGiaSanPham dg
+        INNER JOIN SanPham sp ON dg.SanPhamID = sp.ID
+        WHERE dg.TrangThai = N'DaDuyet' AND dg.SoSao <= 3 ${dateFilter}
+        GROUP BY sp.ID, sp.Ten, sp.HinhAnhURL, sp.GiaBan, sp.SoLuongTon
+        HAVING AVG(CAST(dg.SoSao AS FLOAT)) <= 3.0
+        ORDER BY diemTrungBinh ASC, soLuongDanhGia DESC
+      `, {
+        replacements: params,
+        type: db.sequelize.QueryTypes.SELECT
+      });
+
+      // Lấy đánh giá chi tiết cho từng sản phẩm
+      for (const product of badProductsList) {
+        const reviews = await DanhGiaSanPham.findAll({
+          where: {
+            SanPhamID: product.SanPhamID,
+            TrangThai: 'DaDuyet',
+            SoSao: { [Op.lte]: 3 }
+          },
+          include: [{
+            model: TaiKhoan,
+            as: 'taiKhoan',
+            attributes: ['ID', 'HoTen', 'Email'],
+            required: false
+          }],
+          order: [['SoSao', 'ASC'], ['NgayTao', 'DESC']],
+          limit: 10 // Lấy tối đa 10 đánh giá xấu nhất
+        });
+
+        badRatedProducts.push({
+          ...product,
+          danhGiaChiTiet: reviews.map(review => ({
+            id: review.ID,
+            soSao: review.SoSao,
+            noiDung: review.NoiDung,
+            hinhAnh: review.HinhAnh1,
+            ngayTao: review.NgayTao,
+            nguoiDanhGia: review.taiKhoan ? {
+              hoTen: review.taiKhoan.HoTen,
+              email: review.taiKhoan.Email
+            } : null
+          }))
+        });
+      }
+    } catch (error) {
+      console.error('⚠️ Lỗi query badRatedProducts:', error.message);
+      badRatedProducts = [];
+    }
+
+    // ✨ 9. Tỷ lệ hủy đơn
+    let cancelRate = 0;
+    let totalOrders = 0;
+    let canceledOrders = 0;
+    try {
+      const params = {};
+      let whereClause = '';
+      
+      if (startDate && endDate) {
+        whereClause = ' AND CAST(NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)';
+        params.startDate = startDate;
+        params.endDate = endDate;
+      }
+
+      const cancelStats = await db.sequelize.query(`
+        SELECT 
+          COUNT(*) as tongSoDon,
+          SUM(CASE WHEN TrangThai = N'Đã hủy' THEN 1 ELSE 0 END) as soDonHuy
+        FROM HoaDon
+        WHERE 1=1 ${whereClause}
+      `, {
+        replacements: params,
+        type: db.sequelize.QueryTypes.SELECT
+      });
+
+      if (cancelStats && cancelStats.length > 0) {
+        totalOrders = parseInt(cancelStats[0].tongSoDon || 0);
+        canceledOrders = parseInt(cancelStats[0].soDonHuy || 0);
+        cancelRate = totalOrders > 0 ? (canceledOrders / totalOrders) * 100 : 0;
+      }
+    } catch (error) {
+      console.error('⚠️ Lỗi query cancelRate:', error.message);
+    }
+
+    // ✨ 10. Sản phẩm hết hàng (SoLuongTon = 0)
+    let outOfStockProducts = [];
+    try {
+      outOfStockProducts = await SanPham.findAll({
+        where: {
+          SoLuongTon: 0,
+          TrangThai: true
+        },
+        attributes: ['ID', 'Ten', 'HinhAnhURL', 'GiaBan', 'SoLuongTon'],
+        limit: 10,
+        order: [['Ten', 'ASC']]
+      });
+    } catch (error) {
+      console.error('⚠️ Lỗi query outOfStockProducts:', error.message);
+      outOfStockProducts = [];
+    }
+
+    // ✨ 12. Sản phẩm bán không chạy (số lượng bán thấp trong kỳ, < 10 sản phẩm)
+    let slowSellingProducts = [];
+    try {
+      const params = {};
+      let whereClause = "WHERE hd.TrangThai != N'Đã hủy'";
+      
+      if (startDate && endDate) {
+        whereClause += ' AND CAST(hd.NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)';
+        params.startDate = startDate;
+        params.endDate = endDate;
+      } else if (year && !startDate) {
+        whereClause += ' AND YEAR(hd.NgayLap) = :year';
+        params.year = parseInt(year);
+      }
+
+      const slowProductsResult = await db.sequelize.query(`
+        SELECT 
+          cthd.SanPhamID as SanPhamID,
+          sp.ID as SanPham_ID,
+          sp.Ten as TenSanPham,
+          sp.HinhAnhURL as HinhAnh,
+          sp.GiaBan as GiaBan,
+          sp.SoLuongTon as SoLuongTon,
+          SUM(cthd.SoLuong) as tongSoLuongBan,
+          ISNULL(SUM(cthd.ThanhTien), 0) as tongDoanhThu,
+          COUNT(DISTINCT cthd.HoaDonID) as soLanMua
+        FROM ChiTietHoaDon cthd
+        INNER JOIN HoaDon hd ON cthd.HoaDonID = hd.ID
+        INNER JOIN SanPham sp ON cthd.SanPhamID = sp.ID
+        ${whereClause}
+        GROUP BY cthd.SanPhamID, sp.ID, sp.Ten, sp.HinhAnhURL, sp.GiaBan, sp.SoLuongTon
+        HAVING SUM(cthd.SoLuong) < 10
+        ORDER BY tongSoLuongBan ASC
+      `, {
+        replacements: params,
+        type: db.sequelize.QueryTypes.SELECT
+      });
+
+      slowSellingProducts = slowProductsResult.map(row => ({
+        SanPhamID: row.SanPhamID,
+        TenSanPham: row.TenSanPham,
+        HinhAnh: row.HinhAnh,
+        GiaBan: parseFloat(row.GiaBan || 0),
+        SoLuongTon: parseInt(row.SoLuongTon || 0),
+        TongSoLuongBan: parseInt(row.tongSoLuongBan || 0),
+        TongDoanhThu: parseFloat(row.tongDoanhThu || 0),
+        SoLanMua: parseInt(row.soLanMua || 0)
+      }));
+
+      console.log(`✅ Slow selling products found: ${slowSellingProducts.length}`);
+    } catch (error) {
+      console.error('⚠️ Lỗi query slowSellingProducts:', error.message);
+      slowSellingProducts = [];
+    }
+
+    // ✨ 13. Hàng sắp hết (0 < SoLuongTon <= 10)
+    let lowStockProducts = [];
+    try {
+      lowStockProducts = await SanPham.findAll({
+        where: {
+          SoLuongTon: {
+            [Op.gt]: 0,
+            [Op.lte]: 10
+          },
+          TrangThai: true
+        },
+        attributes: ['ID', 'Ten', 'HinhAnhURL', 'GiaBan', 'SoLuongTon'],
+        order: [['SoLuongTon', 'ASC'], ['Ten', 'ASC']],
+        limit: 20
+      });
+      console.log(`✅ Low stock products found: ${lowStockProducts.length}`);
+    } catch (error) {
+      console.error('⚠️ Lỗi query lowStockProducts:', error.message);
+      lowStockProducts = [];
+    }
+
+    // ✨ 11. Thống kê đánh giá tổng quan
+    let reviewStats = {
+      tongSoDanhGia: 0,
+      diemTrungBinh: 0,
+      phanBoSao: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+    };
+    try {
+      const params = {};
+      let whereClause = "WHERE TrangThai = N'DaDuyet'";
+      
+      if (startDate && endDate) {
+        whereClause += ' AND CAST(NgayTao AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)';
+        params.startDate = startDate;
+        params.endDate = endDate;
+      }
+
+      const reviewStatsResult = await db.sequelize.query(`
+        SELECT 
+          COUNT(*) as tongSoDanhGia,
+          AVG(CAST(SoSao AS FLOAT)) as diemTrungBinh,
+          SUM(CASE WHEN SoSao = 1 THEN 1 ELSE 0 END) as sao1,
+          SUM(CASE WHEN SoSao = 2 THEN 1 ELSE 0 END) as sao2,
+          SUM(CASE WHEN SoSao = 3 THEN 1 ELSE 0 END) as sao3,
+          SUM(CASE WHEN SoSao = 4 THEN 1 ELSE 0 END) as sao4,
+          SUM(CASE WHEN SoSao = 5 THEN 1 ELSE 0 END) as sao5
+        FROM DanhGiaSanPham
+        ${whereClause}
+      `, {
+        replacements: params,
+        type: db.sequelize.QueryTypes.SELECT
+      });
+
+      if (reviewStatsResult && reviewStatsResult.length > 0) {
+        const stat = reviewStatsResult[0];
+        reviewStats = {
+          tongSoDanhGia: parseInt(stat.tongSoDanhGia || 0),
+          diemTrungBinh: parseFloat(stat.diemTrungBinh || 0),
+          phanBoSao: {
+            1: parseInt(stat.sao1 || 0),
+            2: parseInt(stat.sao2 || 0),
+            3: parseInt(stat.sao3 || 0),
+            4: parseInt(stat.sao4 || 0),
+            5: parseInt(stat.sao5 || 0)
+          }
+        };
+      }
+    } catch (error) {
+      console.error('⚠️ Lỗi query reviewStats:', error.message);
+    }
+
     // ✅ Format dữ liệu với DTOMapper
     const statistics = {
       tongDoanhThu: parseFloat(totalStats?.tongDoanhThu || 0),
@@ -377,18 +754,48 @@ exports.getStatistics = async (req, res) => {
         })
       ),
 
-      topKhachHang: topCustomers.map(item => 
-        DTOMapper.toCamelCase({
+      topKhachHang: topCustomers.map(item => {
+        const mapped = DTOMapper.toCamelCase({
           KhachHangId: item.KhachHangID,
           HoTen: item.khachHang?.HoTen || 'Không rõ',
           Email: item.khachHang?.Email || '',
           DienThoai: item.khachHang?.DienThoai || '',
           SoDonHang: parseInt(item.dataValues.soDonHang || 0),
           TongChiTieu: parseFloat(item.dataValues.tongChiTieu || 0)
+        });
+        return mapped;
+      }),
+
+      topSanPham: topProducts.map(item => {
+        const mapped = DTOMapper.toCamelCase({
+          SanPhamId: item.SanPhamID,
+          TenSanPham: item.sanPham?.Ten || 'Không rõ',
+          HinhAnh: item.sanPham?.HinhAnhURL || null,
+          GiaBan: parseFloat(item.sanPham?.GiaBan || 0),
+          TonKho: item.sanPham?.SoLuongTon || 0,
+          TongSoLuongBan: parseInt(item.dataValues.tongSoLuongBan || 0),
+          TongDoanhThu: parseFloat(item.dataValues.tongDoanhThu || 0),
+          SoLanMua: parseInt(item.dataValues.soLanMua || 0),
+          DiemTrungBinh: parseFloat(item.sanPham?.DiemTrungBinh || 0),
+          TongSoDanhGia: parseInt(item.sanPham?.TongSoDanhGia || 0),
+          LoaiID: item.sanPham?.LoaiID || null,
+          LoaiSP: item.sanPham?.loaiSP ? {
+            Ten: item.sanPham.loaiSP.Ten
+          } : null
+        });
+        return mapped;
+      }),
+
+      chartData: chartStats.map(stat => 
+        DTOMapper.toCamelCase({
+          Label: stat.label,
+          SoDonHang: parseInt(stat.soDonHang),
+          DoanhThu: parseFloat(stat.doanhThu || 0)
         })
       ),
 
-      topSanPham: topProducts.map(item => 
+      // ✨ Thống kê mới
+      sanPhamBanE: worstProducts.map(item => 
         DTOMapper.toCamelCase({
           SanPhamId: item.SanPhamID,
           TenSanPham: item.sanPham?.Ten || 'Không rõ',
@@ -401,13 +808,58 @@ exports.getStatistics = async (req, res) => {
         })
       ),
 
-      chartData: chartStats.map(stat => 
+      sanPhamDanhGiaXau: badRatedProducts.map(item => ({
+        sanPhamId: item.SanPhamID,
+        tenSanPham: item.TenSanPham || 'Không rõ',
+        hinhAnh: item.HinhAnh || null,
+        giaBan: parseFloat(item.GiaBan || 0),
+        tonKho: item.TonKho || 0,
+        diemTrungBinh: parseFloat(item.diemTrungBinh || 0),
+        soLuongDanhGia: parseInt(item.soLuongDanhGia || 0),
+        soDanhGia1Sao: parseInt(item.soDanhGia1Sao || 0),
+        soDanhGia2Sao: parseInt(item.soDanhGia2Sao || 0),
+        soDanhGia3Sao: parseInt(item.soDanhGia3Sao || 0),
+        danhGiaChiTiet: item.danhGiaChiTiet || []
+      })),
+
+      tyLeHuyDon: {
+        tongSoDon: totalOrders,
+        soDonHuy: canceledOrders,
+        tyLe: parseFloat(cancelRate.toFixed(2))
+      },
+
+      sanPhamHetHang: outOfStockProducts.map(item => 
         DTOMapper.toCamelCase({
-          Label: stat.label,
-          SoDonHang: parseInt(stat.soDonHang),
-          DoanhThu: parseFloat(stat.doanhThu || 0)
+          SanPhamId: item.ID,
+          TenSanPham: item.Ten,
+          HinhAnh: item.HinhAnhURL,
+          GiaBan: parseFloat(item.GiaBan || 0),
+          SoLuongTon: item.SoLuongTon || 0
         })
       ),
+
+      sanPhamBanKhongChay: slowSellingProducts.map(item => ({
+        sanPhamId: item.SanPhamID,
+        tenSanPham: item.TenSanPham || 'Không rõ',
+        hinhAnh: item.HinhAnh || null,
+        giaBan: parseFloat(item.GiaBan || 0),
+        tonKho: item.SoLuongTon || 0,
+        tongSoLuongBan: parseInt(item.TongSoLuongBan || 0),
+        tongDoanhThu: parseFloat(item.TongDoanhThu || 0),
+        soLanMua: parseInt(item.SoLanMua || 0)
+      })),
+
+      hangSapHet: lowStockProducts.map(item => 
+        DTOMapper.toCamelCase({
+          SanPhamId: item.ID,
+          TenSanPham: item.Ten,
+          HinhAnh: item.HinhAnhURL,
+          GiaBan: parseFloat(item.GiaBan || 0),
+          SoLuongTon: item.SoLuongTon || 0
+        })
+      ),
+
+      thongKeDanhGia: reviewStats,
 
       viewMode: viewMode
     };
@@ -416,6 +868,22 @@ exports.getStatistics = async (req, res) => {
     console.log(`💰 Tổng doanh thu: ${statistics.tongDoanhThu.toLocaleString('vi-VN')} VNĐ`);
     console.log(`📦 Tổng số đơn: ${statistics.soDonHang}`);
     console.log(`📊 View mode: ${viewMode}`);
+    console.log(`👥 Top khách hàng: ${statistics.topKhachHang.length} người`);
+    console.log(`📦 Top sản phẩm: ${statistics.topSanPham.length} sản phẩm`);
+    if (statistics.topSanPham.length > 0) {
+      console.log('📦 Top sản phẩm chi tiết:', statistics.topSanPham.map(p => ({
+        id: p.sanPhamId,
+        ten: p.tenSanPham,
+        ban: p.tongSoLuongBan
+      })));
+    }
+    if (statistics.topKhachHang.length > 0) {
+      console.log('👥 Top khách hàng chi tiết:', statistics.topKhachHang.map(c => ({
+        id: c.khachHangId,
+        ten: c.hoTen,
+        don: c.soDonHang
+      })));
+    }
 
     res.status(200).json({
       success: true,

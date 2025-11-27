@@ -34,7 +34,23 @@ class ProductService {
    */
   async getProducts(params = {}) {
     try {
-      const response = await this.api.get('/products', { params });
+      // Map sortBy thành filter nếu có (để tương thích với backend)
+      const apiParams = { ...params };
+      if (apiParams.sortBy && !apiParams.filter) {
+        // Map các giá trị sortBy phổ biến sang filter
+        const sortByToFilter = {
+          'bestSeller': 'bestSeller',
+          'newest': 'newest',
+          'price': 'price',
+          'rating': 'rating'
+        };
+        if (sortByToFilter[apiParams.sortBy]) {
+          apiParams.filter = sortByToFilter[apiParams.sortBy];
+          delete apiParams.sortBy;
+        }
+      }
+      
+      const response = await this.api.get('/products', { params: apiParams });
       
       if (response.data && response.data.success) {
         return {
@@ -118,6 +134,52 @@ class ProductService {
       throw new Error(response.data.message || 'Lấy danh sách thương hiệu thất bại');
     } catch (error) {
       console.error('❌ Lỗi lấy thương hiệu:', error);
+      throw this._handleError(error);
+    }
+  }
+
+  /**
+   * Lấy thống kê công khai (tổng số khách hàng và rating trung bình)
+   * @returns {Promise<Object>}
+   */
+  async getPublicStats() {
+    try {
+      const response = await this.api.get('/products/stats');
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.data,
+          message: response.data.message
+        };
+      }
+      
+      throw new Error(response.data.message || 'Lấy thống kê thất bại');
+    } catch (error) {
+      console.error('❌ Lỗi lấy thống kê:', error);
+      throw this._handleError(error);
+    }
+  }
+
+  /**
+   * Lấy top 3 khách hàng mua nhiều nhất
+   * @returns {Promise<Object>}
+   */
+  async getTopCustomers() {
+    try {
+      const response = await this.api.get('/products/top-customers');
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.data,
+          message: response.data.message
+        };
+      }
+      
+      throw new Error(response.data.message || 'Lấy top khách hàng thất bại');
+    } catch (error) {
+      console.error('❌ Lỗi lấy top khách hàng:', error);
       throw this._handleError(error);
     }
   }

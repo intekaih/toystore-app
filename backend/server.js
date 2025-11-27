@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const passport = require('passport');
 const db = require('./models');
 const path = require('path');
 
@@ -33,6 +34,9 @@ app.use((req, res, next) => {
 // Middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Passport middleware (cho Google OAuth)
+app.use(passport.initialize());
 
 // ❌ TẮT Transform Response Middleware
 // Lý do: Dữ liệu từ SQL Server dùng PascalCase là chuẩn
@@ -68,6 +72,7 @@ app.use('/api/shipping', require('./routes/shipping.routes')); // ⭐ THÊM MỚ
 app.use('/api/webhooks', require('./routes/webhook.routes')); // 🔔 THÊM MỚI: Webhook từ GHN
 app.use('/api/reviews', require('./routes/review.routes')); // ⭐ THÊM MỚI: Review API
 app.use('/api/vouchers', require('./routes/voucher.routes')); // 🎟️ THÊM MỚI: Voucher API công khai
+app.use('/api/banners', require('./routes/banner.routes')); // 🖼️ THÊM MỚI: Banner API công khai
 app.use('/api/staff', require('./routes/staff.routes')); // ⭐ THÊM MỚI: Staff Management API
 app.use('/api/admin/users', require('./routes/admin.user.routes'));
 app.use('/api/admin/categories', require('./routes/category.routes'));
@@ -75,6 +80,7 @@ app.use('/api/admin/brands', require('./routes/admin.brand.routes')); // ⭐ TH�
 app.use('/api/admin/products', require('./routes/admin.product.routes'));
 app.use('/api/admin/orders', require('./routes/admin.order.routes'));
 app.use('/api/admin/vouchers', require('./routes/admin.voucher.routes'));
+app.use('/api/admin/banners', require('./routes/admin.banner.routes')); // 🖼️ THÊM MỚI: Admin Banner Management API
 app.use('/api/admin/statistics', require('./routes/admin.statistics.routes'));
 
 // Test route
@@ -424,7 +430,7 @@ app.get('/', (req, res) => {
       pagination: "Hầu hết API list đều hỗ trợ phân trang với page & limit",
       softDelete: "Sản phẩm sử dụng soft delete (Enable = false)",
       transactions: "Tạo đơn hàng & hủy đơn sử dụng database transactions",
-      upload: "Upload ảnh sản phẩm giới hạn 5MB, chỉ chấp nhận JPEG/PNG/GIF/WEBP"
+      upload: "Upload ảnh sản phẩm giới hạn 10MB, chỉ chấp nhận JPEG/PNG/GIF/WEBP"
     },
 
     // ========== STATUS CODES ==========

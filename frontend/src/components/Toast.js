@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/Toast.css';
 
-const Toast = ({ message, type = 'info', duration = 3000, onClose }) => {
+const Toast = ({ message, type = 'info', duration = 2000, onClose }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {

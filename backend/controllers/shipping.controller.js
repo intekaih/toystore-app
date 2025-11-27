@@ -453,6 +453,9 @@ exports.syncGHNStatus = async (req, res) => {
     const statusText = result.data.statusText;
     const oldGHNStatus = vanChuyen.TrangThaiGHN;
 
+    // ✅ FIX: Tạo transaction trước khi sử dụng
+    const transaction = await db.sequelize.transaction();
+
     try {
       // Cập nhật trạng thái GHN trong database
       await ThongTinVanChuyen.update(

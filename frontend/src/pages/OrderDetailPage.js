@@ -133,15 +133,6 @@ const OrderDetailPage = ({ isStaffView = false }) => {
               ngayGuiHang: orderData.thongTinVanChuyen.ngayGuiHang || orderData.thongTinVanChuyen.ngayGuiHang,
               trangThaiGHN: orderData.thongTinVanChuyen.trangThaiGHN || orderData.thongTinVanChuyen.trangThaiGHN
             } : null,
-            // ✅ THÊM: Lịch sử trạng thái đơn hàng
-            lichSuTrangThai: orderData.lichSuTrangThai ? orderData.lichSuTrangThai.map(item => ({
-              id: item.id || item.ID,
-              trangThaiCu: item.trangThaiCu || item.TrangThaiCu,
-              trangThaiMoi: item.trangThaiMoi || item.TrangThaiMoi,
-              nguoiThayDoi: item.nguoiThayDoi || item.NguoiThayDoi,
-              lyDo: item.lyDo || item.LyDo,
-              ngayThayDoi: item.ngayThayDoi || item.NgayThayDoi
-            })) : [],
             maVanDon: orderData.maVanDon || orderData.maVanDon || orderData.thongTinVanChuyen?.maVanDon,
             tongSoLuongSanPham: orderData.tongSoLuongSanPham || 0,
             soLoaiSanPham: orderData.soLoaiSanPham || 0
@@ -157,18 +148,38 @@ const OrderDetailPage = ({ isStaffView = false }) => {
 
         if (response.success) {
           const orderData = response.data.hoaDon || response.data;
-          // ✅ THÊM: Map lichSuTrangThai nếu có
-          if (orderData.lichSuTrangThai) {
-            orderData.lichSuTrangThai = orderData.lichSuTrangThai.map(item => ({
-              id: item.id || item.ID,
-              trangThaiCu: item.trangThaiCu || item.TrangThaiCu,
-              trangThaiMoi: item.trangThaiMoi || item.TrangThaiMoi,
-              nguoiThayDoi: item.nguoiThayDoi || item.NguoiThayDoi,
-              lyDo: item.lyDo || item.LyDo,
-              ngayThayDoi: item.ngayThayDoi || item.NgayThayDoi
-            }));
-          }
-          setOrder(orderData);
+          
+          // ✅ Normalize dữ liệu để đảm bảo format nhất quán
+          const normalizedOrder = {
+            ...orderData,
+            // ✅ Normalize địa chỉ giao hàng: Backend trả về tinhThanh, quanHuyen, phuongXa
+            diaChiGiaoHang: orderData.diaChiGiaoHang ? {
+              id: orderData.diaChiGiaoHang.id,
+              diaChiChiTiet: orderData.diaChiGiaoHang.diaChiChiTiet || '',
+              tenPhuong: orderData.diaChiGiaoHang.phuongXa || orderData.diaChiGiaoHang.tenPhuong || '',
+              tenQuan: orderData.diaChiGiaoHang.quanHuyen || orderData.diaChiGiaoHang.tenQuan || '',
+              tenTinh: orderData.diaChiGiaoHang.tinhThanh || orderData.diaChiGiaoHang.tenTinh || '',
+              tenNguoiNhan: orderData.diaChiGiaoHang.tenNguoiNhan || '',
+              soDienThoai: orderData.diaChiGiaoHang.soDienThoai || ''
+            } : null,
+            // ✅ Normalize chi tiết sản phẩm: Backend trả về hinhAnh
+            chiTiet: (orderData.chiTiet || []).map(item => ({
+              id: item.id,
+              soLuong: item.soLuong || item.SoLuong || 0,
+              donGia: item.donGia || item.DonGia || 0,
+              thanhTien: item.thanhTien || item.ThanhTien || 0,
+              sanPham: {
+                id: item.sanPham?.id,
+                ten: item.sanPham?.ten || item.sanPham?.Ten || 'Sản phẩm không xác định',
+                giaBan: item.sanPham?.giaBan || item.donGia || 0,
+                hinhAnhUrl: item.sanPham?.hinhAnh || item.sanPham?.hinhAnhUrl || item.sanPham?.hinhAnhURL || item.sanPham?.HinhAnhURL || '',
+                loaiSP: item.sanPham?.loaiSp || item.sanPham?.loaiSP || {}
+              }
+            })),
+          };
+          
+          console.log('✅ Normalized order (guest):', normalizedOrder);
+          setOrder(normalizedOrder);
         }
       } else if (id) {
         // Logged-in user: Gọi API cần token bằng ID
@@ -182,18 +193,38 @@ const OrderDetailPage = ({ isStaffView = false }) => {
 
         if (response.success) {
           const orderData = response.data.hoaDon || response.data;
-          // ✅ THÊM: Map lichSuTrangThai nếu có
-          if (orderData.lichSuTrangThai) {
-            orderData.lichSuTrangThai = orderData.lichSuTrangThai.map(item => ({
-              id: item.id || item.ID,
-              trangThaiCu: item.trangThaiCu || item.TrangThaiCu,
-              trangThaiMoi: item.trangThaiMoi || item.TrangThaiMoi,
-              nguoiThayDoi: item.nguoiThayDoi || item.NguoiThayDoi,
-              lyDo: item.lyDo || item.LyDo,
-              ngayThayDoi: item.ngayThayDoi || item.NgayThayDoi
-            }));
-          }
-          setOrder(orderData);
+          
+          // ✅ Normalize dữ liệu để đảm bảo format nhất quán
+          const normalizedOrder = {
+            ...orderData,
+            // ✅ Normalize địa chỉ giao hàng: Backend trả về tinhThanh, quanHuyen, phuongXa
+            diaChiGiaoHang: orderData.diaChiGiaoHang ? {
+              id: orderData.diaChiGiaoHang.id,
+              diaChiChiTiet: orderData.diaChiGiaoHang.diaChiChiTiet || '',
+              tenPhuong: orderData.diaChiGiaoHang.phuongXa || orderData.diaChiGiaoHang.tenPhuong || '',
+              tenQuan: orderData.diaChiGiaoHang.quanHuyen || orderData.diaChiGiaoHang.tenQuan || '',
+              tenTinh: orderData.diaChiGiaoHang.tinhThanh || orderData.diaChiGiaoHang.tenTinh || '',
+              tenNguoiNhan: orderData.diaChiGiaoHang.tenNguoiNhan || '',
+              soDienThoai: orderData.diaChiGiaoHang.soDienThoai || ''
+            } : null,
+            // ✅ Normalize chi tiết sản phẩm: Backend trả về hinhAnh
+            chiTiet: (orderData.chiTiet || []).map(item => ({
+              id: item.id,
+              soLuong: item.soLuong || item.SoLuong || 0,
+              donGia: item.donGia || item.DonGia || 0,
+              thanhTien: item.thanhTien || item.ThanhTien || 0,
+              sanPham: {
+                id: item.sanPham?.id,
+                ten: item.sanPham?.ten || item.sanPham?.Ten || 'Sản phẩm không xác định',
+                giaBan: item.sanPham?.giaBan || item.donGia || 0,
+                hinhAnhUrl: item.sanPham?.hinhAnh || item.sanPham?.hinhAnhUrl || item.sanPham?.hinhAnhURL || item.sanPham?.HinhAnhURL || '',
+                loaiSP: item.sanPham?.loaiSp || item.sanPham?.loaiSP || {}
+              }
+            })),
+          };
+          
+          console.log('✅ Normalized order (user):', normalizedOrder);
+          setOrder(normalizedOrder);
         }
       } else {
         throw new Error('Thiếu thông tin đơn hàng');
@@ -323,7 +354,7 @@ const OrderDetailPage = ({ isStaffView = false }) => {
         </button>
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-primary-50 to-rose-50 rounded-bubble p-6 mb-6 border-2 border-primary-100 shadow-soft">
+        <div className="bg-gradient-to-r from-primary-50 to-rose-50 rounded-bubble py-3 px-6 mb-6 border-2 border-primary-100 shadow-soft">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-3xl md:text-4xl font-display font-bold text-gray-800 mb-2">
@@ -340,13 +371,12 @@ const OrderDetailPage = ({ isStaffView = false }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Order Info */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-6">
             {/* Order Status Timeline */}
             <OrderStatusTimeline
               currentStatus={order.trangThai}
-              lichSuTrangThai={order.lichSuTrangThai || []}
               order={{
                 ...order,
                 maVanDon: order.thongTinVanChuyen?.maVanDon || order.maVanDon || order.MaVanDon,
@@ -358,65 +388,27 @@ const OrderDetailPage = ({ isStaffView = false }) => {
               }}
             />
 
-            {/* Customer Info */}
-            <div className="bg-white rounded-cute p-6 border-2 border-primary-100 shadow-soft">
-              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <User size={24} className="text-primary-500" />
-                Thông Tin Người Nhận
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <User size={18} className="text-gray-400 mt-1 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm text-gray-500">Họ tên</p>
-                    <p className="font-semibold text-gray-800">
-                      {order.diaChiGiaoHang?.tenNguoiNhan || order.khachHang.hoTen}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Phone size={18} className="text-gray-400 mt-1 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm text-gray-500">Số điện thoại</p>
-                    <p className="font-semibold text-gray-800">
-                      {order.diaChiGiaoHang?.soDienThoai || order.khachHang.dienThoai || 'Chưa cập nhật'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Mail size={18} className="text-gray-400 mt-1 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm text-gray-500">Email</p>
-                    <p className="font-semibold text-gray-800">{order.khachHang.email || 'Chưa cập nhật'}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <MapPin size={18} className="text-gray-400 mt-1 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm text-gray-500">Địa chỉ giao hàng</p>
-                    {/* ✅ FIX: Lấy địa chỉ từ order.diaChiGiaoHang */}
-                    <p className="font-semibold text-gray-800">
-                      {order.diaChiGiaoHang ? (
-                        <>
-                          {order.diaChiGiaoHang.diaChiChiTiet && `${order.diaChiGiaoHang.diaChiChiTiet}, `}
-                          {order.diaChiGiaoHang.tenPhuong && `${order.diaChiGiaoHang.tenPhuong}, `}
-                          {order.diaChiGiaoHang.tenQuan && `${order.diaChiGiaoHang.tenQuan}, `}
-                          {order.diaChiGiaoHang.tenTinh || ''}
-                        </>
-                      ) : (
-                        'Chưa cập nhật địa chỉ'
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* GHN Tracking - Hiển thị nếu đơn hàng đã có mã vận đơn */}
+            {(order.thongTinVanChuyen?.maVanDon || order.maVanDon) && (
+              <GHNTracking
+                orderId={order.id || order.ID}
+                orderCode={order.maHD || order.MaHD}
+              />
+            )}
+          </div>
 
+          {/* Right Column - Order Summary */}
+          <div className="space-y-6">
             {/* Products List */}
             <div className="bg-white rounded-cute p-6 border-2 border-primary-100 shadow-soft">
-              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Package size={24} className="text-primary-500" />
-                Danh Sách Sản Phẩm ({order.chiTiet.length})
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Package size={24} className="text-primary-500" />
+                  <span>Danh Sách Sản Phẩm ({order.chiTiet.length})</span>
+                </div>
+                <Badge variant="info" size="md">
+                  {order.phuongThucThanhToan?.ten || order.phuongThucThanhToan?.Ten || 'Chưa xác định'}
+                </Badge>
               </h3>
               <div className="space-y-4">
                 {order.chiTiet.map((item, index) => (
@@ -426,7 +418,7 @@ const OrderDetailPage = ({ isStaffView = false }) => {
                       }`}
                   >
                     <img
-                      src={buildImageUrl(item.sanPham?.hinhAnhUrl || item.sanPham?.hinhAnhURL || item.sanPham?.HinhAnhURL || item.hinhAnh)}
+                      src={buildImageUrl(item.sanPham?.hinhAnhUrl || item.sanPham?.hinhAnhURL || item.sanPham?.HinhAnhURL || item.hinhAnh || '')}
                       alt={item.sanPham?.ten || item.tenSanPham || 'Sản phẩm'}
                       className="w-20 h-20 object-cover rounded-cute border-2 border-primary-100 flex-shrink-0"
                       onError={handleImageError}
@@ -438,28 +430,159 @@ const OrderDetailPage = ({ isStaffView = false }) => {
                       >
                         {item.sanPham?.ten || item.sanPham?.Ten || item.tenSanPham || 'Sản phẩm không xác định'}
                       </Link>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
+                      <div className="flex items-center justify-between mt-2 text-sm text-gray-600">
                         <span>Số lượng: <strong>{item.soLuong || item.SoLuong || 0}</strong></span>
                         <span>Đơn giá: <strong>{formatPrice(item.donGia || item.DonGia || item.sanPham?.giaBan || 0)}</strong></span>
                       </div>
-                      <div className="mt-2">
+                      <div className="mt-2 flex justify-between items-center">
+                        <span className="text-lg font-bold text-gray-800">Thành tiền:</span>
                         <span className="text-lg font-bold text-red-600">
-                          Thành tiền: {formatPrice(item.thanhTien || item.ThanhTien || ((item.soLuong || item.SoLuong || 0) * (item.donGia || item.DonGia || item.sanPham?.giaBan || 0)))}
+                          {formatPrice(item.thanhTien || item.ThanhTien || ((item.soLuong || item.SoLuong || 0) * (item.donGia || item.DonGia || item.sanPham?.giaBan || 0)))}
                         </span>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
+
+              {/* Chi phí và tổng tiền */}
+              <div className="mt-6 pt-4 border-t-2 border-primary-200 space-y-3">
+                {/* Tạm tính */}
+                <div className="flex justify-between items-center text-gray-700">
+                  <span className="flex items-center gap-2">
+                    <span>📦</span>
+                    <span>Tạm tính:</span>
+                  </span>
+                  <span className="font-semibold">
+                    {formatPrice(
+                      order.chiTiet.reduce((sum, item) => 
+                        sum + (item.thanhTien || item.ThanhTien || ((item.soLuong || item.SoLuong || 0) * (item.donGia || item.DonGia || 0))), 
+                        0
+                      )
+                    )}
+                  </span>
+                </div>
+
+                {/* Phí vận chuyển */}
+                {(order.priceBreakdown?.shipping?.fee || order.tienShip || order.TienShip) && (
+                  <div className="flex justify-between items-center text-gray-700">
+                    <span className="flex items-center gap-2">
+                      <span>🚚</span>
+                      <span>Phí vận chuyển:</span>
+                    </span>
+                    <span className="font-semibold text-green-600">
+                      {formatPrice(
+                        order.priceBreakdown?.shipping?.fee || 
+                        parseFloat(order.tienShip || order.TienShip || 0)
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                {/* VAT */}
+                {(order.priceBreakdown?.vat?.amount || order.tienVAT || order.TienVAT) && (
+                  <div className="flex justify-between items-center text-gray-700">
+                    <span className="flex items-center gap-2">
+                      <span>💰</span>
+                      <span>VAT ({order.priceBreakdown?.vat?.rate ? `${(order.priceBreakdown.vat.rate * 100).toFixed(0)}%` : '10%'}):</span>
+                    </span>
+                    <span className="font-semibold text-blue-600">
+                      {formatPrice(
+                        order.priceBreakdown?.vat?.amount || 
+                        parseFloat(order.tienVAT || order.TienVAT || 0)
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                {/* Giảm giá */}
+                {(order.priceBreakdown?.voucher?.discountAmount || order.giamGia || order.GiamGia) && (
+                  <div className="flex justify-between items-center text-gray-700">
+                    <span className="flex items-center gap-2">
+                      <span>🎁</span>
+                      <span>Giảm giá:</span>
+                    </span>
+                    <span className="font-semibold text-red-600">
+                      -{formatPrice(
+                        order.priceBreakdown?.voucher?.discountAmount || 
+                        parseFloat(order.giamGia || order.GiamGia || 0)
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                {/* Tổng cộng */}
+                <div className="pt-3 border-t-2 border-primary-300">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-bold text-gray-800">Tổng cộng:</span>
+                    <span className="text-2xl font-bold text-red-600">
+                      {formatPrice(
+                        order.tongTien || 
+                        order.thanhTien || 
+                        order.priceBreakdown?.thanhTien || 
+                        0
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* GHN Tracking - Hiển thị nếu đơn hàng đã có mã vận đơn */}
-            {(order.thongTinVanChuyen?.maVanDon || order.maVanDon) && (
-              <GHNTracking
-                orderId={order.id || order.ID}
-                orderCode={order.maHD || order.MaHD}
-              />
-            )}
+            {/* Customer Info */}
+            <div className="bg-white rounded-cute p-6 border-2 border-primary-100 shadow-soft">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <User size={24} className="text-primary-500" />
+                Thông Tin Người Nhận
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <User size={18} className="text-gray-400 flex-shrink-0" />
+                    <p className="text-sm text-gray-500">Họ tên</p>
+                  </div>
+                  <p className="font-semibold text-gray-800">
+                    {order.diaChiGiaoHang?.tenNguoiNhan || order.khachHang.hoTen}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Phone size={18} className="text-gray-400 flex-shrink-0" />
+                      <p className="text-sm text-gray-500">Số điện thoại</p>
+                    </div>
+                    <p className="font-semibold text-gray-800">
+                      {order.diaChiGiaoHang?.soDienThoai || order.khachHang.dienThoai || 'Chưa cập nhật'}
+                    </p>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Mail size={18} className="text-gray-400 flex-shrink-0" />
+                      <p className="text-sm text-gray-500">Email</p>
+                    </div>
+                    <p className="font-semibold text-gray-800">{order.khachHang.email || 'Chưa cập nhật'}</p>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <MapPin size={18} className="text-gray-400 flex-shrink-0" />
+                    <p className="text-sm text-gray-500">Địa chỉ giao hàng</p>
+                  </div>
+                  {/* ✅ FIX: Lấy địa chỉ từ order.diaChiGiaoHang */}
+                  <p className="font-semibold text-gray-800">
+                    {order.diaChiGiaoHang ? (
+                      <>
+                        {order.diaChiGiaoHang.diaChiChiTiet && `${order.diaChiGiaoHang.diaChiChiTiet}, `}
+                        {order.diaChiGiaoHang.tenPhuong && `${order.diaChiGiaoHang.tenPhuong}, `}
+                        {order.diaChiGiaoHang.tenQuan && `${order.diaChiGiaoHang.tenQuan}, `}
+                        {order.diaChiGiaoHang.tenTinh || ''}
+                      </>
+                    ) : (
+                      'Chưa cập nhật địa chỉ'
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
 
             {/* Note */}
             {order.ghiChu && (
@@ -471,44 +594,6 @@ const OrderDetailPage = ({ isStaffView = false }) => {
                 <p className="text-gray-700 leading-relaxed">{order.ghiChu || order.GhiChu}</p>
               </div>
             )}
-          </div>
-
-          {/* Right Column - Order Summary */}
-          <div className="space-y-6">
-            {/* Payment Method */}
-            <div className="bg-white rounded-cute p-6 border-2 border-primary-100 shadow-soft">
-              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <CreditCard size={24} className="text-primary-500" />
-                Phương Thức Thanh Toán
-              </h3>
-              <div className="flex items-center gap-2">
-                <Badge variant="info" size="md">
-                  {order.phuongThucThanhToan?.ten || order.phuongThucThanhToan?.Ten || 'Chưa xác định'}
-                </Badge>
-              </div>
-            </div>
-
-            {/* Order Summary */}
-            <div className="bg-gradient-to-br from-primary-50 to-rose-50 rounded-cute p-6 border-2 border-primary-100 shadow-soft">
-              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <FileText size={24} className="text-primary-500" />
-                Tóm Tắt Đơn Hàng
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Tổng số lượng:</span>
-                  <span className="font-semibold text-gray-800">
-                    {order.chiTiet.reduce((sum, item) => sum + (item.soLuong || item.SoLuong || 0), 0)} sản phẩm
-                  </span>
-                </div>
-                <div className="flex justify-between items-center pt-3 border-t-2 border-primary-200">
-                  <span className="text-lg font-bold text-gray-800">Tổng tiền:</span>
-                  <span className="text-xl font-bold text-red-600">
-                    {formatPrice(order.tongTien || order.thanhTien || 0)}
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>

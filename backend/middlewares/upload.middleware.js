@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const sharp = require('sharp');
 
 // Tạo thư mục uploads nếu chưa tồn tại
 const uploadDir = path.join(__dirname, '../uploads');
@@ -52,7 +53,7 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024 // Giới hạn 5MB
+    fileSize: 10 * 1024 * 1024 // Giới hạn 10MB
   }
 });
 
@@ -63,7 +64,7 @@ const handleUploadError = (err, req, res, next) => {
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         success: false,
-        message: 'Kích thước file vượt quá giới hạn 5MB'
+        message: 'Kích thước file vượt quá giới hạn 10MB'
       });
     }
     
@@ -99,15 +100,61 @@ const createProductFolder = (productId) => {
   return productFolder;
 };
 
-// Hàm di chuyển files từ temp vào thư mục sản phẩm
-const moveFilesToProductFolder = (files, productId) => {
+// Hàm xử lý ảnh chuyển về tỷ lệ vuông 1:1
+const processImageToSquare = async (inputPath, outputPath) => {
+  try {
+    // Đọc metadata của ảnh để lấy kích thước
+    const metadata = await sharp(inputPath).metadata();
+    const { width, height } = metadata;
+    
+    // Tính toán kích thước vuông (lấy cạnh nhỏ hơn)
+    const size = Math.min(width, height);
+    
+    // Tính toán vị trí crop để căn giữa
+    const left = Math.floor((width - size) / 2);
+    const top = Math.floor((height - size) / 2);
+    
+    // Xử lý ảnh: crop về vuông và resize nếu cần
+    await sharp(inputPath)
+      .extract({
+        left: left,
+        top: top,
+        width: size,
+        height: size
+      })
+      .resize(size, size, {
+        fit: 'cover',
+        position: 'center'
+      })
+      .toFile(outputPath);
+    
+    console.log(`✅ Đã xử lý ảnh về tỷ lệ vuông 1:1: ${size}x${size}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Lỗi xử lý ảnh:', error);
+    // Nếu lỗi, copy file gốc
+    try {
+      fs.copyFileSync(inputPath, outputPath);
+      console.log('⚠️ Đã copy file gốc do lỗi xử lý');
+      return false;
+    } catch (copyError) {
+      console.error('❌ Lỗi copy file:', copyError);
+      return false;
+    }
+  }
+};
+
+// Hàm di chuyển files từ temp vào thư mục sản phẩm (với xử lý ảnh vuông 1:1)
+const moveFilesToProductFolder = async (files, productId) => {
   if (!files || files.length === 0) return null;
   
   try {
     const productFolder = createProductFolder(productId);
     const imageUrls = [];
     
-    files.forEach((file, index) => {
+    // Xử lý từng file một cách tuần tự để đảm bảo thứ tự
+    for (let index = 0; index < files.length; index++) {
+      const file = files[index];
       const tempPath = path.join(tempDir, file.filename);
       const ext = path.extname(file.filename);
       
@@ -115,13 +162,22 @@ const moveFilesToProductFolder = (files, productId) => {
       const newFilename = `image_${index}_${Date.now()}${ext}`;
       const newPath = path.join(productFolder, newFilename);
       
-      // Di chuyển file từ temp vào thư mục sản phẩm
+      // Kiểm tra file tồn tại
       if (fs.existsSync(tempPath)) {
-        fs.renameSync(tempPath, newPath);
-        console.log(`✅ Đã di chuyển: ${file.filename} -> product_${productId}/${newFilename}`);
+        // Xử lý ảnh về tỷ lệ vuông 1:1
+        await processImageToSquare(tempPath, newPath);
+        
+        // Xóa file tạm sau khi xử lý xong
+        try {
+          fs.unlinkSync(tempPath);
+        } catch (unlinkError) {
+          console.warn('⚠️ Không thể xóa file tạm:', tempPath);
+        }
+        
+        console.log(`✅ Đã xử lý và lưu: ${file.filename} -> product_${productId}/${newFilename}`);
         imageUrls.push(`/uploads/product_${productId}/${newFilename}`);
       }
-    });
+    }
     
     return JSON.stringify(imageUrls);
   } catch (error) {
@@ -220,6 +276,140 @@ const renameFileByProductId = (oldFilename, productId, index = 0) => {
   }
 };
 
+// ==================== BANNER UPLOAD ====================
+// Tạo thư mục banner nếu chưa tồn tại
+const bannerDir = path.join(uploadDir, 'banner');
+if (!fs.existsSync(bannerDir)) {
+  fs.mkdirSync(bannerDir, { recursive: true });
+  console.log('📁 Đã tạo thư mục banner');
+}
+
+// Cấu hình storage cho banner
+const bannerStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, bannerDir);
+  },
+  filename: function (req, file, cb) {
+    // Tên file: banner_<timestamp>_<random>.<ext>
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const nameWithoutExt = path.basename(file.originalname, ext);
+    
+    // Loại bỏ ký tự đặc biệt trong tên file
+    const sanitizedName = nameWithoutExt.replace(/[^a-zA-Z0-9]/g, '_');
+    
+    cb(null, `banner_${sanitizedName}_${uniqueSuffix}${ext}`);
+  }
+});
+
+// Multer upload cho banner (single file)
+const uploadBanner = multer({
+  storage: bannerStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // Giới hạn 10MB
+  }
+});
+
+// Hàm xóa file banner cũ
+const deleteOldBannerImage = (imagePath) => {
+  if (!imagePath) return;
+  
+  try {
+    // Nếu là base64 string, không cần xóa
+    if (imagePath.startsWith('data:image/')) {
+      return;
+    }
+    
+    // Lấy tên file từ URL hoặc path
+    let filename = imagePath;
+    if (imagePath.startsWith('/uploads/banner/')) {
+      filename = imagePath.replace('/uploads/banner/', '');
+    } else if (imagePath.startsWith('uploads/banner/')) {
+      filename = imagePath.replace('uploads/banner/', '');
+    } else {
+      filename = path.basename(imagePath);
+    }
+    
+    const filePath = path.join(bannerDir, filename);
+    
+    // Kiểm tra file có tồn tại không
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log('🗑️ Đã xóa banner cũ:', filename);
+    }
+  } catch (error) {
+    console.error('❌ Lỗi xóa banner cũ:', error);
+  }
+};
+
+// ==================== BRAND LOGO UPLOAD ====================
+// Tạo thư mục brands nếu chưa tồn tại
+const brandDir = path.join(uploadDir, 'brands');
+if (!fs.existsSync(brandDir)) {
+  fs.mkdirSync(brandDir, { recursive: true });
+  console.log('📁 Đã tạo thư mục brands');
+}
+
+// Cấu hình storage cho brand logo
+const brandStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, brandDir);
+  },
+  filename: function (req, file, cb) {
+    // Tên file: brand_<timestamp>_<random>.<ext>
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const nameWithoutExt = path.basename(file.originalname, ext);
+    
+    // Loại bỏ ký tự đặc biệt trong tên file
+    const sanitizedName = nameWithoutExt.replace(/[^a-zA-Z0-9]/g, '_');
+    
+    cb(null, `brand_${sanitizedName}_${uniqueSuffix}${ext}`);
+  }
+});
+
+// Multer upload cho brand logo (single file)
+const uploadBrandLogo = multer({
+  storage: brandStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // Giới hạn 5MB cho logo
+  }
+});
+
+// Hàm xóa file brand logo cũ
+const deleteOldBrandLogo = (imagePath) => {
+  if (!imagePath) return;
+  
+  try {
+    // Nếu là base64 string hoặc URL bên ngoài, không cần xóa
+    if (imagePath.startsWith('data:image/') || imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return;
+    }
+    
+    // Lấy tên file từ URL hoặc path
+    let filename = imagePath;
+    if (imagePath.startsWith('/uploads/brands/')) {
+      filename = imagePath.replace('/uploads/brands/', '');
+    } else if (imagePath.startsWith('uploads/brands/')) {
+      filename = imagePath.replace('uploads/brands/', '');
+    } else {
+      filename = path.basename(imagePath);
+    }
+    
+    const filePath = path.join(brandDir, filename);
+    
+    // Kiểm tra file có tồn tại không
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      console.log('🗑️ Đã xóa brand logo cũ:', filename);
+    }
+  } catch (error) {
+    console.error('❌ Lỗi xóa brand logo cũ:', error);
+  }
+};
+
 module.exports = {
   upload,
   handleUploadError,
@@ -227,5 +417,9 @@ module.exports = {
   renameFileByProductId,
   moveFilesToProductFolder,
   deleteProductFolder,
-  cleanupTempFiles
+  cleanupTempFiles,
+  uploadBanner,
+  deleteOldBannerImage,
+  uploadBrandLogo,
+  deleteOldBrandLogo
 };

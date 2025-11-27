@@ -1,12 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { productService, cartService } from '../services';
-import { ShoppingBag, Sparkles, TrendingUp, Users, Star, ArrowRight, Zap, Clock, Shield, Truck, CreditCard, Headphones, Gift, Mail } from 'lucide-react';
+import { productService, cartService, bannerService } from '../services';
+import config from '../config';
+import { ShoppingCart, ShoppingBag, Sparkles, TrendingUp, Users, Star, ArrowRight, Zap, Clock, Shield, Truck, CreditCard, Headphones, Gift, Mail } from 'lucide-react';
 import MainLayout from '../layouts/MainLayout';
-import { ProductCard, Loading, Button } from '../components/ui';
+import { ProductCard, Loading, Button, OptimizedImage } from '../components/ui';
 import ProductQuickViewModal from '../components/ProductQuickViewModal.jsx';
 import Toast from '../components/Toast.js';
+import LeaderboardBanner from '../components/LeaderboardBanner.jsx';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation, Pagination, Autoplay, EffectFade } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/navigation';
+import 'swiper/css/pagination';
+import 'swiper/css/effect-fade';
+import './Homepage.css';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const Homepage = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
@@ -24,16 +34,99 @@ const Homepage = () => {
   const [stats, setStats] = useState({
     totalProducts: 0,
     categories: 4,
-    customers: 150
+    customers: 0,
+    averageRating: 0
   });
+  const [banners, setBanners] = useState([]);
+  const [isBannerHovered, setIsBannerHovered] = useState(false);
+  const [bannerImagesLoaded, setBannerImagesLoaded] = useState({});
 
   const navigate = useNavigate();
   const { user } = useAuth();
+  const swiperRef = useRef(null);
 
   useEffect(() => {
     loadAllProducts();
     startCountdown();
+    loadBanners();
+    loadPublicStats();
   }, []);
+
+  // Preload banner đầu tiên để tăng tốc độ load
+  useEffect(() => {
+    if (banners.length > 0) {
+      const firstBanner = banners[0];
+      if (firstBanner?.imageUrl) {
+        const img = new Image();
+        img.src = firstBanner.imageUrl;
+        img.onload = () => {
+          setBannerImagesLoaded(prev => ({ ...prev, [firstBanner.id]: true }));
+        };
+      }
+    }
+  }, [banners]);
+
+  const loadBanners = async () => {
+    try {
+      const response = await bannerService.getActiveBanners();
+      let mappedBanners = [];
+      
+      if (response.success && response.data) {
+        // Map từ API format sang format frontend
+        mappedBanners = response.data.banners.map(b => {
+          // ✅ XỬ LÝ URL: Nếu là đường dẫn tương đối, thêm API_BASE_URL
+          let imageUrl = b.hinhAnhUrl;
+          if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('data:image/')) {
+            // Nếu là đường dẫn tương đối (/uploads/banner/...), thêm API base URL
+            if (imageUrl.startsWith('/uploads/')) {
+              imageUrl = `${config.API_BASE_URL}${imageUrl}`;
+            }
+          }
+          
+          return {
+            id: b.id,
+            imageUrl: imageUrl,
+            link: b.link,
+            order: b.thuTu,
+            type: 'image'
+          };
+        });
+      }
+      
+      // Thêm leaderboard banner vào đầu danh sách
+      mappedBanners.unshift({
+        id: 'leaderboard-banner',
+        type: 'leaderboard',
+        order: 0
+      });
+      
+      setBanners(mappedBanners);
+    } catch (error) {
+      console.error('Error loading banners:', error);
+      // Khi có lỗi, vẫn thêm leaderboard banner
+      setBanners([{
+        id: 'leaderboard-banner',
+        type: 'leaderboard',
+        order: 0
+      }]);
+    }
+  };
+
+  const loadPublicStats = async () => {
+    try {
+      const response = await productService.getPublicStats();
+      if (response.success && response.data) {
+        setStats(prev => ({
+          ...prev,
+          customers: response.data.totalCustomers || 0,
+          averageRating: response.data.averageRating || 0
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading public stats:', error);
+      // Giữ giá trị mặc định nếu có lỗi
+    }
+  };
 
   // Countdown timer cho Flash Sale
   const startCountdown = () => {
@@ -63,12 +156,11 @@ const Homepage = () => {
       setLoading(true);
       
       // Load tất cả các loại sản phẩm song song
-      // Note: Tất cả đều dùng 'newest' vì API có thể không hỗ trợ bestSeller/trending
       const [featuredRes, bestSellerRes, newArrivalRes, trendingRes] = await Promise.all([
-        productService.getProducts({ page: 1, limit: 6, sortBy: 'newest', order: 'desc' }).catch(() => ({ success: false })),
-        productService.getProducts({ page: 1, limit: 4, sortBy: 'newest', order: 'desc' }).catch(() => ({ success: false })),
-        productService.getProducts({ page: 1, limit: 4, sortBy: 'newest', order: 'desc' }).catch(() => ({ success: false })),
-        productService.getProducts({ page: 1, limit: 4, sortBy: 'newest', order: 'desc' }).catch(() => ({ success: false }))
+        productService.getProducts({ page: 1, limit: 6, filter: 'newest' }).catch(() => ({ success: false })),
+        productService.getProducts({ page: 1, limit: 4, filter: 'bestSeller' }).catch(() => ({ success: false })),
+        productService.getProducts({ page: 1, limit: 4, filter: 'newest' }).catch(() => ({ success: false })),
+        productService.getProducts({ page: 1, limit: 4, filter: 'newest' }).catch(() => ({ success: false }))
       ]);
 
       // Xử lý kết quả
@@ -145,6 +237,30 @@ const Homepage = () => {
     }
   };
 
+  const handleBuyNow = async (product) => {
+    try {
+      setAdding(true);
+      const productId = product.id;
+      const response = await cartService.addToCart(productId, 1);
+
+      if (response.success) {
+        const productName = product.ten;
+        showToast(
+          `Đã thêm ${productName} vào giỏ hàng`,
+          'success',
+          2000
+        );
+        // Navigate to cart
+        navigate('/cart');
+      }
+    } catch (error) {
+      console.error('❌ Lỗi mua ngay:', error);
+      showToast(error.message || 'Không thể thêm vào giỏ hàng', 'error', 4000);
+    } finally {
+      setAdding(false);
+    }
+  };
+
   const handleQuickView = (product) => {
     setQuickViewProduct(product);
     setIsQuickViewOpen(true);
@@ -171,7 +287,10 @@ const Homepage = () => {
   };
 
   return (
+
     <MainLayout>
+
+       
       <section className="relative overflow-hidden bg-gradient-to-br from-primary-50 via-rose-50 to-cream-100 py-20">
         <div className="absolute top-10 left-10 text-6xl opacity-20 animate-float">🧸</div>
         <div className="absolute top-32 right-20 text-5xl opacity-20 animate-float" style={{ animationDelay: '0.5s' }}>🎀</div>
@@ -197,11 +316,33 @@ const Homepage = () => {
                 </div>
               ) : null}
               
-              <div className="flex flex-wrap gap-4 pt-4">
+              <div className="flex flex-wrap items-center gap-6 pt-4">
+                {/* Customer Count */}
+                <div className="flex items-center gap-3">
+                  <span className="text-4xl">😊</span>
+                  <div>
+                    <p className="text-2xl font-bold text-rose-600">
+                      {stats.customers || 0}+
+                    </p>
+                    <p className="text-gray-700 text-sm font-medium">Khách hàng</p>
+                  </div>
+                </div>
+
+                {/* Rating */}
+                <div className="flex items-center gap-3">
+                  <span className="text-4xl">⭐</span>
+                  <div>
+                    <p className="text-2xl font-bold text-rose-600">
+                      {stats.averageRating > 0 ? stats.averageRating.toFixed(1) : '4.8'}
+                    </p>
+                    <p className="text-gray-700 text-sm font-medium">Đánh giá</p>
+                  </div>
+                </div>
+
                 <Button 
                   variant="primary" 
                   size="lg"
-                  icon={<ShoppingBag size={20} />}
+                  icon={<ShoppingCart size={20} />}
                   onClick={() => navigate('/products')}
                 >
                   Mua sắm ngay
@@ -218,19 +359,74 @@ const Homepage = () => {
               </div>
             </div>
 
-            <div className="relative hidden md:block">
-              <div className="relative w-full h-96 flex items-center justify-center">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary-200 to-rose-200 rounded-bubble opacity-20"></div>
-                <div className="relative grid grid-cols-3 gap-4 p-8">
-                  <div className="text-7xl animate-bounce-soft">🚗</div>
-                  <div className="text-8xl animate-bounce-soft" style={{ animationDelay: '0.2s' }}>🧸</div>
-                  <div className="text-7xl animate-bounce-soft" style={{ animationDelay: '0.4s' }}>🎮</div>
-                  <div className="text-7xl animate-bounce-soft" style={{ animationDelay: '0.6s' }}>🪀</div>
-                  <div className="text-8xl animate-bounce-soft" style={{ animationDelay: '0.8s' }}>🎯</div>
-                  <div className="text-7xl animate-bounce-soft" style={{ animationDelay: '1s' }}>🎪</div>
+            {banners.length > 0 && (
+              <div className="relative hidden md:block">
+                <div 
+                  className="relative w-full h-96"
+                  onMouseEnter={() => setIsBannerHovered(true)}
+                  onMouseLeave={() => setIsBannerHovered(false)}
+                >
+                  <Swiper
+                    onSwiper={(swiper) => {
+                      swiperRef.current = swiper;
+                    }}
+                    modules={[Navigation, Pagination, Autoplay, EffectFade]}
+                    spaceBetween={0}
+                    slidesPerView={1}
+                    pagination={{
+                      clickable: true,
+                      bulletClass: 'swiper-pagination-bullet-custom',
+                    }}
+                    autoplay={{
+                      delay: 5000,
+                      disableOnInteraction: false,
+                    }}
+                    effect="fade"
+                    fadeEffect={{
+                      crossFade: true
+                    }}
+                    loop={banners.length > 1}
+                    className="banner-swiper rounded-bubble overflow-hidden h-full"
+                  >
+                    {banners.map((banner, index) => (
+                      <SwiperSlide key={banner.id}>
+                        {banner.type === 'leaderboard' ? (
+                          <LeaderboardBanner />
+                        ) : (
+                          <div className="relative w-full h-full bg-gradient-to-br from-primary-100 to-rose-100">
+                            <OptimizedImage
+                              src={banner.imageUrl}
+                              alt={`Banner ${banner.order}`}
+                              aspectRatio="16/9"
+                              objectFit="cover"
+                              sizes="100vw"
+                              priority={index === 0}
+                              className="cursor-pointer"
+                              onClick={() => navigate(banner.link || '/products')}
+                              fallback="/barbie.jpg"
+                            />
+                          </div>
+                        )}
+                      </SwiperSlide>
+                    ))}
+                  </Swiper>
+                  <button 
+                    onClick={() => swiperRef.current?.slidePrev()}
+                    className={`swiper-button-prev-custom absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-white/80 hover:bg-white rounded-full p-2 shadow-lg transition-all ${isBannerHovered ? 'opacity-100' : 'opacity-0'}`}
+                    aria-label="Previous slide"
+                  >
+                    <ChevronLeft size={20} className="text-gray-800" />
+                  </button>
+                  <button 
+                    onClick={() => swiperRef.current?.slideNext()}
+                    className={`swiper-button-next-custom absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-white/80 hover:bg-white rounded-full p-2 shadow-lg transition-all ${isBannerHovered ? 'opacity-100' : 'opacity-0'}`}
+                    aria-label="Next slide"
+                  >
+                    <ChevronRight size={20} className="text-gray-800" />
+                  </button>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </section>
@@ -247,7 +443,7 @@ const Homepage = () => {
             <div className="flex items-center gap-3">
               <Zap className="text-yellow-300 animate-pulse" size={32} />
               <div>
-                <h2 className="text-2xl md:text-3xl font-display font-bold">⚡ FLASH SALE - HÔM NAY THÔI!</h2>
+                <h2 className="text-2xl md:text-3xl font-display font-bold"> FLASH SALE - HÔM NAY THÔI!</h2>
                 <p className="text-rose-100 text-sm">Giảm giá cực sốc, không bỏ lỡ!</p>
               </div>
             </div>
@@ -276,25 +472,59 @@ const Homepage = () => {
                         src={product.hinhAnhUrl || product.hinhAnhURL || '/barbie.jpg'}
                         alt={product.ten || product.Ten}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        loading="lazy"
+                        decoding="async"
                       />
                     </div>
                   </div>
                   <h3 className="font-bold text-gray-800 text-sm mb-2 line-clamp-2">{product.ten || product.Ten}</h3>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-gray-400 line-through text-xs">
-                      {new Intl.NumberFormat('vi-VN').format(product.originalPrice)}đ
-                    </span>
-                    <span className="text-primary-600 font-bold text-lg">
-                      {new Intl.NumberFormat('vi-VN').format(product.giaBan || product.GiaBan || 0)}đ
-                    </span>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-primary-600 font-bold text-lg">
+                        {new Intl.NumberFormat('vi-VN').format(product.giaBan || product.GiaBan || 0)}đ
+                      </span>
+                      <span className="text-gray-400 line-through text-xs">
+                        {new Intl.NumberFormat('vi-VN').format(product.originalPrice)}đ
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleBuyNow(product);
+                        }}
+                        className="bg-primary-600 hover:bg-primary-700 text-white font-semibold text-base px-3 py-1.5 rounded-lg transition-all"
+                      >
+                        Mua ngay
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToCart(product);
+                        }}
+                        className="flex items-center justify-center w-10 h-10 rounded-lg bg-gray-100 text-gray-600 hover:bg-primary-600 hover:text-white transition-all"
+                        title="Thêm vào giỏ"
+                      >
+                        <ShoppingCart size={18} />
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-center gap-1 text-yellow-400 text-xs">
-                    <Star size={12} fill="currentColor" />
-                    <Star size={12} fill="currentColor" />
-                    <Star size={12} fill="currentColor" />
-                    <Star size={12} fill="currentColor" />
-                    <Star size={12} fill="currentColor" />
-                    <span className="text-gray-600 ml-1">(128)</span>
+                    {[...Array(5)].map((_, index) => {
+                      const rating = product.diemTrungBinh || product.DiemTrungBinh || 0;
+                      const filled = index < Math.round(rating);
+                      return (
+                        <Star 
+                          key={index} 
+                          size={12} 
+                          fill={filled ? "currentColor" : "none"}
+                          className={filled ? "" : "text-gray-300"}
+                        />
+                      );
+                    })}
+                    <span className="text-gray-600 ml-1">
+                      ({product.tongSoDanhGia || product.TongSoDanhGia || 0})
+                    </span>
                   </div>
                 </div>
               ))}
@@ -303,156 +533,237 @@ const Homepage = () => {
         </div>
       </section>
 
-      <section className="py-12 bg-white border-y-2 border-primary-100">
-        <div className="container-cute">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="text-center p-6 bg-gradient-to-br from-primary-50 to-rose-50 rounded-cute hover:shadow-cute transition-all">
-              <div className="text-4xl mb-3">🎪</div>
-              <div className="text-3xl font-bold text-gradient-primary">{stats.totalProducts}+</div>
-              <div className="text-gray-600 font-medium mt-1">Sản phẩm</div>
-            </div>
-            <div className="text-center p-6 bg-gradient-to-br from-rose-50 to-primary-50 rounded-cute hover:shadow-cute transition-all">
-              <div className="text-4xl mb-3">📦</div>
-              <div className="text-3xl font-bold text-gradient-primary">{stats.categories}</div>
-              <div className="text-gray-600 font-medium mt-1">Danh mục</div>
-            </div>
-            <div className="text-center p-6 bg-gradient-to-br from-primary-50 to-rose-50 rounded-cute hover:shadow-cute transition-all">
-              <div className="text-4xl mb-3">😊</div>
-              <div className="text-3xl font-bold text-gradient-primary">{stats.customers}+</div>
-              <div className="text-gray-600 font-medium mt-1">Khách hàng</div>
-            </div>
-            <div className="text-center p-6 bg-gradient-to-br from-rose-50 to-primary-50 rounded-cute hover:shadow-cute transition-all">
-              <div className="text-4xl mb-3">⭐</div>
-              <div className="text-3xl font-bold text-gradient-primary">4.8</div>
-              <div className="text-gray-600 font-medium mt-1">Đánh giá</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Featured Collections */}
-      <section className="py-16 container-cute">
+      <section className="mb-6 md:mb-8 container-cute">
         {/* Best Sellers */}
-        <div className="mb-16">
-          <div className="text-center mb-8 space-y-2">
-            <div className="flex items-center justify-center gap-2">
-              <TrendingUp className="text-primary-500" size={28} />
-              <h2 className="text-3xl font-display font-bold text-gray-800">🏆 Sản phẩm Bán Chạy Nhất</h2>
-              <TrendingUp className="text-primary-500" size={28} />
-            </div>
-            <p className="text-gray-600">Những món đồ chơi được yêu thích nhất</p>
+        <div className="mb-6 md:mb-8 bg-gradient-to-br from-primary-50 via-rose-50 to-cream-50 rounded-cute p-6 md:p-8 relative overflow-hidden">
+          <div className="absolute top-5 left-5 text-5xl opacity-20 animate-float">🏆</div>
+          <div className="absolute top-10 right-10 text-4xl opacity-20 animate-float" style={{ animationDelay: '0.5s' }}>🎯</div>
+          <div className="absolute bottom-10 left-1/4 text-4xl opacity-20 animate-float" style={{ animationDelay: '1s' }}>🎁</div>
+          <div className="absolute bottom-5 right-1/3 text-3xl opacity-20 animate-float" style={{ animationDelay: '1.5s' }}>⭐</div>
+          <div className="relative z-10">
+          <div className="flex items-center justify-between px-1 pb-4 pt-5">
+            <h2 className="text-gray-800 text-2xl font-bold leading-tight tracking-tight">
+              🏆 Sản phẩm Bán Chạy Nhất
+            </h2>
+            <button
+              onClick={() => navigate('/products?sortBy=bestSeller')}
+              className="text-primary-600 text-sm font-bold hover:underline"
+            >
+              Xem tất cả
+            </button>
           </div>
 
           {loading ? (
             <Loading text="Đang tải sản phẩm..." />
           ) : (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                {bestSellers.map((product) => (
-                  <div key={product.id} onClick={() => navigate(`/products/${product.id}`)}>
-                    <ProductCard 
-                      product={product}
-                      onAddToCart={handleAddToCart}
-                      onQuickView={handleQuickView}
-                      onFavorite={handleFavorite}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="text-center">
-                <Button 
-                  variant="outline" 
-                  size="md"
-                  icon={<ArrowRight size={18} />}
-                  onClick={() => navigate('/products?sortBy=bestSeller')}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {bestSellers.map((product) => (
+                <div
+                  key={product.id}
+                  className="flex flex-col gap-3 rounded-xl bg-white p-3 group border border-transparent hover:border-primary-200 hover:shadow-lg transition-all cursor-pointer"
+                  onClick={() => navigate(`/products/${product.id}`)}
                 >
-                  Xem thêm
-                </Button>
-              </div>
-            </>
+                  <OptimizedImage
+                    src={product.hinhAnhUrl || product.hinhAnhURL || '/barbie.jpg'}
+                    alt={product.ten || product.Ten}
+                    aspectRatio="1"
+                    objectFit="cover"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    className="rounded-lg"
+                    fallback="/barbie.jpg"
+                  />
+                  <p className="text-gray-800 text-base font-medium truncate group-hover:text-primary-600 transition-colors">
+                    {product.ten || product.Ten}
+                  </p>
+                  <p className="text-gray-500 text-sm">
+                    {product.loaiSP?.ten || product.loaiSP?.Ten || product.LoaiSP?.Ten || product.LoaiSP?.ten || product.tenLoai || product.TenLoai || product.category || product.danhMuc || 'Đồ chơi'}
+                  </p>
+                  <div className="flex justify-between items-center">
+                    <p className="text-gray-800 text-lg font-bold">
+                      {new Intl.NumberFormat('vi-VN').format(product.giaBan || product.GiaBan || 0)}₫
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await handleBuyNow(product);
+                        }}
+                        className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-semibold transition-all"
+                      >
+                        Mua ngay
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToCart(product);
+                        }}
+                        className="flex items-center justify-center w-9 h-9 rounded-lg bg-gray-100 text-gray-600 hover:bg-primary-600 hover:text-white transition-all"
+                        title="Thêm vào giỏ"
+                      >
+                        <ShoppingCart size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
+          </div>
         </div>
 
         {/* New Arrivals */}
-        <div className="mb-16">
-          <div className="text-center mb-8 space-y-2">
-            <div className="flex items-center justify-center gap-2">
-              <Sparkles className="text-primary-500" size={28} />
-              <h2 className="text-3xl font-display font-bold text-gray-800">🆕 Sản Phẩm Mới</h2>
-              <Sparkles className="text-primary-500" size={28} />
-            </div>
-            <p className="text-gray-600">Những sản phẩm mới nhất tại ToyStore</p>
+        <div className="mb-6 md:mb-8 bg-gradient-to-br from-cream-50 via-primary-50 to-rose-50 rounded-cute p-6 md:p-8 relative overflow-hidden">
+          <div className="absolute top-5 left-5 text-5xl opacity-20 animate-float">🆕</div>
+          <div className="absolute top-10 right-10 text-4xl opacity-20 animate-float" style={{ animationDelay: '0.5s' }}>🎈</div>
+          <div className="absolute bottom-10 left-1/4 text-4xl opacity-20 animate-float" style={{ animationDelay: '1s' }}>🎨</div>
+          <div className="absolute bottom-5 right-1/3 text-3xl opacity-20 animate-float" style={{ animationDelay: '1.5s' }}>✨</div>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between px-1 pb-4 pt-5">
+            <h2 className="text-gray-800 text-2xl font-bold leading-tight tracking-tight">
+              🆕 Sản Phẩm Mới
+            </h2>
+            <button
+              onClick={() => navigate('/products?sortBy=newest')}
+              className="text-primary-600 text-sm font-bold hover:underline"
+            >
+              Xem tất cả
+            </button>
           </div>
 
           {loading ? (
             <Loading text="Đang tải sản phẩm..." />
           ) : (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                {newArrivals.map((product) => (
-                  <div key={product.id} onClick={() => navigate(`/products/${product.id}`)}>
-                    <ProductCard 
-                      product={product}
-                      onAddToCart={handleAddToCart}
-                      onQuickView={handleQuickView}
-                      onFavorite={handleFavorite}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="text-center">
-                <Button 
-                  variant="outline" 
-                  size="md"
-                  icon={<ArrowRight size={18} />}
-                  onClick={() => navigate('/products?sortBy=newest')}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {newArrivals.map((product) => (
+                <div
+                  key={product.id}
+                  className="flex flex-col gap-3 rounded-xl bg-white p-3 group border border-transparent hover:border-primary-200 hover:shadow-lg transition-all cursor-pointer"
+                  onClick={() => navigate(`/products/${product.id}`)}
                 >
-                  Xem thêm
-                </Button>
-              </div>
-            </>
+                  <OptimizedImage
+                    src={product.hinhAnhUrl || product.hinhAnhURL || '/barbie.jpg'}
+                    alt={product.ten || product.Ten}
+                    aspectRatio="1"
+                    objectFit="cover"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    className="rounded-lg"
+                    fallback="/barbie.jpg"
+                  />
+                  <p className="text-gray-800 text-base font-medium truncate group-hover:text-primary-600 transition-colors">
+                    {product.ten || product.Ten}
+                  </p>
+                  <p className="text-gray-500 text-sm">
+                    {product.loaiSP?.ten || product.loaiSP?.Ten || product.LoaiSP?.Ten || product.LoaiSP?.ten || product.tenLoai || product.TenLoai || product.category || product.danhMuc || 'Đồ chơi'}
+                  </p>
+                  <div className="flex justify-between items-center">
+                    <p className="text-gray-800 text-lg font-bold">
+                      {new Intl.NumberFormat('vi-VN').format(product.giaBan || product.GiaBan || 0)}₫
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await handleBuyNow(product);
+                        }}
+                        className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-semibold transition-all"
+                      >
+                        Mua ngay
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToCart(product);
+                        }}
+                        className="flex items-center justify-center w-9 h-9 rounded-lg bg-gray-100 text-gray-600 hover:bg-primary-600 hover:text-white transition-all"
+                        title="Thêm vào giỏ"
+                      >
+                        <ShoppingCart size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
+          </div>
         </div>
 
         {/* Trending Now */}
-        <div>
-          <div className="text-center mb-8 space-y-2">
-            <div className="flex items-center justify-center gap-2">
-              <Zap className="text-primary-500" size={28} />
-              <h2 className="text-3xl font-display font-bold text-gray-800">🔥 Đang Thịnh Hành</h2>
-              <Zap className="text-primary-500" size={28} />
-            </div>
-            <p className="text-gray-600">Sản phẩm đang được tìm kiếm nhiều nhất</p>
+        <div className="bg-gradient-to-br from-rose-50 via-cream-50 to-primary-50 rounded-cute p-6 md:p-8 relative overflow-hidden">
+          <div className="absolute top-5 left-5 text-5xl opacity-20 animate-float">🔥</div>
+          <div className="absolute top-10 right-10 text-4xl opacity-20 animate-float" style={{ animationDelay: '0.5s' }}>🚀</div>
+          <div className="absolute bottom-10 left-1/4 text-4xl opacity-20 animate-float" style={{ animationDelay: '1s' }}>💫</div>
+          <div className="absolute bottom-5 right-1/3 text-3xl opacity-20 animate-float" style={{ animationDelay: '1.5s' }}>🌟</div>
+          <div className="relative z-10">
+          <div className="flex items-center justify-between px-1 pb-4 pt-5">
+            <h2 className="text-gray-800 text-2xl font-bold leading-tight tracking-tight">
+              🔥 Đang Thịnh Hành
+            </h2>
+            <button
+              onClick={() => navigate('/products?sortBy=trending')}
+              className="text-primary-600 text-sm font-bold hover:underline"
+            >
+              Xem tất cả
+            </button>
           </div>
 
           {loading ? (
             <Loading text="Đang tải sản phẩm..." />
           ) : (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                {trendingProducts.map((product) => (
-                  <div key={product.id} onClick={() => navigate(`/products/${product.id}`)}>
-                    <ProductCard 
-                      product={product}
-                      onAddToCart={handleAddToCart}
-                      onQuickView={handleQuickView}
-                      onFavorite={handleFavorite}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="text-center">
-                <Button 
-                  variant="outline" 
-                  size="md"
-                  icon={<ArrowRight size={18} />}
-                  onClick={() => navigate('/products?sortBy=trending')}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {trendingProducts.map((product) => (
+                <div
+                  key={product.id}
+                  className="flex flex-col gap-3 rounded-xl bg-white p-3 group border border-transparent hover:border-primary-200 hover:shadow-lg transition-all cursor-pointer"
+                  onClick={() => navigate(`/products/${product.id}`)}
                 >
-                  Xem thêm
-                </Button>
-              </div>
-            </>
+                  <OptimizedImage
+                    src={product.hinhAnhUrl || product.hinhAnhURL || '/barbie.jpg'}
+                    alt={product.ten || product.Ten}
+                    aspectRatio="1"
+                    objectFit="cover"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    className="rounded-lg"
+                    fallback="/barbie.jpg"
+                  />
+                  <p className="text-gray-800 text-base font-medium truncate group-hover:text-primary-600 transition-colors">
+                    {product.ten || product.Ten}
+                  </p>
+                  <p className="text-gray-500 text-sm">
+                    {product.loaiSP?.ten || product.loaiSP?.Ten || product.LoaiSP?.Ten || product.LoaiSP?.ten || product.tenLoai || product.TenLoai || product.category || product.danhMuc || 'Đồ chơi'}
+                  </p>
+                  <div className="flex justify-between items-center">
+                    <p className="text-gray-800 text-lg font-bold">
+                      {new Intl.NumberFormat('vi-VN').format(product.giaBan || product.GiaBan || 0)}₫
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await handleBuyNow(product);
+                        }}
+                        className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg text-sm font-semibold transition-all"
+                      >
+                        Mua ngay
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToCart(product);
+                        }}
+                        className="flex items-center justify-center w-9 h-9 rounded-lg bg-gray-100 text-gray-600 hover:bg-primary-600 hover:text-white transition-all"
+                        title="Thêm vào giỏ"
+                      >
+                        <ShoppingCart size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
+          </div>
         </div>
       </section>
 
@@ -604,6 +915,7 @@ const Homepage = () => {
         onClose={() => setIsQuickViewOpen(false)}
         product={quickViewProduct}
         onAddToCart={handleAddToCart}
+        onBuyNow={handleBuyNow}
         onFavorite={handleFavorite}
       />
 

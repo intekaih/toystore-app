@@ -498,7 +498,10 @@ exports.getPublicBrands = async (req, res) => {
       order: [['TenThuongHieu', 'ASC']]  // ✅ SỬA: 'Ten' → 'TenThuongHieu'
     });
 
-    // ✅ Đếm số lượng sản phẩm ĐANG BÁN cho từng thương hiệu
+    // Lấy base URL từ request
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    // ✅ Đếm số lượng sản phẩm ĐANG BÁN cho từng thương hiệu và thêm logo
     const brandsWithCount = await Promise.all(
       brands.map(async (brand) => {
         const productCount = await SanPham.count({
@@ -508,9 +511,23 @@ exports.getPublicBrands = async (req, res) => {
           }
         });
 
+        // Xử lý logo URL
+        let logoUrl = null;
+        if (brand.Logo) {
+          // Nếu logo bắt đầu bằng http thì là URL bên ngoài, giữ nguyên
+          // Nếu không thì là đường dẫn local, thêm base URL
+          if (brand.Logo.startsWith('http://') || brand.Logo.startsWith('https://')) {
+            logoUrl = brand.Logo;
+          } else {
+            logoUrl = `${baseUrl}${brand.Logo}`;
+          }
+        }
+
         return {
           id: brand.ID,
           ten: brand.TenThuongHieu,  // ✅ SỬA: brand.Ten → brand.TenThuongHieu
+          tenThuongHieu: brand.TenThuongHieu, // Thêm alias
+          logo: logoUrl,
           soLuongSanPham: productCount
         };
       })

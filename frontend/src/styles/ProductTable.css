@@ -51,10 +51,12 @@
   font-weight: 600;
   color: #667eea;
   width: 60px;
+  text-align: left;
 }
 
 .image-col {
   width: 80px;
+  text-align: left;
 }
 
 .product-thumbnail {
@@ -67,18 +69,21 @@
 
 .name-col {
   min-width: 200px;
+  text-align: left;
 }
 
 .product-name {
   font-weight: 600;
   color: #333;
   margin-bottom: 4px;
+  text-align: left;
 }
 
 .product-desc {
   font-size: 12px;
   color: #888;
   line-height: 1.4;
+  text-align: left;
 }
 
 .category-col {
@@ -90,6 +95,20 @@
   padding: 4px 12px;
   background: #e3f2fd;
   color: #1976d2;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.brand-col {
+  width: 150px;
+}
+
+.brand-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background: #f3e5f5;
+  color: #7b1fa2;
   border-radius: 20px;
   font-size: 12px;
   font-weight: 500;

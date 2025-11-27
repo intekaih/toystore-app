@@ -322,12 +322,17 @@ class AdminService {
 
   /**
    * Tạo thương hiệu mới
-   * @param {Object} brandData
+   * @param {FormData|Object} brandData - FormData nếu có file upload, hoặc Object nếu chỉ có text
    * @returns {Promise<Object>}
    */
   async createBrand(brandData) {
     try {
-      const response = await this.api.post('/admin/brands', brandData);
+      // Axios tự động xử lý Content-Type cho FormData
+      const config = brandData instanceof FormData 
+        ? { headers: { 'Content-Type': 'multipart/form-data' } }
+        : {};
+      
+      const response = await this.api.post('/admin/brands', brandData, config);
 
       if (response.data && response.data.success) {
         return {
@@ -347,12 +352,17 @@ class AdminService {
   /**
    * Cập nhật thương hiệu
    * @param {number} brandId - ID thương hiệu
-   * @param {Object} brandData - Dữ liệu cập nhật
+   * @param {FormData|Object} brandData - FormData nếu có file upload, hoặc Object nếu chỉ có text
    * @returns {Promise<Object>}
    */
   async updateBrand(brandId, brandData) {
     try {
-      const response = await this.api.put(`/admin/brands/${brandId}`, brandData);
+      // Axios tự động xử lý Content-Type cho FormData
+      const config = brandData instanceof FormData 
+        ? { headers: { 'Content-Type': 'multipart/form-data' } }
+        : {};
+      
+      const response = await this.api.put(`/admin/brands/${brandId}`, brandData, config);
 
       if (response.data && response.data.success) {
         return {
@@ -611,6 +621,29 @@ class AdminService {
       throw new Error(response.data.message || 'Lấy số lượng đơn hàng thất bại');
     } catch (error) {
       console.error('❌ Lỗi lấy số lượng đơn hàng:', error);
+      throw this._handleError(error);
+    }
+  }
+
+  /**
+   * ✅ Lấy danh sách khách hàng từ đơn hàng (bao gồm cả khách vãng lai có số điện thoại)
+   * @returns {Promise<Object>}
+   */
+  async getCustomersFromOrders() {
+    try {
+      const response = await this.api.get('/admin/orders/customers');
+
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.data || [],
+          message: response.data.message
+        };
+      }
+
+      throw new Error(response.data.message || 'Lấy danh sách khách hàng thất bại');
+    } catch (error) {
+      console.error('❌ Lỗi lấy danh sách khách hàng:', error);
       throw this._handleError(error);
     }
   }

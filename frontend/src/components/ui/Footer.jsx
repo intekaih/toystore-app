@@ -15,7 +15,7 @@ const Footer = () => {
           {/* About Section */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-3xl">🧸</span>
+              <img src="/logo.svg" alt="ToyStore Logo" className="w-12 h-12 object-contain" />
               <h3 className="text-xl font-display font-bold text-gradient-primary">ToyStore</h3>
             </div>
             <p className="text-gray-600 leading-relaxed mb-4">

@@ -292,21 +292,21 @@ const CartPage = () => {
   return (
     <MainLayout>
       <div className="container-cute py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-display font-bold text-gradient-primary mb-2 flex items-center gap-3">
-            <ShoppingCart size={40} />
-            Giỏ Hàng Của Bạn
-          </h1>
-          <p className="text-gray-600">
-            Bạn có <strong className="text-primary-600">{getTotalItems()}</strong> sản phẩm trong giỏ hàng
-          </p>
-        </div>
-
         {/* Cart Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2 space-y-4">
+            {/* Header */}
+            <div className="mb-6">
+              <h1 className="text-4xl font-display font-bold text-gradient-primary mb-2 flex items-center gap-3">
+                <ShoppingCart size={40} />
+                Giỏ Hàng Của Bạn
+              </h1>
+              <p className="text-gray-600">
+                Bạn có <strong className="text-primary-600">{getTotalItems()}</strong> sản phẩm trong giỏ hàng
+              </p>
+            </div>
+
             {/* Header Actions */}
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-700">Sản phẩm</h3>
@@ -346,6 +346,7 @@ const CartPage = () => {
                         className="w-full h-full object-cover rounded-cute"
                         onError={handleImageError}
                         loading="lazy"
+                        decoding="async"
                       />
                       {isOutOfStock && (
                         <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-cute">
@@ -394,6 +395,17 @@ const CartPage = () => {
                         >
                           <Plus size={16} />
                         </button>
+                        
+                        <button
+                          onClick={() => setShowDeleteConfirm({ 
+                            productId: item.sanPhamId, // ✅ Sửa từ SanPhamID → sanPhamId
+                            productName: item.sanPham.ten 
+                          })}
+                          disabled={isUpdating}
+                          className="text-red-500 hover:text-red-700 disabled:opacity-50 transition-colors"
+                        >
+                          <Trash2 size={20} />
+                        </button>
                       </div>
 
                       <div className="text-right">
@@ -402,17 +414,6 @@ const CartPage = () => {
                           {itemTotal.toLocaleString('vi-VN')} ₫
                         </div>
                       </div>
-
-                      <button
-                        onClick={() => setShowDeleteConfirm({ 
-                          productId: item.sanPhamId, // ✅ Sửa từ SanPhamID → sanPhamId
-                          productName: item.sanPham.ten 
-                        })}
-                        disabled={isUpdating}
-                        className="text-red-500 hover:text-red-700 disabled:opacity-50 transition-colors"
-                      >
-                        <Trash2 size={20} />
-                      </button>
                     </div>
                   </div>
 

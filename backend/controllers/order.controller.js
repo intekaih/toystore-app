@@ -135,7 +135,8 @@ exports.createOrder = async (req, res) => {
       maQuanID,
       maPhuongXa,
       phuongThucThanhToanId,
-      maVoucher
+      maVoucher,
+      ghiChu: ghiChu || '(không có)'
     });
 
     // Validate phương thức thanh toán
@@ -401,6 +402,7 @@ exports.createOrder = async (req, res) => {
     }, { transaction });
 
     console.log('✅ Đã tạo hóa đơn:', hoaDon.ID, '- Trạng thái:', trangThaiBanDau);
+    console.log('📝 Ghi chú đã lưu:', hoaDon.GhiChu || '(không có)');
 
     // ✅ TẠO ĐỊA CHỈ GIAO HÀNG (Bảng DiaChiGiaoHang - Quan hệ 1-1 với HoaDon)
     // Theo file toystore.sql: Địa chỉ lưu ở bảng riêng, không lưu trong HoaDon
@@ -794,13 +796,6 @@ exports.getPublicOrderDetail = async (req, res) => {
           as: 'thongTinVanChuyen',
           attributes: ['MaVanDon', 'DonViVanChuyen', 'TrangThaiGHN', 'NgayGiaoDuKien', 'NgayGuiHang']
         },
-        // ✅ THÊM: Include bảng LichSuTrangThaiDonHang
-        {
-          model: db.LichSuTrangThaiDonHang,
-          as: 'lichSuTrangThai',
-          attributes: ['ID', 'TrangThaiCu', 'TrangThaiMoi', 'NguoiThayDoi', 'LyDo', 'NgayThayDoi'],
-          order: [['NgayThayDoi', 'ASC']]
-        },
         {
           model: ChiTietHoaDon,
           as: 'chiTiet',
@@ -872,14 +867,6 @@ exports.getPublicOrderDetail = async (req, res) => {
             ngayGuiHang: hoaDon.thongTinVanChuyen.NgayGuiHang
           } : null,
           // ✅ THÊM: Lịch sử trạng thái đơn hàng
-          lichSuTrangThai: hoaDon.lichSuTrangThai ? hoaDon.lichSuTrangThai.map(item => ({
-            id: item.ID,
-            trangThaiCu: item.TrangThaiCu,
-            trangThaiMoi: item.TrangThaiMoi,
-            nguoiThayDoi: item.NguoiThayDoi,
-            lyDo: item.LyDo,
-            ngayThayDoi: item.NgayThayDoi
-          })) : [],
           chiTiet: hoaDon.chiTiet.map(item => ({
             id: item.ID,
             sanPham: {
@@ -963,13 +950,27 @@ exports.getMyOrders = async (req, res) => {
           maHD: o.MaHD,
           ngayLap: o.NgayLap,
           tongTien: parseFloat(o.ThanhTien),
+          thanhTien: parseFloat(o.ThanhTien),
           trangThai: o.TrangThai,
-          phuongThucThanhToan: o.phuongThucThanhToan.Ten,
-          soSanPham: o.chiTiet.length,
-          sanPhamDauTien: o.chiTiet.length > 0 ? {
-            ten: o.chiTiet[0].sanPham.Ten,
-            hinhAnh: o.chiTiet[0].sanPham.HinhAnhURL
-          } : null
+          phuongThucThanhToan: o.phuongThucThanhToan ? {
+            id: o.phuongThucThanhToan.ID,
+            ten: o.phuongThucThanhToan.Ten
+          } : null,
+          // ✅ THÊM: Trả về chiTiet đầy đủ
+          chiTiet: o.chiTiet.map(item => ({
+            id: item.ID,
+            soLuong: item.SoLuong,
+            donGia: parseFloat(item.DonGia),
+            thanhTien: parseFloat(item.ThanhTien),
+            sanPham: {
+              id: item.sanPham ? item.sanPham.ID : null,
+              ten: item.sanPham ? item.sanPham.Ten : 'Sản phẩm không xác định',
+              hinhAnhUrl: item.sanPham ? item.sanPham.HinhAnhURL : '',
+              hinhAnhURL: item.sanPham ? item.sanPham.HinhAnhURL : '',
+              hinhAnh: item.sanPham ? item.sanPham.HinhAnhURL : '',
+              giaBan: parseFloat(item.DonGia)
+            }
+          }))
         }))
       }
     });
@@ -1159,13 +1160,6 @@ exports.getOrderDetail = async (req, res) => {
           as: 'thongTinVanChuyen',
           attributes: ['MaVanDon', 'DonViVanChuyen', 'TrangThaiGHN', 'NgayGiaoDuKien', 'NgayGuiHang']
         },
-        // ✅ THÊM: Include bảng LichSuTrangThaiDonHang
-        {
-          model: db.LichSuTrangThaiDonHang,
-          as: 'lichSuTrangThai',
-          attributes: ['ID', 'TrangThaiCu', 'TrangThaiMoi', 'NguoiThayDoi', 'LyDo', 'NgayThayDoi'],
-          order: [['NgayThayDoi', 'ASC']]
-        },
         {
           model: ChiTietHoaDon,
           as: 'chiTiet',
@@ -1237,14 +1231,6 @@ exports.getOrderDetail = async (req, res) => {
             ngayGuiHang: hoaDon.thongTinVanChuyen.NgayGuiHang
           } : null,
           // ✅ THÊM: Lịch sử trạng thái đơn hàng
-          lichSuTrangThai: hoaDon.lichSuTrangThai ? hoaDon.lichSuTrangThai.map(item => ({
-            id: item.ID,
-            trangThaiCu: item.TrangThaiCu,
-            trangThaiMoi: item.TrangThaiMoi,
-            nguoiThayDoi: item.NguoiThayDoi,
-            lyDo: item.LyDo,
-            ngayThayDoi: item.NgayThayDoi
-          })) : [],
           chiTiet: hoaDon.chiTiet.map(item => ({
             id: item.ID,
             sanPham: {
@@ -1320,7 +1306,8 @@ exports.createGuestOrder = async (req, res) => {
       email,
       dienThoai,
       diaChiGiaoHang,
-      phuongThucThanhToanId
+      phuongThucThanhToanId,
+      ghiChu: ghiChu || '(không có)'
     });
 
     // Kiểm tra phương thức thanh toán
@@ -1494,6 +1481,7 @@ exports.createGuestOrder = async (req, res) => {
     }, { transaction });
 
     console.log('✅ Đã tạo hóa đơn guest:', hoaDon.ID);
+    console.log('📝 Ghi chú đã lưu:', hoaDon.GhiChu || '(không có)');
 
     // Tạo địa chỉ giao hàng
     const DiaChiGiaoHang = db.DiaChiGiaoHang;

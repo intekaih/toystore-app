@@ -33,42 +33,120 @@ const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, b
   useEffect(() => {
     if (isOpen) {
       if (mode === 'edit' && editingProduct) {
+        console.log('📝 Loading product for edit:', editingProduct);
+        
+        // ✅ Normalize dữ liệu - hỗ trợ nhiều format
         const stock = editingProduct.soLuongTon !== undefined ? editingProduct.soLuongTon :
                      editingProduct.SoLuongTon !== undefined ? editingProduct.SoLuongTon :
                      editingProduct.Ton !== undefined ? editingProduct.Ton :
                      editingProduct.ton !== undefined ? editingProduct.ton : '';
         
+        // ✅ Lấy loaiID từ nhiều format
+        const loaiID = editingProduct.loaiID || 
+                       editingProduct.LoaiID || 
+                       editingProduct.loaiId || 
+                       editingProduct.IDLoai || 
+                       editingProduct.idLoai ||
+                       (editingProduct.loaiSP?.id || editingProduct.loaiSP?.ID) ||
+                       '';
+        
+        // ✅ Lấy thuongHieuID từ nhiều format
+        const thuongHieuID = editingProduct.thuongHieuID || 
+                             editingProduct.ThuongHieuID || 
+                             editingProduct.thuongHieuId ||
+                             editingProduct.IDThuongHieu ||
+                             editingProduct.idThuongHieu ||
+                             (editingProduct.thuongHieu?.id || editingProduct.thuongHieu?.ID) ||
+                             '';
+        
+        // ✅ Lấy enable/trangThai
+        const enable = editingProduct.enable !== undefined ? editingProduct.enable :
+                      editingProduct.Enable !== undefined ? editingProduct.Enable :
+                      editingProduct.trangThai !== undefined ? (editingProduct.trangThai === 1 || editingProduct.trangThai === true) :
+                      editingProduct.TrangThai !== undefined ? (editingProduct.TrangThai === 1 || editingProduct.TrangThai === true) :
+                      true;
+        
+        console.log('📝 Extracted IDs - loaiID:', loaiID, 'thuongHieuID:', thuongHieuID);
+        
         setFormData({
-          ten: editingProduct.ten || '',
-          moTa: editingProduct.moTa || '',
-          giaBan: editingProduct.giaBan || '',
+          ten: editingProduct.ten || editingProduct.Ten || '',
+          moTa: editingProduct.moTa || editingProduct.MoTa || '',
+          giaBan: editingProduct.giaBan || editingProduct.GiaBan || '',
           soLuongTon: stock,
-          loaiID: editingProduct.loaiID || '',
-          thuongHieuID: editingProduct.thuongHieuID || '',
-          enable: editingProduct.enable !== undefined ? editingProduct.enable : true
+          loaiID: loaiID,
+          thuongHieuID: thuongHieuID,
+          enable: enable
         });
 
-        const category = categories.find(c => c.id === editingProduct.loaiID);
+        // ✅ Tìm category với nhiều cách so sánh
+        const category = categories.find(c => 
+          c.id === loaiID || 
+          c.ID === loaiID ||
+          c.id === parseInt(loaiID) ||
+          c.ID === parseInt(loaiID)
+        );
+        
         if (category) {
-          setCategoryData({ id: category.id, ten: category.ten });
+          console.log('✅ Found category:', category);
+          setCategoryData({ id: category.id || category.ID, ten: category.ten || category.Ten });
+        } else {
+          console.warn('⚠️ Category not found for loaiID:', loaiID, 'Available categories:', categories);
         }
 
-        const brand = brands.find(b => b.id === editingProduct.thuongHieuID);
+        // ✅ Tìm brand với nhiều cách so sánh
+        const brand = brands.find(b => 
+          b.id === thuongHieuID || 
+          b.ID === thuongHieuID ||
+          b.id === parseInt(thuongHieuID) ||
+          b.ID === parseInt(thuongHieuID)
+        );
+        
         if (brand) {
-          setBrandData({ id: brand.id, tenThuongHieu: brand.tenThuongHieu });
+          console.log('✅ Found brand:', brand);
+          setBrandData({ 
+            id: brand.id || brand.ID, 
+            tenThuongHieu: brand.tenThuongHieu || brand.TenThuongHieu 
+          });
+        } else {
+          console.warn('⚠️ Brand not found for thuongHieuID:', thuongHieuID, 'Available brands:', brands);
         }
 
-        if (editingProduct.hinhAnhURL) {
+        // ✅ Load hình ảnh - hỗ trợ nhiều format
+        const hinhAnhURL = editingProduct.hinhAnhURL || editingProduct.HinhAnhURL;
+        const hinhAnhs = editingProduct.hinhAnhs || editingProduct.HinhAnhs || [];
+        
+        if (hinhAnhs && Array.isArray(hinhAnhs) && hinhAnhs.length > 0) {
+          // Nếu có mảng hinhAnhs, lấy từ đó
+          const imageUrls = hinhAnhs
+            .sort((a, b) => (a.thuTu || a.ThuTu || 0) - (b.thuTu || b.ThuTu || 0))
+            .map(img => {
+              const url = img.duongDanHinhAnh || img.DuongDanHinhAnh || '';
+              return url.startsWith('http') ? url : config.getImageUrl(url);
+            });
+          setImagePreviews(imageUrls);
+          console.log('✅ Loaded images from hinhAnhs:', imageUrls.length);
+        } else if (hinhAnhURL) {
           try {
-            const urls = JSON.parse(editingProduct.hinhAnhURL);
+            // Thử parse JSON nếu là string JSON
+            const urls = JSON.parse(hinhAnhURL);
             if (Array.isArray(urls)) {
-              setImagePreviews(urls.map(url => config.getImageUrl(url)));
+              setImagePreviews(urls.map(url => {
+                const fullUrl = url.startsWith('http') ? url : config.getImageUrl(url);
+                return fullUrl;
+              }));
             } else {
-              setImagePreviews([config.getImageUrl(editingProduct.hinhAnhURL)]);
+              const fullUrl = hinhAnhURL.startsWith('http') ? hinhAnhURL : config.getImageUrl(hinhAnhURL);
+              setImagePreviews([fullUrl]);
             }
           } catch {
-            setImagePreviews([config.getImageUrl(editingProduct.hinhAnhURL)]);
+            // Nếu không phải JSON, dùng trực tiếp
+            const fullUrl = hinhAnhURL.startsWith('http') ? hinhAnhURL : config.getImageUrl(hinhAnhURL);
+            setImagePreviews([fullUrl]);
           }
+          console.log('✅ Loaded image from hinhAnhURL');
+        } else {
+          setImagePreviews([]);
+          console.warn('⚠️ No images found for product');
         }
       } else {
         setFormData({
@@ -111,7 +189,7 @@ const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, b
     
     if (files.length === 0) return;
 
-    const maxSize = 5 * 1024 * 1024;
+    const maxSize = 10 * 1024 * 1024;
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     const maxImages = 5;
 
@@ -138,7 +216,7 @@ const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, b
       if (file.size > maxSize) {
         setErrors(prev => ({
           ...prev,
-          hinhAnh: 'Kích thước ảnh không được vượt quá 5MB'
+          hinhAnh: 'Kích thước ảnh không được vượt quá 10MB'
         }));
         continue;
       }

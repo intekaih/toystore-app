@@ -133,11 +133,7 @@ module.exports = (sequelize, Sequelize) => {
       as: 'thongTinVanChuyen'
     });
 
-    // Quan hệ với LichSuTrangThaiDonHang
-    HoaDon.hasMany(models.LichSuTrangThaiDonHang, {
-      foreignKey: 'HoaDonID',
-      as: 'lichSuTrangThai'
-    });
+    // ✅ REMOVED: Không dùng LichSuTrangThaiDonHang nữa, chỉ dùng HoaDon.TrangThai
   };
 
   return HoaDon;

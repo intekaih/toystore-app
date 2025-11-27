@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext.js';
 import ErrorBoundary from './components/ErrorBoundary.js';
+import ScrollToTop from './components/ScrollToTop.js';
 import Homepage from './pages/Homepage.js';
 import ProductList from './pages/Products/ProductList.js';
 import ProductDetail from './pages/Products/ProductDetail.js';
@@ -14,6 +15,7 @@ import OrderLookupPage from './pages/OrderLookupPage.js';
 import PaymentReturnPage from './pages/PaymentReturnPage.js';
 import Login from './pages/LoginPage.js';
 import Register from './pages/RegisterPage.js';
+import GoogleCallbackPage from './pages/GoogleCallbackPage.js';
 import Profile from './pages/ProfilePage.js';
 import EditProfilePage from './pages/EditProfilePage.js';
 import AdminLoginPage from './pages/AdminLoginPage.js';
@@ -27,6 +29,7 @@ import StatisticsPage from './pages/StatisticsPage.jsx';
 import VoucherManagementPage from './pages/VoucherManagementPage.jsx';
 import GHNManagementPage from './pages/GHNManagementPage.jsx';
 import GHNMockTestPage from './pages/GHNMockTestPage.jsx';
+import BannerManagementPage from './pages/BannerManagementPage.jsx';
 // ✅ THÊM: Import các trang đánh giá
 import ReviewableProductsPage from './pages/ReviewableProductsPage.jsx';
 import AdminReviewManagementPage from './pages/AdminReviewManagementPage.jsx';
@@ -43,6 +46,7 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <Router>
+          <ScrollToTop />
           <div className="App">
             <Routes>
               {/* Public routes */}
@@ -51,6 +55,7 @@ function App() {
               <Route path="/products/:id" element={<ProductDetail />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
               
               {/* Payment return route (public - VNPay redirect) */}
               <Route path="/payment/return" element={<PaymentReturnPage />} />
@@ -141,6 +146,15 @@ function App() {
                 element={
                   <AdminRoute>
                     <GHNMockTestPage />
+                  </AdminRoute>
+                } 
+              />
+              {/* ✅ MỚI: Quản lý Banner */}
+              <Route 
+                path="/admin/banners" 
+                element={
+                  <AdminRoute>
+                    <BannerManagementPage />
                   </AdminRoute>
                 } 
               />

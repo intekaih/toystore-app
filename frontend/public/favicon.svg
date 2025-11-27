@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="1000" height="1000"><g clip-path="url(#SvgjsClipPath1118)"><rect width="1000" height="1000" fill="#ffffff"></rect><g transform="matrix(2,0,0,2,0,0)"><svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="500" height="500"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <defs>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FF9A9E;stop-opacity:1"></stop>
+      <stop offset="100%" style="stop-color:#FAD0C4;stop-opacity:1"></stop>
+    </linearGradient>
+    <linearGradient id="earGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" style="stop-color:#FFD1FF;stop-opacity:1"></stop>
+        <stop offset="100%" style="stop-color:#FAD0C4;stop-opacity:1"></stop>
+    </linearGradient>
+     <linearGradient id="controllerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#A1C4FD;stop-opacity:1"></stop>
+        <stop offset="100%" style="stop-color:#C2E9FB;stop-opacity:1"></stop>
+    </linearGradient>
+    
+    <style>
+      .outline { fill: none; stroke: #2C3E50; stroke-width: 12; stroke-linecap: round; stroke-linejoin: round; }
+      .fill-main { fill: #FFECEC; }
+      .fill-accent-1 { fill: url(#earGradient); }
+      .fill-accent-2 { fill: #FFF9B0; }
+      .fill-accent-3 { fill: url(#controllerGradient); }
+    </style>
+  <clipPath id="SvgjsClipPath1118"><rect width="1000" height="1000" x="0" y="0" rx="500" ry="500"></rect></clipPath></defs>
+
+  <g id="background-elements">
+    <path class="outline fill-accent-2" d="M100,120 L110,150 L140,155 L115,175 L125,205 L100,185 L75,205 L85,175 L60,155 L90,150 Z" transform="rotate(-20 100 160)"></path>
+    <circle class="outline fill-accent-1" cx="400" cy="150" r="25"></circle>
+    <path class="outline" d="M380,150 L420,150 M400,130 L400,170" stroke-width="8" stroke="#FFF"></path>
+    <circle class="outline fill-accent-3" cx="380" cy="250" r="15"></circle>
+     <circle class="outline fill-accent-2" cx="80" cy="280" r="10"></circle>
+  </g>
+
+  <g id="mascot" transform="translate(0, 20)">
+    <circle class="outline fill-accent-1" cx="170" cy="180" r="50"></circle>
+    <circle class="outline fill-accent-1" cx="330" cy="180" r="50"></circle>
+    
+    <rect class="outline fill-main" x="150" y="150" width="200" height="180" rx="90" ry="90"></rect>
+    
+    <circle class="fill-accent-1" cx="200" cy="220" r="15"></circle>
+    <circle class="fill-accent-1" cx="300" cy="220" r="15"></circle>
+    <circle fill="#2C3E50" cx="215" cy="200" r="12"></circle>
+    <circle fill="#2C3E50" cx="285" cy="200" r="12"></circle>
+    <ellipse class="fill-accent-2" cx="250" cy="235" rx="35" ry="25" stroke="#2C3E50" stroke-width="8"></ellipse>
+    <path d="M240,230 Q250,240 260,230" fill="none" stroke="#2C3E50" stroke-width="8" stroke-linecap="round"></path>
+    <circle fill="#2C3E50" cx="250" cy="225" r="8"></circle>
+    <path class="outline fill-accent-3" d="M180,320 C160,320 150,340 160,360 C170,380 200,370 220,350 L280,350 C300,370 330,380 340,360 C350,340 340,320 320,320 Z"></path>
+    <circle fill="#FFF" cx="190" cy="345" r="8"></circle>
+    <circle fill="#FFF" cx="310" cy="345" r="8"></circle>
+    <circle fill="#FFF" cx="325" cy="335" r="6"></circle>
+  </g>
+  
+  <g fill="#FFF9B0">
+      <path d="M250,100 L255,115 L270,120 L255,125 L250,140 L245,125 L230,120 L245,115 Z"></path>
+      <circle cx="130" cy="330" r="5"></circle>
+      <circle cx="370" cy="300" r="5"></circle>
+  </g>
+</svg></svg></g></g></svg>

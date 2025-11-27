@@ -248,6 +248,59 @@ class AuthService {
       return true;
     }
   }
+
+  /**
+   * Đăng nhập bằng Google - Redirect đến backend Google OAuth endpoint
+   */
+  googleLogin() {
+    const backendUrl = API_URL.replace('/api', ''); // Lấy base URL (http://localhost:5000)
+    window.location.href = `${backendUrl}/api/auth/google`;
+  }
+
+  /**
+   * Xử lý callback từ Google OAuth
+   * @param {string} token - JWT token từ backend
+   */
+  async handleGoogleCallback(token) {
+    if (!token) {
+      throw new Error('Không nhận được token từ Google');
+    }
+
+    // Lưu token
+    this.setToken(token);
+
+    // Fetch user profile từ backend
+    try {
+      const response = await this.api.get('/users/profile', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.data && response.data.success) {
+        const user = response.data.data.user;
+        this.saveUserInfo(user);
+        return { token, user };
+      } else {
+        throw new Error('Không thể lấy thông tin người dùng');
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      // Vẫn giữ token nếu có, user có thể được load sau
+      throw error;
+    }
+  }
+
+  /**
+   * Set token (dùng cho Google callback)
+   */
+  setToken(token) {
+    try {
+      localStorage.setItem(this.TOKEN_KEY, token);
+    } catch (error) {
+      console.error('Error setting token:', error);
+    }
+  }
 }
 
 export default new AuthService();

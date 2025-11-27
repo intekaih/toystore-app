@@ -379,7 +379,7 @@ const CheckoutPage = () => {
 
   return (
     <MainLayout>
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="max-w-7xl mx-auto px-0 py-6">
         {/* Breadcrumb */}
         <div className="mb-6 text-sm flex items-center gap-2">
           <Link to="/cart" className="text-blue-600 hover:underline">Giỏ hàng</Link>
@@ -415,25 +415,10 @@ const CheckoutPage = () => {
           </button>
         </div>
 
-        {/* Info Banner */}
-        <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <div className="text-2xl">📦</div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-blue-900 mb-1">Thông tin quan trọng</h3>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>• Vui lòng kiểm tra kỹ thông tin giao hàng trước khi đặt hàng</li>
-                <li>• Đơn hàng sẽ được giao trong vòng 3-5 ngày làm việc</li>
-                <li>• Miễn phí giao hàng cho đơn hàng trên 500.000₫</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
         {/* Title and Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Title + Form */}
-          <div>
+          <div className="lg:col-span-2">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-pink-400 to-pink-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
                 1
@@ -448,29 +433,28 @@ const CheckoutPage = () => {
                   <span className="text-xl">👤</span> Thông tin liên hệ
                 </h3>
                 
-                {/* Họ và tên */}
-                <div className="mb-3">
-                  <label className="block text-sm text-gray-700 mb-1 font-medium">
-                    Họ và tên <span className="text-red-500">*</span>
-                    <span className="text-gray-500 text-xs font-normal ml-2">(Người nhận hàng)</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="hoTen"
-                    value={formData.hoTen}
-                    onChange={handleInputChange}
-                    placeholder="VD: Nguyễn Văn A"
-                    className={`w-full px-3 py-2.5 border ${errors.hoTen ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all`}
-                  />
-                  {errors.hoTen && (
-                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                      <span>⚠️</span> {errors.hoTen}
-                    </p>
-                  )}
-                </div>
+                {/* Họ và tên, Email, Số điện thoại - 3 cột */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1 font-medium">
+                      Họ và tên <span className="text-red-500">*</span>
+                      <span className="text-gray-500 text-xs font-normal ml-2">(Người nhận hàng)</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="hoTen"
+                      value={formData.hoTen}
+                      onChange={handleInputChange}
+                      placeholder="VD: Nguyễn Văn A"
+                      className={`w-full px-3 py-2.5 border ${errors.hoTen ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all`}
+                    />
+                    {errors.hoTen && (
+                      <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                        <span>⚠️</span> {errors.hoTen}
+                      </p>
+                    )}
+                  </div>
 
-                {/* Email và Số điện thoại - 2 cột */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm text-gray-700 mb-1 font-medium">
                       Email <span className="text-red-500">*</span>
@@ -626,14 +610,6 @@ const CheckoutPage = () => {
                     )}
                   </div>
                 </div>
-
-                {/* Hint */}
-                <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs text-blue-800 flex items-start gap-2">
-                    <span className="text-sm">💡</span>
-                    <span>Vui lòng chọn đầy đủ Tỉnh/Thành phố, Quận/Huyện và Phường/Xã để chúng tôi tính phí vận chuyển chính xác</span>
-                  </p>
-                </div>
               </div>
 
               {/* Ghi chú */}
@@ -683,7 +659,7 @@ const CheckoutPage = () => {
           </div>
 
           {/* Right Column - Order Summary */}
-          <div>
+          <div className="lg:col-span-1">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
                 2
@@ -737,23 +713,6 @@ const CheckoutPage = () => {
                 })}
               </div>
 
-              {/* Mã giảm giá */}
-              <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <label className="block text-xs font-semibold text-gray-700 mb-2">
-                  🎟️ Mã giảm giá / Voucher
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Nhập mã giảm giá"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                  />
-                  <button className="px-4 py-2 bg-yellow-400 text-gray-800 rounded-lg text-sm font-semibold hover:bg-yellow-500 transition-colors">
-                    Áp dụng
-                  </button>
-                </div>
-              </div>
-
               {/* Tính toán chi tiết */}
               <div className="space-y-3 mb-4 pt-4 border-t-2 border-gray-200">
                 <div className="flex justify-between text-gray-700">
@@ -775,22 +734,6 @@ const CheckoutPage = () => {
                 </div>
               </div>
 
-              {/* Tổng cộng */}
-              <div className="pt-4 border-t-2 border-gray-300 bg-gradient-to-r from-red-50 to-pink-50 -mx-5 -mb-5 px-5 pb-5 rounded-b-lg">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-lg font-bold text-gray-800">Tổng thanh toán:</span>
-                  <div className="text-right">
-                    <div className="text-xs text-gray-500 mb-1">VND</div>
-                    <div className="text-3xl font-bold text-red-600">
-                      {total.toLocaleString('vi-VN')} ₫
-                    </div>
-                  </div>
-                </div>
-                <div className="text-xs text-gray-600 text-right">
-                  (Đã bao gồm VAT nếu có)
-                </div>
-              </div>
-
               {/* Login reminder */}
               {!user && (
                 <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg">
@@ -807,6 +750,21 @@ const CheckoutPage = () => {
                   </Link>
                 </div>
               )}
+
+              {/* Info Banner */}
+              <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="text-2xl">📦</div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-blue-900 mb-1">Thông tin quan trọng</h3>
+                    <ul className="text-sm text-blue-800 space-y-1">
+                      <li>• Vui lòng kiểm tra kỹ thông tin giao hàng trước khi đặt hàng</li>
+                      <li>• Đơn hàng sẽ được giao trong vòng 3-5 ngày làm việc</li>
+                      <li>• Miễn phí giao hàng cho đơn hàng trên 500.000₫</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

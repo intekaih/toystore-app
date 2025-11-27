@@ -7,6 +7,12 @@ const categoryController = require('../controllers/category.controller');
 router.get('/categories/brands', categoryController.getPublicBrands);
 router.get('/categories', categoryController.getPublicCategories);
 
+// ✅ PUBLIC STATS ROUTE (ĐẶT TRƯỚC /products)
+router.get('/stats', productController.getPublicStats);
+
+// ✅ PUBLIC TOP CUSTOMERS ROUTE
+router.get('/top-customers', productController.getTopCustomers);
+
 // PRODUCTS ROUTES
 router.get('/', productController.getAllProducts);
 router.get('/:id', productController.getProductById);

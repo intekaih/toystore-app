@@ -67,6 +67,28 @@ const ProductTable = ({ products, categories, onEdit, onDelete, isStaffView = fa
     }
   };
 
+  // Lấy tên thương hiệu với error handling
+  const getBrandName = (product) => {
+    try {
+      // ✅ Backend đã convert sang camelCase, kiểm tra cả camelCase và PascalCase
+      if (product.thuongHieu) {
+        // Kiểm tra camelCase (sau DTOMapper)
+        if (product.thuongHieu.tenThuongHieu) {
+          return product.thuongHieu.tenThuongHieu;
+        }
+        // Kiểm tra PascalCase (nếu chưa convert)
+        if (product.thuongHieu.TenThuongHieu) {
+          return product.thuongHieu.TenThuongHieu;
+        }
+      }
+      
+      return 'Không có thương hiệu';
+    } catch (error) {
+      console.error('Error getting brand name:', error);
+      return 'Không có thương hiệu';
+    }
+  };
+
   // Lấy URL ảnh đầy đủ với error handling
   const getImageUrl = (product) => {
     try {
@@ -119,6 +141,7 @@ const ProductTable = ({ products, categories, onEdit, onDelete, isStaffView = fa
             <th>Ảnh</th>
             <th>Tên sản phẩm</th>
             <th>Loại</th>
+            <th>Thương hiệu</th>
             <th>Giá bán</th>
             <th>Tồn kho</th>
             <th>Trạng thái</th>
@@ -136,22 +159,65 @@ const ProductTable = ({ products, categories, onEdit, onDelete, isStaffView = fa
                 moTa: product.MoTa || product.moTa,
                 giaBan: product.GiaBan || product.giaBan || 0,
                 soLuongTon: product.SoLuongTon !== undefined ? product.SoLuongTon : (product.soLuongTon !== undefined ? product.soLuongTon : 0),
-                trangThai: product.TrangThai !== undefined ? product.TrangThai : (product.trangThai !== undefined ? product.trangThai : 1),
-                enable: product.Enable !== undefined ? product.Enable : (product.enable !== undefined ? product.enable : 1),
+                // ✅ Xử lý TrangThai - 0 = inactive, 1 = active
+                trangThai: (product.TrangThai !== undefined && product.TrangThai !== null) ? product.TrangThai : 
+                          (product.trangThai !== undefined && product.trangThai !== null) ? product.trangThai : 1,
+                // ✅ Xử lý Enable - 0 = inactive, 1 = active
+                enable: (product.Enable !== undefined && product.Enable !== null) ? product.Enable : 
+                       (product.enable !== undefined && product.enable !== null) ? product.enable : 1,
                 ngayTao: product.NgayTao || product.ngayTao,
                 hinhAnhURL: product.HinhAnhURL || product.hinhAnhURL,
                 loaiSP: product.loaiSP || product.LoaiSP,
-                loaiID: product.IDLoai || product.idLoai || product.loaiID,
+                // ✅ Lấy loaiID từ nhiều nguồn
+                loaiID: product.LoaiID || 
+                       product.loaiID || 
+                       product.IDLoai || 
+                       product.idLoai ||
+                       (product.loaiSP?.ID || product.loaiSP?.id) ||
+                       (product.LoaiSP?.ID || product.LoaiSP?.id) ||
+                       '',
+                thuongHieu: product.thuongHieu || product.ThuongHieu,
+                // ✅ Lấy thuongHieuID từ nhiều nguồn
+                thuongHieuID: product.ThuongHieuID || 
+                             product.thuongHieuID || 
+                             product.IDThuongHieu || 
+                             product.idThuongHieu ||
+                             (product.thuongHieu?.ID || product.thuongHieu?.id) ||
+                             (product.ThuongHieu?.ID || product.ThuongHieu?.id) ||
+                             '',
+                hinhAnhs: product.hinhAnhs || product.HinhAnhs || [],
                 ...product // Giữ lại các field khác
               };
               
               // ✅ Hỗ trợ nhiều format tên biến từ backend
               const productStock = normalizedProduct.soLuongTon;
               
-              // ✅ Hỗ trợ cả enable và trangThai (1 = active, 0 = inactive)
-              const isEnabled = normalizedProduct.trangThai === 1 || normalizedProduct.enable === 1 || normalizedProduct.trangThai === true || normalizedProduct.enable === true;
+              // ✅ Xác định trạng thái: 1 = active, 0 = inactive
+              // Kiểm tra cả trangThai và enable, ưu tiên trangThai
+              const trangThaiValue = normalizedProduct.trangThai;
+              const enableValue = normalizedProduct.enable;
               
-              console.log(`🔍 Rendering product #${index}:`, normalizedProduct.id, normalizedProduct.ten);
+              // ✅ Ưu tiên trangThai, nếu không có thì dùng enable
+              // isEnabled = true chỉ khi trangThai === 1 HOẶC (trangThai không có và enable === 1)
+              let isEnabled = false;
+              if (trangThaiValue !== undefined && trangThaiValue !== null) {
+                // Có trangThai, dùng trangThai
+                isEnabled = (trangThaiValue === 1 || trangThaiValue === true);
+              } else if (enableValue !== undefined && enableValue !== null) {
+                // Không có trangThai, dùng enable
+                isEnabled = (enableValue === 1 || enableValue === true);
+              } else {
+                // Mặc định là active nếu không có cả hai
+                isEnabled = true;
+              }
+              
+              console.log(`🔍 Rendering product #${index}:`, {
+                id: normalizedProduct.id,
+                ten: normalizedProduct.ten,
+                trangThai: trangThaiValue,
+                enable: enableValue,
+                isEnabled: isEnabled
+              });
               
               return (
                 <tr key={normalizedProduct.id || index} className={!isEnabled ? 'disabled-row' : ''} style={{minHeight: '60px'}}>
@@ -170,12 +236,12 @@ const ProductTable = ({ products, categories, onEdit, onDelete, isStaffView = fa
                     />
                   </td>
                 
-                  <td className="name-col">
-                    <div className="product-name" style={{color: '#333', fontWeight: '600'}}>
+                  <td className="name-col" style={{textAlign: 'left'}}>
+                    <div className="product-name" style={{color: '#333', fontWeight: '600', textAlign: 'left'}}>
                       {normalizedProduct.ten || 'Không có tên'}
                     </div>
                     {normalizedProduct.moTa && (
-                      <div className="product-desc" style={{color: '#888', fontSize: '12px'}} title={normalizedProduct.moTa}>
+                      <div className="product-desc" style={{color: '#888', fontSize: '12px', textAlign: 'left'}} title={normalizedProduct.moTa}>
                         {normalizedProduct.moTa.length > 50
                           ? normalizedProduct.moTa.substring(0, 50) + '...'
                           : normalizedProduct.moTa}
@@ -188,7 +254,13 @@ const ProductTable = ({ products, categories, onEdit, onDelete, isStaffView = fa
                       {getCategoryName(normalizedProduct)}
                     </span>
                   </td>
-                
+                  
+                  <td className="brand-col">
+                    <span className="brand-badge" style={{background: '#f3e5f5', color: '#7b1fa2', padding: '4px 12px', borderRadius: '20px', display: 'inline-block'}}>
+                      {getBrandName(normalizedProduct)}
+                    </span>
+                  </td>
+                  
                   <td className="price-col">
                     <span className="price" style={{color: '#e91e63', fontWeight: '600', fontSize: '15px'}}>
                       {formatPrice(normalizedProduct.giaBan)}
@@ -228,7 +300,10 @@ const ProductTable = ({ products, categories, onEdit, onDelete, isStaffView = fa
                         {onEdit && (
                           <button
                             className="btn-edit"
-                            onClick={() => onEdit(product)}
+                            onClick={() => {
+                              console.log('🔍 Click edit product:', normalizedProduct);
+                              onEdit(normalizedProduct);
+                            }}
                             title="Chỉnh sửa"
                             style={{padding: '6px 10px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '16px', background: '#e3f2fd', color: '#1976d2', display: 'flex', alignItems: 'center', gap: '4px'}}
                           >
@@ -257,7 +332,7 @@ const ProductTable = ({ products, categories, onEdit, onDelete, isStaffView = fa
               console.error('❌ Error rendering product row:', error, product);
               return (
                 <tr key={product.id || index}>
-                  <td colSpan="9" style={{padding: '12px', color: 'red', textAlign: 'center'}}>
+                  <td colSpan="10" style={{padding: '12px', color: 'red', textAlign: 'center'}}>
                     Lỗi hiển thị sản phẩm #{product.id || index}
                   </td>
                 </tr>

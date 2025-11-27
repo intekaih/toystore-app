@@ -19,17 +19,20 @@ GO
 
 -- ========== NHÓM 1: HỆ THỐNG & DANH MỤC (4 bảng) ==========
 
--- 1. TaiKhoan - Quản lý người dùng (9 cột)
+-- 1. TaiKhoan - Quản lý người dùng (11 cột) ✅ Thêm Google OAuth
 CREATE TABLE TaiKhoan (
     ID INT IDENTITY(1,1) PRIMARY KEY,
     TenDangNhap VARCHAR(50) NOT NULL,
-    MatKhau VARCHAR(255) NOT NULL,
+    MatKhau VARCHAR(255) NULL,  -- NULL cho tài khoản Google-only
     HoTen NVARCHAR(100) NOT NULL,
     Email NVARCHAR(100) NOT NULL,
     DienThoai VARCHAR(20) NULL,
     VaiTro NVARCHAR(20) DEFAULT 'KhachHang',  -- 'Admin', 'NhanVien', 'KhachHang'
     NgayTao DATETIME DEFAULT GETDATE(),
-    TrangThai BIT DEFAULT 1
+    TrangThai BIT DEFAULT 1,
+    -- Google OAuth fields
+    GoogleID VARCHAR(255) NULL,  -- Google User ID
+    LoginMethod NVARCHAR(20) DEFAULT 'Password' NULL  -- 'Password', 'Google', 'Both'
 );
 
 -- 2. LoaiSP - Danh mục sản phẩm (3 cột) ✅ Giảm từ 6 → 3
@@ -281,6 +284,8 @@ GO
 -- ========== TaiKhoan ==========
 ALTER TABLE TaiKhoan ADD CONSTRAINT CK_TaiKhoan_VaiTro 
     CHECK (VaiTro IN ('Admin', 'NhanVien', 'KhachHang'));
+ALTER TABLE TaiKhoan ADD CONSTRAINT CK_TaiKhoan_LoginMethod 
+    CHECK (LoginMethod IN ('Password', 'Google', 'Both') OR LoginMethod IS NULL);
 
 -- ========== SanPham ==========
 ALTER TABLE SanPham ADD CONSTRAINT CK_SanPham_GiaBan CHECK (GiaBan >= 0);
@@ -406,6 +411,8 @@ GO
 CREATE UNIQUE NONCLUSTERED INDEX UQ_TaiKhoan_TenDangNhap ON TaiKhoan(TenDangNhap);
 CREATE UNIQUE NONCLUSTERED INDEX UQ_TaiKhoan_Email ON TaiKhoan(Email);
 CREATE NONCLUSTERED INDEX IX_TaiKhoan_VaiTro ON TaiKhoan(VaiTro, TrangThai);
+CREATE UNIQUE NONCLUSTERED INDEX UQ_TaiKhoan_GoogleID ON TaiKhoan(GoogleID) WHERE GoogleID IS NOT NULL;
+CREATE NONCLUSTERED INDEX IX_TaiKhoan_LoginMethod ON TaiKhoan(LoginMethod);
 
 -- ========== LoaiSP ==========
 CREATE UNIQUE NONCLUSTERED INDEX UQ_LoaiSP_Ten ON LoaiSP(Ten);
@@ -528,8 +535,8 @@ PRINT N'✅ DATABASE TOYSTORE MVP v3.1 - SIÊU TỐI ƯU!';
 PRINT N'═══════════════════════════════════════════════════════════════════';
 PRINT N'';
 
-PRINT N'🎯 ĐÃ LOẠI BỎ 30 TRƯỜNG DƯ THỪA:';
-PRINT N'  • TaiKhoan: 10 → 9 cột (-1)';
+PRINT N'🎯 ĐÃ LOẠI BỎ 30 TRƯỜNG DƯ THỪA + THÊM GOOGLE OAUTH:';
+PRINT N'  • TaiKhoan: 9 → 11 cột (+2: GoogleID, LoginMethod) ✅';
 PRINT N'  • LoaiSP: 6 → 3 cột (-3) ✅';
 PRINT N'  • ThuongHieu: 9 → 3 cột (-6) ✅';
 PRINT N'  • PhuongThucThanhToan: 3 → 2 cột (-1)';
@@ -553,7 +560,7 @@ PRINT N'  ✅ Seed data đầy đủ';
 PRINT N'';
 
 PRINT N'🚀 19 BẢNG MVP SIÊU GỌN:';
-PRINT N'  1. TaiKhoan (9)';
+PRINT N'  1. TaiKhoan (11) ✅ + Google OAuth';
 PRINT N'  2. LoaiSP (3) ⭐';
 PRINT N'  3. ThuongHieu (3) ⭐';
 PRINT N'  4. PhuongThucThanhToan (2)';
@@ -583,7 +590,7 @@ PRINT N'';
 
 PRINT N'═══════════════════════════════════════════════════════════════════';
 PRINT N'✅ SẴN SÀNG PRODUCTION!';
-PRINT N'📅 Version: 3.1 FINAL | ' + CONVERT(VARCHAR, GETDATE(), 120);
+PRINT N'📅 Version: 3.2 - Google OAuth Support | ' + CONVERT(VARCHAR, GETDATE(), 120);
 PRINT N'═══════════════════════════════════════════════════════════════════';
 
 GO

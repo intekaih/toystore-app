@@ -91,7 +91,8 @@ exports.register = async (req, res) => {
       Email: (Email && Email.trim()) ? Email.trim().toLowerCase() : null,
       DienThoai: (DienThoai && DienThoai.trim()) ? DienThoai.trim() : null,
       VaiTro: 'KhachHang',  // Changed from 'user' to 'KhachHang'
-      TrangThai: true       // Changed from Enable to TrangThai
+      TrangThai: true,      // Changed from Enable to TrangThai
+      LoginMethod: 'Password'  // Đánh dấu đăng ký bằng password
     });
 
     logger.success(`✅ Đăng ký thành công: ${newUser.TenDangNhap} (ID: ${newUser.ID})`);
@@ -105,7 +106,9 @@ exports.register = async (req, res) => {
       DienThoai: newUser.DienThoai,
       VaiTro: newUser.VaiTro,
       NgayTao: newUser.NgayTao,
-      TrangThai: newUser.TrangThai
+      TrangThai: newUser.TrangThai,
+      GoogleID: newUser.GoogleID,
+      LoginMethod: newUser.LoginMethod
     });
 
     res.status(201).json({
@@ -130,7 +133,7 @@ exports.register = async (req, res) => {
     if (error.name === 'SequelizeUniqueConstraintError') {
       const field = error.errors[0].path;
       let message = "Dữ liệu đã tồn tại";
-      
+
       if (field === 'TenDangNhap') {
         message = "Tên đăng nhập đã tồn tại";
       } else if (field === 'Email') {
@@ -183,9 +186,27 @@ exports.login = async (req, res) => {
       });
     }
 
+    // Kiểm tra tài khoản có mật khẩu không (tài khoản Google-only không có mật khẩu)
+    if (!user.MatKhau) {
+      logger.warn(`Đăng nhập thất bại: Tài khoản chỉ đăng nhập được bằng Google - ${TenDangNhap}`);
+      return res.status(401).json({
+        success: false,
+        message: 'Tài khoản này chỉ đăng nhập được bằng Google. Vui lòng sử dụng "Đăng nhập bằng Google"'
+      });
+    }
+
+    // Kiểm tra LoginMethod nếu có
+    if (user.LoginMethod === 'Google') {
+      logger.warn(`Đăng nhập thất bại: Tài khoản chỉ hỗ trợ Google login - ${TenDangNhap}`);
+      return res.status(401).json({
+        success: false,
+        message: 'Tài khoản này chỉ đăng nhập được bằng Google. Vui lòng sử dụng "Đăng nhập bằng Google"'
+      });
+    }
+
     // So sánh mật khẩu
     const isPasswordValid = await bcrypt.compare(MatKhau, user.MatKhau);
-    
+
     if (!isPasswordValid) {
       logger.warn(`Đăng nhập thất bại: Sai mật khẩu - ${TenDangNhap}`);
       return res.status(401).json({
@@ -220,7 +241,9 @@ exports.login = async (req, res) => {
       Email: user.Email,
       DienThoai: user.DienThoai,
       NgayTao: user.NgayTao,
-      TrangThai: user.TrangThai
+      TrangThai: user.TrangThai,
+      GoogleID: user.GoogleID,
+      LoginMethod: user.LoginMethod
     });
 
     // Trả về thông tin đăng nhập thành công
@@ -276,9 +299,18 @@ exports.adminLogin = async (req, res) => {
       });
     }
 
+    // Kiểm tra tài khoản có mật khẩu không (tài khoản Google-only không có mật khẩu)
+    if (!user.MatKhau) {
+      logger.warn(`Đăng nhập admin thất bại: Tài khoản chỉ đăng nhập được bằng Google - ${username}`);
+      return res.status(401).json({
+        success: false,
+        message: 'Tài khoản này chỉ đăng nhập được bằng Google'
+      });
+    }
+
     // So sánh mật khẩu
     const isPasswordValid = await bcrypt.compare(password, user.MatKhau);
-    
+
     if (!isPasswordValid) {
       logger.warn(`Đăng nhập admin thất bại: Sai mật khẩu - ${username}`);
       return res.status(401).json({
@@ -313,7 +345,9 @@ exports.adminLogin = async (req, res) => {
       Email: user.Email,
       DienThoai: user.DienThoai,
       NgayTao: user.NgayTao,
-      TrangThai: user.TrangThai
+      TrangThai: user.TrangThai,
+      GoogleID: user.GoogleID,
+      LoginMethod: user.LoginMethod
     });
 
     // Trả về thông tin đăng nhập thành công
@@ -333,5 +367,51 @@ exports.adminLogin = async (req, res) => {
       message: 'Lỗi server nội bộ',
       error: config.isDevelopment() ? error.message : 'Internal Server Error'
     });
+  }
+};
+
+// Hàm xử lý Google OAuth callback
+exports.googleCallback = async (req, res) => {
+  try {
+    // User đã được xác thực bởi passport middleware
+    const user = req.user;
+
+    if (!user) {
+      logger.warn('Google OAuth callback: Không tìm thấy user');
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/login?error=google_auth_failed`);
+    }
+
+    // Kiểm tra tài khoản có bị khóa không
+    if (!user.TrangThai) {
+      logger.warn(`Google OAuth: Tài khoản bị khóa - ${user.TenDangNhap}`);
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      return res.redirect(`${frontendUrl}/login?error=account_disabled`);
+    }
+
+    // Tạo JWT token
+    const jwtSecret = config.getValue('jwt', 'secret');
+    const jwtExpires = config.getValue('jwt', 'expiresIn');
+
+    const token = jwt.sign(
+      {
+        userId: user.ID,
+        username: user.TenDangNhap,
+        role: user.VaiTro || 'KhachHang'
+      },
+      jwtSecret,
+      { expiresIn: jwtExpires }
+    );
+
+    logger.success(`✅ Google OAuth đăng nhập thành công: ${user.TenDangNhap} (${user.VaiTro})`);
+
+    // Redirect về frontend với token
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    return res.redirect(`${frontendUrl}/auth/google/callback?token=${token}&success=true`);
+
+  } catch (error) {
+    logger.logError(error, 'Google OAuth callback');
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    return res.redirect(`${frontendUrl}/login?error=server_error`);
   }
 };

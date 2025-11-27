@@ -185,7 +185,7 @@ class PackingState extends OrderState {
 
     // ✅ FIX: Kiểm tra mã vận đơn từ order object trước (đã được set từ controller)
     let maVanDon = this.order.MaVanDon;
-
+    
     // ✅ FIX: Nếu không có trong order object, query từ DB (không dùng transaction để tránh lỗi)
     if (!maVanDon) {
       try {
@@ -609,28 +609,10 @@ class OrderStateContext {
         NgayCapNhat: updateData.NgayCapNhat
       });
       console.log(`🔍 [transitionTo] Transaction status before update: finished=${transaction?.finished}, id=${transaction?.id}`);
-
-      // ✅ FIX: Đảm bảo update được thực hiện trong transaction
-      await this.order.update(updateData, {
-        transaction,
-        validate: false // Bỏ qua validation để tránh lỗi
-      });
-
+      
+      await this.order.update(updateData, { transaction });
+      
       console.log(`🔍 [transitionTo] Update successful. Transaction status after update: finished=${transaction?.finished}, id=${transaction?.id}`);
-
-      // ✅ FIX: Verify update bằng cách query trực tiếp trong transaction
-      const verifyOrder = await db.HoaDon.findByPk(this.order.ID, {
-        attributes: ['ID', 'TrangThai'],
-        transaction
-      });
-
-      if (verifyOrder && verifyOrder.TrangThai === updateData.TrangThai) {
-        console.log(`✅ [transitionTo] Update verified. Order ${this.order.ID} status: ${verifyOrder.TrangThai}`);
-      } else {
-        const errorMsg = `❌ [transitionTo] Update verification failed! Expected: ${updateData.TrangThai}, Got: ${verifyOrder?.TrangThai || 'null'}`;
-        console.error(errorMsg);
-        throw new Error(`Không thể cập nhật trạng thái đơn hàng. ${errorMsg}`);
-      }
     } catch (updateError) {
       console.error(`❌ [transitionTo] Lỗi khi update order:`, updateError);
       console.error(`❌ [transitionTo] Update error stack:`, updateError.stack);
@@ -642,56 +624,15 @@ class OrderStateContext {
     Object.assign(this.order, updateData);
     console.log(`🔍 [transitionTo] Order object updated. Order.TrangThai=${this.order.TrangThai}`);
 
-    // ✅ THÊM: Ghi lịch sử trạng thái
-    try {
-      const LichSuTrangThaiDonHang = db.LichSuTrangThaiDonHang;
-      if (LichSuTrangThaiDonHang) {
-        // ✅ FIX CRITICAL: Dùng raw SQL để tránh Sequelize tự động thêm timezone vào NgayThayDoi
-        // Sequelize's DataTypes.NOW tự động thêm timezone → SQL Server DATETIME lỗi conversion
-        // → Transaction bị rollback → Lỗi "no corresponding BEGIN TRANSACTION"
-        await db.sequelize.query(
-          `INSERT INTO LichSuTrangThaiDonHang (HoaDonID, TrangThaiCu, TrangThaiMoi, NguoiThayDoi, LyDo, NgayThayDoi)
-           VALUES (:hoaDonID, :trangThaiCu, :trangThaiMoi, :nguoiThayDoi, :lyDo, GETDATE())`,
-          {
-            replacements: {
-              hoaDonID: this.order.ID,
-              trangThaiCu: currentStateName,
-              trangThaiMoi: newStateName,
-              nguoiThayDoi: additionalData.NguoiThayDoi || 'Hệ thống',
-              lyDo: additionalData.LyDo || updateNote
-            },
-            transaction,
-            type: db.sequelize.QueryTypes.INSERT
-          }
-        );
-        console.log(`✅ [transitionTo] Đã ghi lịch sử trạng thái: ${currentStateName} → ${newStateName}`);
-      }
-    } catch (historyError) {
-      console.warn('⚠️ Không thể ghi lịch sử trạng thái:', historyError.message);
-      console.warn('⚠️ History error stack:', historyError.stack);
-      // Không throw để không làm gián đoạn flow chính
-    }
+    // ✅ REMOVED: Không ghi lịch sử vào LichSuTrangThaiDonHang nữa
+    // Timeline sẽ chỉ dựa vào HoaDon.TrangThai hiện tại để suy đoán các bước đã hoàn thành
+    console.log(`✅ [transitionTo] Đã cập nhật trạng thái: ${currentStateName} → ${newStateName}`);
 
     // ✅ THÊM: Cập nhật reference trong newState
     newState.order = this.order;
 
-    // ✅ FIX: Gọi onEnter của state mới với try-catch
-    // ⚠️ QUAN TRỌNG: KHÔNG rollback transaction ở đây vì controller đang quản lý transaction
-    // Chỉ re-throw error để controller biết và tự xử lý rollback
-    try {
-      await newState.onEnter(currentStateName, transaction);
-    } catch (onEnterError) {
-      console.error(`❌ [transitionTo] Lỗi trong onEnter của ${newStateName}:`, onEnterError);
-      console.error(`❌ [transitionTo] OnEnter error stack:`, onEnterError.stack);
-      console.error(`❌ [transitionTo] Transaction status on onEnter error: finished=${transaction?.finished}, id=${transaction?.id}`);
-
-      // ✅ FIX: KHÔNG rollback transaction ở đây
-      // Transaction lifecycle phải được quản lý bởi controller, không phải state class
-      // Nếu rollback ở đây, controller sẽ không thể commit và gây lỗi "no corresponding BEGIN TRANSACTION"
-      console.error(`⚠️ [transitionTo] Re-throwing error to controller để xử lý rollback`);
-
-      throw onEnterError; // Re-throw để caller biết và tự xử lý transaction
-    }
+    // Gọi onEnter của state mới (bây giờ newState.order đã có MaVanDon)
+    await newState.onEnter(currentStateName, transaction);
 
     // Cập nhật state hiện tại
     this.currentState = newState;

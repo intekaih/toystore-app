@@ -16,10 +16,9 @@ import './OrderStatusTimeline.css';
  * Component hiển thị timeline theo dõi trạng thái đơn hàng
  * @param {Object} props
  * @param {string} props.currentStatus - Trạng thái hiện tại của đơn hàng
- * @param {Array} props.lichSuTrangThai - Lịch sử thay đổi trạng thái từ bảng LichSuTrangThaiDonHang
  * @param {Object} props.order - Thông tin đơn hàng (để lấy thông tin bổ sung)
  */
-const OrderStatusTimeline = ({ currentStatus, lichSuTrangThai = [], order = {} }) => {
+const OrderStatusTimeline = ({ currentStatus, order = {} }) => {
   // Định nghĩa các bước trong timeline
   const statusSteps = [
     {
@@ -100,21 +99,6 @@ const OrderStatusTimeline = ({ currentStatus, lichSuTrangThai = [], order = {} }
     }
   ];
 
-  // ✅ SỬ DỤNG LỊCH SỬ TRẠNG THÁI: Tạo map từ lichSuTrangThai để lấy thời gian thực tế
-  const statusHistoryMap = {};
-  if (lichSuTrangThai && lichSuTrangThai.length > 0) {
-    lichSuTrangThai.forEach(item => {
-      // Lưu thời gian khi chuyển sang trạng thái mới
-      if (item.trangThaiMoi && !statusHistoryMap[item.trangThaiMoi]) {
-        statusHistoryMap[item.trangThaiMoi] = {
-          ngayThayDoi: item.ngayThayDoi,
-          nguoiThayDoi: item.nguoiThayDoi,
-          lyDo: item.lyDo
-        };
-      }
-    });
-  }
-
   // Tìm index của trạng thái hiện tại
   const getCurrentStatusIndex = () => {
     const index = statusSteps.findIndex(step => step.key === currentStatus);
@@ -126,33 +110,22 @@ const OrderStatusTimeline = ({ currentStatus, lichSuTrangThai = [], order = {} }
   const specialStatus = specialStatuses.find(s => s.key === currentStatus);
 
   // Xác định trạng thái của mỗi step
-  // ✅ CẢI THIỆN: Sử dụng lichSuTrangThai để xác định step nào đã hoàn thành
   const getStepStatus = (stepIndex) => {
     if (isSpecialStatus) {
       // Nếu là trạng thái đặc biệt, tất cả các step đều là pending
       return 'pending';
     }
 
-    const step = statusSteps[stepIndex];
-    if (!step) return 'pending';
-
-    // ✅ Nếu có lịch sử, kiểm tra xem trạng thái này đã được ghi nhận chưa
-    if (lichSuTrangThai && lichSuTrangThai.length > 0) {
-      const hasHistory = statusHistoryMap[step.key] || 
-        lichSuTrangThai.some(item => item.trangThaiMoi === step.key);
-      
-      if (hasHistory && stepIndex < currentIndex) {
-        return 'completed';
-      } else if (step.key === currentStatus) {
-        return 'current';
-      } else {
-        return 'pending';
-      }
-    }
-
-    // Fallback: Dùng logic cũ nếu không có lịch sử
     if (currentIndex === -1) {
       return 'pending';
+    }
+
+    // ✅ FIX: Nếu là trạng thái cuối cùng (Hoàn thành), tất cả các step đều completed
+    const isLastStatus = currentIndex === statusSteps.length - 1;
+    
+    if (isLastStatus) {
+      // Trạng thái cuối cùng → tất cả các step đều completed
+      return 'completed';
     }
 
     if (stepIndex < currentIndex) {
@@ -238,19 +211,7 @@ const OrderStatusTimeline = ({ currentStatus, lichSuTrangThai = [], order = {} }
                       {step.label}
                     </h4>
                     <p className="timeline-step-description">{step.description}</p>
-                    {/* ✅ HIỂN THỊ THỜI GIAN THỰC TẾ TỪ LỊCH SỬ */}
-                    {statusHistoryMap[step.key] && statusHistoryMap[step.key].ngayThayDoi && (
-                      <span className="timeline-step-time">
-                        {new Date(statusHistoryMap[step.key].ngayThayDoi).toLocaleString('vi-VN', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </span>
-                    )}
-                    {stepStatus === 'current' && !statusHistoryMap[step.key] && (
+                    {stepStatus === 'current' && order.ngayLap && (
                       <span className="timeline-step-time">
                         Đang xử lý...
                       </span>

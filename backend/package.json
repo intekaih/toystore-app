@@ -7,7 +7,8 @@
     "dev": "nodemon server.js",
     "create-default-admin": "node create-default-admin.js",
     "test": "node test-api-comprehensive.js",
-    "test:watch": "nodemon test-api-comprehensive.js"
+    "test:watch": "nodemon test-api-comprehensive.js",
+    "check-google-oauth": "node scripts/check-google-oauth-config.js"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +22,7 @@
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "express-rate-limit": "^8.1.0",
+    "google-auth-library": "^10.5.0",
     "jsonwebtoken": "^9.0.2",
     "mssql": "^10.0.4",
     "multer": "^2.0.2",
@@ -28,6 +30,9 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "sequelize": "^6.37.7",
+    "sharp": "^0.34.5",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "tedious": "^18.6.1"
   },
   "devDependencies": {

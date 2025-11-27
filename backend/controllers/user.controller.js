@@ -10,7 +10,7 @@ exports.getProfile = async (req, res) => {
     const userId = req.user.id;
     
     const user = await TaiKhoan.findByPk(userId, {
-      attributes: ['ID', 'TenDangNhap', 'HoTen', 'Email', 'DienThoai', 'VaiTro', 'NgayTao', 'TrangThai']
+      attributes: ['ID', 'TenDangNhap', 'HoTen', 'Email', 'DienThoai', 'VaiTro', 'NgayTao', 'TrangThai', 'GoogleID', 'LoginMethod']
     });
 
     if (!user || !user.TrangThai) {
@@ -29,7 +29,9 @@ exports.getProfile = async (req, res) => {
       DienThoai: user.DienThoai,
       VaiTro: user.VaiTro,
       NgayTao: user.NgayTao,
-      TrangThai: user.TrangThai
+      TrangThai: user.TrangThai,
+      GoogleID: user.GoogleID,
+      LoginMethod: user.LoginMethod
     });
 
     res.status(200).json({

@@ -11,7 +11,8 @@ import {
   TrendingUp,
   Zap,
   MapPin,
-  TestTube
+  TestTube,
+  Image
 } from 'lucide-react';
 import { Card } from '../components/ui';
 import AdminLayout from '../layouts/AdminLayout';
@@ -150,6 +151,15 @@ const AdminDashboard = () => {
       color: 'from-yellow-50 to-yellow-100 border-yellow-200',
       iconBg: 'bg-yellow-500',
       stats: 'Công cụ test'
+    },
+    {
+      title: 'Quản lý Banner',
+      description: 'Thêm, sửa, xóa banner trang chủ',
+      icon: Image,
+      route: '/admin/banners',
+      color: 'from-rose-50 to-rose-100 border-rose-200',
+      iconBg: 'bg-rose-500',
+      stats: 'Quản lý banner'
     }
   ];
 

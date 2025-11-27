@@ -11,6 +11,9 @@ router.use(requireAdmin);
 // ⭐ GET /api/admin/orders/counts/by-status - Lấy số lượng đơn hàng theo trạng thái (PHẢI ĐẶT TRƯỚC /:id)
 router.get('/counts/by-status', adminOrderController.getOrderCountsByStatus);
 
+// GET /api/admin/orders/customers - Lấy danh sách khách hàng từ đơn hàng
+router.get('/customers', adminOrderController.getCustomersFromOrders);
+
 // ❌ TEMPORARY: Commented out - function doesn't exist yet
 // router.post('/print-label', webhookController.printGHNLabel);
 
