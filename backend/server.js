@@ -82,6 +82,7 @@ app.use('/api/admin/orders', require('./routes/admin.order.routes'));
 app.use('/api/admin/vouchers', require('./routes/admin.voucher.routes'));
 app.use('/api/admin/banners', require('./routes/admin.banner.routes')); // 🖼️ THÊM MỚI: Admin Banner Management API
 app.use('/api/admin/statistics', require('./routes/admin.statistics.routes'));
+app.use('/api/admin/settings', require('./routes/admin.settings.routes')); // ⚙️ THÊM MỚI: Admin Settings API
 
 // Test route
 app.get('/', (req, res) => {

@@ -1,7 +1,7 @@
 // src/pages/ProductManagementPage.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, FolderOpen, Plus, Search, ChevronDown } from 'lucide-react';
+import { Package, FolderOpen, Plus, Search, ChevronDown, Tag, RotateCcw } from 'lucide-react';
 import { productService, categoryService } from '../services'; // ✅ Sử dụng services
 import adminService from '../services/adminService';
 import ProductTable from '../components/ProductTable';
@@ -236,6 +236,16 @@ const ProductManagementPage = ({ isStaffView = false }) => {
     setCurrentPage(1);
   };
 
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setFilterCategory('');
+    setFilterBrand('');
+    setFilterStock('');
+    setFilterStatus('true');
+    setShowActiveOnly(true);
+    setCurrentPage(1);
+  };
+
   const handlePageChange = (page) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -248,20 +258,53 @@ const ProductManagementPage = ({ isStaffView = false }) => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Danh sách sản phẩm</h1>
         </div>
-        {/* Nút "Thêm sản phẩm mới" - Chỉ hiển thị cho Admin */}
+        {/* Nút "Thêm sản phẩm mới" và điều hướng - Chỉ hiển thị cho Admin */}
         {!isStaffView && (
-          <button
-            onClick={handleOpenCreateModal}
-            className="px-5 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 
-                     text-white font-semibold text-sm rounded-lg
-                     hover:from-pink-600 hover:to-rose-600
-                     focus:outline-none focus:ring-2 focus:ring-pink-300
-                     transition-all duration-200 shadow-md hover:shadow-lg
-                     flex items-center gap-2 whitespace-nowrap"
-          >
-            <Plus size={18} />
-            Thêm
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Nút điều hướng đến Danh mục */}
+            <button
+              onClick={() => navigate('/admin/categories')}
+              className="px-4 py-2.5 bg-white border-2 border-gray-300 
+                       text-gray-700 font-semibold text-sm rounded-lg
+                       hover:bg-gray-50 hover:border-gray-400
+                       focus:outline-none focus:ring-2 focus:ring-gray-300
+                       transition-all duration-200 shadow-sm hover:shadow-md
+                       flex items-center gap-2 whitespace-nowrap"
+              title="Quản lý danh mục"
+            >
+              <FolderOpen size={18} />
+              Danh mục
+            </button>
+            
+            {/* Nút điều hướng đến Thương hiệu */}
+            <button
+              onClick={() => navigate('/admin/brands')}
+              className="px-4 py-2.5 bg-white border-2 border-gray-300 
+                       text-gray-700 font-semibold text-sm rounded-lg
+                       hover:bg-gray-50 hover:border-gray-400
+                       focus:outline-none focus:ring-2 focus:ring-gray-300
+                       transition-all duration-200 shadow-sm hover:shadow-md
+                       flex items-center gap-2 whitespace-nowrap"
+              title="Quản lý thương hiệu"
+            >
+              <Tag size={18} />
+              Thương hiệu
+            </button>
+            
+            {/* Nút "Thêm sản phẩm mới" */}
+            <button
+              onClick={handleOpenCreateModal}
+              className="px-5 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 
+                       text-white font-semibold text-sm rounded-lg
+                       hover:from-pink-600 hover:to-rose-600
+                       focus:outline-none focus:ring-2 focus:ring-pink-300
+                       transition-all duration-200 shadow-md hover:shadow-lg
+                       flex items-center gap-2 whitespace-nowrap"
+            >
+              <Plus size={18} />
+              Thêm
+            </button>
+          </div>
         )}
       </div>
 
@@ -376,6 +419,21 @@ const ProductManagementPage = ({ isStaffView = false }) => {
             </select>
             <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
+
+          {/* Nút loại bỏ lọc */}
+          <button
+            onClick={handleResetFilters}
+            className="px-4 py-2.5 bg-white border-2 border-gray-300 
+                     text-gray-700 font-semibold text-sm rounded-lg
+                     hover:bg-gray-50 hover:border-gray-400
+                     focus:outline-none focus:ring-2 focus:ring-gray-300
+                     transition-all duration-200 shadow-sm hover:shadow-md
+                     flex items-center gap-2 whitespace-nowrap"
+            title="Loại bỏ tất cả bộ lọc"
+          >
+            <RotateCcw size={18} />
+            Loại bỏ lọc
+          </button>
         </div>
       </div>
 

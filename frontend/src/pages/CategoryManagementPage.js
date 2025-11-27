@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { categoryService } from '../services';
-import { FolderOpen, Plus, RotateCcw, ArrowLeft } from 'lucide-react';
+import { FolderOpen, Plus, ArrowLeft } from 'lucide-react';
 import CategoryTable from '../components/CategoryTable';
 import CategoryModal from '../components/CategoryModal';
 import Toast from '../components/Toast';
@@ -28,8 +28,6 @@ const CategoryManagementPage = () => {
     message: '',
     type: 'info'
   });
-
-  const [searchTerm, setSearchTerm] = useState('');
 
   const showToast = (message, type = 'info') => {
     setToast({ show: true, message, type });
@@ -162,14 +160,6 @@ const CategoryManagementPage = () => {
     }
   };
 
-  const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
-  };
-
-  const handleResetFilters = () => {
-    setSearchTerm('');
-  };
-
   return (
     <AdminLayout>
       {/* Page Title */}
@@ -184,43 +174,24 @@ const CategoryManagementPage = () => {
             <span className="text-sm font-medium">Quay lại</span>
           </button>
         </div>
-        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
-          <FolderOpen size={32} />
-          Quản lý danh mục sản phẩm
-        </h2>
-        <p className="text-gray-600 mt-1">Thêm, sửa, xóa danh mục sản phẩm</p>
-      </div>
-
-      {/* Filters & Actions */}
-      <div className="mb-6 bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 rounded-2xl p-5 shadow-sm border border-blue-100">
-        <div className="flex flex-wrap gap-3 items-center justify-between">
-          <div className="flex flex-wrap gap-3 flex-1">
-            <input
-              type="text"
-              placeholder="Tìm kiếm danh mục..."
-              value={searchTerm}
-              onChange={handleSearch}
-              className="flex-1 min-w-[250px] px-4 py-2.5 bg-white border-2 border-blue-200 rounded-xl 
-                       text-gray-700 font-medium text-sm placeholder-gray-400
-                       focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400
-                       hover:border-blue-300 transition-all duration-200 shadow-sm"
-            />
-
-            <button
-              onClick={handleResetFilters}
-              className="px-5 bg-white border-2 border-blue-300 text-blue-600 font-semibold text-sm rounded-xl
-                       hover:bg-blue-50 hover:border-blue-400 transition-all duration-200 shadow-sm
-                       flex items-center gap-2"
-            >
-              <RotateCcw size={18} />
-              Reset
-            </button>
+        
+        {/* Title and Add Button Row */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+              <FolderOpen size={32} />
+              Quản lý danh mục sản phẩm
+            </h2>
+            <p className="text-gray-600 mt-1">Thêm, sửa, xóa danh mục sản phẩm</p>
           </div>
-
+          
           <button
             onClick={handleOpenCreateModal}
-            className="px-6 bg-gradient-to-r from-blue-400 to-indigo-400 text-white font-semibold text-sm rounded-xl
-                     hover:from-blue-500 hover:to-indigo-500 transition-all duration-200 shadow-md hover:shadow-lg
+            className="px-6 py-2.5 bg-gradient-to-r from-pink-500 to-rose-500 
+                     text-white font-semibold text-sm rounded-lg
+                     hover:from-pink-600 hover:to-rose-600
+                     focus:outline-none focus:ring-2 focus:ring-pink-300
+                     transition-all duration-200 shadow-md hover:shadow-lg
                      flex items-center gap-2 whitespace-nowrap"
           >
             <Plus size={18} />
@@ -228,53 +199,6 @@ const CategoryManagementPage = () => {
           </button>
         </div>
       </div>
-
-      {/* Statistics - Siêu Compact trong 1 Card */}
-      <Card className="mb-6 bg-gradient-to-r from-blue-50 via-purple-50 to-green-50 border-primary-200">
-        <div className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="text-3xl">
-                <FolderOpen size={32} />
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Tổng danh mục</p>
-                <p className="text-2xl font-bold text-blue-600">{categories.length}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="text-3xl">📦</div>
-              <div>
-                <p className="text-xs text-gray-600">Tổng sản phẩm</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {categories.reduce((sum, cat) => sum + (cat.SoLuongSanPham || 0), 0)}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="text-3xl">✅</div>
-              <div>
-                <p className="text-xs text-gray-600">Hoạt động</p>
-                <p className="text-2xl font-bold text-purple-600">
-                  {categories.filter(cat => cat.TrangThai).length}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="text-3xl">🔒</div>
-              <div>
-                <p className="text-xs text-gray-600">Vô hiệu hóa</p>
-                <p className="text-2xl font-bold text-orange-600">
-                  {categories.filter(cat => !cat.TrangThai).length}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Card>
 
       {/* Category Table - Hiển thị trực tiếp */}
       {loading ? (

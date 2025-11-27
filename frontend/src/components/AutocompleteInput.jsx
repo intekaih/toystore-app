@@ -57,8 +57,16 @@ const AutocompleteInput = ({
   // Tìm kiếm với debounce
   const handleInputChange = async (e) => {
     const newValue = e.target.value;
+    const hadSelection = selectedId !== null; // Lưu trạng thái trước khi clear
     setInputValue(newValue);
     setSelectedId(null);
+
+    // ✅ Nếu input bị xóa và có selection trước đó, gọi onSelect(null) để parent biết
+    if (hadSelection && (!newValue.trim() || newValue.trim().length === 0)) {
+      if (onSelect) {
+        onSelect({ [displayKey]: '', [valueKey]: null });
+      }
+    }
 
     // Gọi onChange để parent component biết
     if (onChange) {

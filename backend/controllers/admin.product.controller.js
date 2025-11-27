@@ -2,6 +2,7 @@ const db = require('../models');
 const SanPham = db.SanPham;
 const SanPhamHinhAnh = db.SanPhamHinhAnh;
 const LoaiSP = db.LoaiSP;
+const ThuongHieu = db.ThuongHieu;
 const { Op } = require('sequelize');
 const { deleteOldImage, renameFileByProductId, moveFilesToProductFolder, deleteProductFolder, cleanupTempFiles } = require('../middlewares/upload.middleware');
 const DTOMapper = require('../utils/DTOMapper');
@@ -474,7 +475,7 @@ exports.updateProduct = async (req, res) => {
       });
     }
 
-    const { Ten, MoTa, GiaBan, Ton, LoaiID, Enable } = req.body;
+    const { Ten, MoTa, GiaBan, Ton, LoaiID, ThuongHieuID, Enable } = req.body;
 
     // Validate dữ liệu đầu vào
     const errors = [];
@@ -504,6 +505,12 @@ exports.updateProduct = async (req, res) => {
     if (LoaiID !== undefined) {
       if (isNaN(LoaiID) || parseInt(LoaiID) < 1) {
         errors.push('Loại sản phẩm không hợp lệ');
+      }
+    }
+
+    if (ThuongHieuID !== undefined && ThuongHieuID !== null && ThuongHieuID !== '') {
+      if (isNaN(ThuongHieuID) || parseInt(ThuongHieuID) < 1) {
+        errors.push('Thương hiệu không hợp lệ');
       }
     }
 
@@ -562,6 +569,21 @@ exports.updateProduct = async (req, res) => {
       }
     }
 
+    // Kiểm tra thương hiệu nếu được cập nhật
+    if (ThuongHieuID !== undefined && ThuongHieuID !== null && ThuongHieuID !== '') {
+      const thuongHieu = await ThuongHieu.findByPk(parseInt(ThuongHieuID));
+
+      if (!thuongHieu) {
+        if (req.files && req.files.length > 0) {
+          cleanupTempFiles(req.files);
+        }
+        return res.status(404).json({
+          success: false,
+          message: 'Thương hiệu không tồn tại'
+        });
+      }
+    }
+
     // Kiểm tra tên trùng lặp (nếu tên được cập nhật)
     if (Ten !== undefined && Ten.trim() !== product.Ten) {
       const existingProduct = await SanPham.findOne({
@@ -608,6 +630,15 @@ exports.updateProduct = async (req, res) => {
 
     if (LoaiID !== undefined) {
       updateData.LoaiID = parseInt(LoaiID);
+    }
+
+    // ✅ Xử lý ThuongHieuID: có thể là số (đặt thương hiệu) hoặc null/empty (xóa thương hiệu)
+    if (ThuongHieuID !== undefined) {
+      if (ThuongHieuID === null || ThuongHieuID === '' || ThuongHieuID === 'null') {
+        updateData.ThuongHieuID = null; // Xóa thương hiệu
+      } else if (parseInt(ThuongHieuID) > 0) {
+        updateData.ThuongHieuID = parseInt(ThuongHieuID); // Đặt thương hiệu
+      }
     }
 
     if (Enable !== undefined) {
@@ -668,11 +699,18 @@ exports.updateProduct = async (req, res) => {
     // Lấy lại thông tin sản phẩm đã cập nhật
     const updatedProduct = await SanPham.findOne({
       where: { ID: productId },
-      include: [{
-        model: LoaiSP,
-        as: 'loaiSP',
-        attributes: ['ID', 'Ten'] // ✅ Bỏ 'MoTa'
-      }]
+      include: [
+        {
+          model: LoaiSP,
+          as: 'loaiSP',
+          attributes: ['ID', 'Ten'] // ✅ Bỏ 'MoTa'
+        },
+        {
+          model: ThuongHieu,
+          as: 'thuongHieu',
+          attributes: ['ID', 'TenThuongHieu']
+        }
+      ]
     });
 
     console.log('✅ Cập nhật sản phẩm thành công:', updatedProduct.Ten);
@@ -686,11 +724,16 @@ exports.updateProduct = async (req, res) => {
       SoLuongTon: updatedProduct.SoLuongTon,
       HinhAnhURL: updatedProduct.HinhAnhURL,
       LoaiID: updatedProduct.LoaiID,
+      ThuongHieuID: updatedProduct.ThuongHieuID,
       NgayTao: updatedProduct.NgayTao,
       TrangThai: updatedProduct.TrangThai,
       LoaiSP: updatedProduct.loaiSP ? {
         ID: updatedProduct.loaiSP.ID,
         Ten: updatedProduct.loaiSP.Ten
+      } : null,
+      ThuongHieu: updatedProduct.thuongHieu ? {
+        ID: updatedProduct.thuongHieu.ID,
+        TenThuongHieu: updatedProduct.thuongHieu.TenThuongHieu
       } : null
     });
 

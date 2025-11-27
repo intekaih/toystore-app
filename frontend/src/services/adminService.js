@@ -1244,6 +1244,55 @@ class AdminService {
   }
 
   /**
+   * Lấy phí ship cố định
+   * @returns {Promise<Object>}
+   */
+  async getShippingFee() {
+    try {
+      const response = await this.api.get('/admin/settings/shipping-fee');
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.data,
+          message: response.data.message
+        };
+      }
+      
+      throw new Error(response.data.message || 'Lấy phí ship thất bại');
+    } catch (error) {
+      console.error('❌ Lỗi lấy phí ship:', error);
+      throw this._handleError(error);
+    }
+  }
+
+  /**
+   * Cập nhật phí ship cố định
+   * @param {number} shippingFee - Phí ship mới (VNĐ)
+   * @returns {Promise<Object>}
+   */
+  async updateShippingFee(shippingFee) {
+    try {
+      const response = await this.api.put('/admin/settings/shipping-fee', {
+        shippingFee: shippingFee
+      });
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.data,
+          message: response.data.message
+        };
+      }
+      
+      throw new Error(response.data.message || 'Cập nhật phí ship thất bại');
+    } catch (error) {
+      console.error('❌ Lỗi cập nhật phí ship:', error);
+      throw this._handleError(error);
+    }
+  }
+
+  /**
    * Xử lý lỗi
    * @private
    */

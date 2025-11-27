@@ -61,6 +61,20 @@
 .modal-header h2 {
   margin: 0;
   font-size: 1.25rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.header-icon-box {
+  background: white;
+  padding: 0.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #667eea;
 }
 
 .close-btn {
@@ -97,13 +111,14 @@
   overflow: hidden;
 }
 
-.form-body {
+.category-modal .form-body {
   padding: 1.25rem;
-  display: flex;
+  display: flex !important;
   flex-direction: column;
   gap: 1rem;
   flex: 1;
   overflow-y: auto;
+  grid-template-columns: none !important;
 }
 
 .form-group {
@@ -124,12 +139,17 @@
 
 .form-group input,
 .form-group textarea {
-  padding: 0.6rem 0.75rem;
+  padding: 0.75rem 1rem;
   border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 0.875rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
   transition: all 0.3s ease;
   font-family: inherit;
+  background: white;
+}
+
+.form-group input::placeholder {
+  color: #999;
 }
 
 .form-group input:focus,
@@ -165,7 +185,8 @@
   font-size: 0.75rem;
   color: #999;
   text-align: right;
-  margin-top: -0.15rem;
+  margin-top: 0.25rem;
+  font-weight: 500;
 }
 
 .info-box {

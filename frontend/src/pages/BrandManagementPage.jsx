@@ -195,9 +195,9 @@ const BrandManagementPage = () => {
         {/* Back Button */}
         <div className="mb-4">
           <button
-            onClick={() => navigate('/admin/dashboard')}
+            onClick={() => navigate('/admin/products')}
             className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200"
-            title="Quay lại dashboard"
+            title="Quay lại trang quản lý sản phẩm"
           >
             <ArrowLeft size={18} />
             <span>Quay lại</span>

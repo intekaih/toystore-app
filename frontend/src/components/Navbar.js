@@ -441,6 +441,75 @@ const Navbar = () => {
     }
   };
 
+  // ✅ Kiểm tra thông tin khách hàng đã đầy đủ chưa
+  const checkCustomerInfoComplete = () => {
+    const STORAGE_KEY = 'checkout_customer_info';
+    const savedInfo = localStorage.getItem(STORAGE_KEY);
+    
+    if (!savedInfo) {
+      return false;
+    }
+
+    try {
+      const info = JSON.parse(savedInfo);
+      
+      // ✅ Kiểm tra tất cả các trường bắt buộc
+      const isComplete = !!(
+        info.hoTen?.trim() &&
+        info.email?.trim() &&
+        info.dienThoai?.trim() &&
+        info.diaChi?.trim() &&
+        info.tinhThanhCode &&
+        info.tinhThanhName &&
+        info.quanHuyenCode &&
+        info.quanHuyenName &&
+        info.phuongXaCode &&
+        info.phuongXaName
+      );
+
+      return isComplete;
+    } catch (e) {
+      console.error('❌ Lỗi khi parse thông tin:', e);
+      return false;
+    }
+  };
+
+  // ✅ Hàm xử lý khi nhấn "Tiến hành thanh toán" trong popup giỏ hàng
+  const handleCheckoutClick = (e) => {
+    e.preventDefault();
+    setShowCartPopup(false);
+    
+    const isInfoComplete = checkCustomerInfoComplete();
+
+    if (isInfoComplete) {
+      // ✅ Thông tin đã đầy đủ → Chuyển thẳng sang trang chọn phương thức thanh toán
+      const savedInfo = JSON.parse(localStorage.getItem('checkout_customer_info'));
+      
+      navigate('/payment-method', {
+        state: {
+          customerInfo: {
+            hoTen: savedInfo.hoTen,
+            email: savedInfo.email,
+            dienThoai: savedInfo.dienThoai,
+            diaChi: savedInfo.diaChi,
+            // ✅ GỬI TÊN (để hiển thị)
+            tinhThanh: savedInfo.tinhThanhName,
+            quanHuyen: savedInfo.quanHuyenName,
+            phuongXa: savedInfo.phuongXaName,
+            // ✅ THÊM: GỬI MÃ (cho GHN API)
+            maTinhID: savedInfo.tinhThanhCode,
+            maQuanID: savedInfo.quanHuyenCode,
+            maPhuongXa: savedInfo.phuongXaCode,
+            ghiChu: ''
+          }
+        }
+      });
+    } else {
+      // ❌ Thông tin chưa đầy đủ → Chuyển đến trang checkout để nhập
+      navigate('/checkout');
+    }
+  };
+
   // Update quantity
   const handleUpdateQuantity = async (productId, newQuantity) => {
     if (newQuantity < 1) {
@@ -1222,14 +1291,13 @@ const Navbar = () => {
 
                 {/* Action Buttons */}
                 <div className="p-4 space-y-2 border-t-2 border-primary-100 bg-white rounded-b-cute">
-                  <Link
-                    to="/checkout"
+                  <button
+                    onClick={handleCheckoutClick}
                     className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-primary-400 hover:bg-primary-500 text-white text-sm font-display font-semibold rounded-cute transition-all shadow-soft hover:shadow-cute"
-                    onClick={() => setShowCartPopup(false)}
                   >
                     <span>Tiến hành thanh toán</span>
                     <ChevronRight size={16} />
-                  </Link>
+                  </button>
                   <Link
                     to="/products"
                     className="block w-full text-center text-sm text-gray-600 hover:text-primary-600 font-body transition-colors py-2"

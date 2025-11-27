@@ -18,6 +18,8 @@ import { Card } from '../components/ui';
 import AdminLayout from '../layouts/AdminLayout';
 import { statisticsService } from '../services'; // ✅ Sử dụng statisticsService
 import { useAuth } from '../contexts/AuthContext';
+import adminService from '../services/adminService';
+import { Save } from 'lucide-react';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -32,6 +34,11 @@ const AdminDashboard = () => {
     doanhThu: 0
   });
   const [loading, setLoading] = useState(true);
+  
+  // State cho phí ship
+  const [shippingFee, setShippingFee] = useState(30000);
+  const [shippingFeeInput, setShippingFeeInput] = useState('30000');
+  const [isUpdatingShippingFee, setIsUpdatingShippingFee] = useState(false);
 
   // Fetch thống kê dashboard
   useEffect(() => {
@@ -58,6 +65,51 @@ const AdminDashboard = () => {
 
     fetchDashboardStats();
   }, [logout, navigate]);
+
+  // Fetch phí ship cố định
+  useEffect(() => {
+    const fetchShippingFee = async () => {
+      try {
+        const response = await adminService.getShippingFee();
+        if (response.success) {
+          const fee = response.data.shippingFee || 30000;
+          setShippingFee(fee);
+          setShippingFeeInput(fee.toString());
+        }
+      } catch (error) {
+        console.error('Error fetching shipping fee:', error);
+      }
+    };
+
+    fetchShippingFee();
+  }, []);
+
+  // Xử lý cập nhật phí ship
+  const handleUpdateShippingFee = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const fee = parseFloat(shippingFeeInput);
+    
+    if (isNaN(fee) || fee < 0) {
+      alert('Phí ship phải là số không âm');
+      return;
+    }
+
+    setIsUpdatingShippingFee(true);
+    try {
+      const response = await adminService.updateShippingFee(fee);
+      if (response.success) {
+        setShippingFee(fee);
+        alert('✅ Cập nhật phí ship thành công!');
+      }
+    } catch (error) {
+      console.error('Error updating shipping fee:', error);
+      alert(`❌ ${error.message || 'Cập nhật phí ship thất bại'}`);
+    } finally {
+      setIsUpdatingShippingFee(false);
+    }
+  };
 
   // Format số tiền
   const formatCurrency = (value) => {
@@ -118,7 +170,9 @@ const AdminDashboard = () => {
     },
     {
       title: 'Quản lý phí ship',
-      description: 'Quản lý phí vận chuyển',
+      description: <p className="text-xs text-gray-500">
+      Hiện tại: {shippingFee.toLocaleString('vi-VN')} VNĐ
+    </p>,
       icon: Truck,
       route: '/admin/shipping-fees',
       color: 'from-cyan-50 to-cyan-100 border-cyan-200',
@@ -228,32 +282,97 @@ const AdminDashboard = () => {
           Chức năng quản lý
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {adminFeatures.map((feature, index) => {
-            const IconComponent = feature.icon;
-            return (
-              <Card
-                key={index}
-                className={`bg-gradient-to-r ${feature.color} cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-lg`}
-                onClick={() => navigate(feature.route)}
-              >
-                <div className="p-4">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`p-2 ${feature.iconBg} rounded-cute text-white shadow-lg`}>
-                      <IconComponent size={24} />
+          {/* Render các card khác trước */}
+          {adminFeatures
+            .filter(feature => feature.title !== 'Quản lý phí ship')
+            .map((feature, index) => {
+              const IconComponent = feature.icon;
+              return (
+                <Card
+                  key={index}
+                  className={`bg-gradient-to-r ${feature.color} cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-lg`}
+                  onClick={() => navigate(feature.route)}
+                >
+                  <div className="p-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`p-2 ${feature.iconBg} rounded-cute text-white shadow-lg`}>
+                        <IconComponent size={24} />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-base font-bold text-gray-800 mb-0.5">{feature.title}</h3>
+                        <p className="text-gray-600 text-xs">{feature.description}</p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-base font-bold text-gray-800 mb-0.5">{feature.title}</h3>
-                      <p className="text-gray-600 text-xs">{feature.description}</p>
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-300">
+                      <span className="text-xs font-semibold text-gray-500">{feature.stats}</span>
+                      <span className="text-primary-600 text-sm">→</span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-300">
-                    <span className="text-xs font-semibold text-gray-500">{feature.stats}</span>
-                    <span className="text-primary-600 text-sm">→</span>
+                </Card>
+              );
+            })}
+          
+          {/* Card "Quản lý phí ship" render cuối cùng */}
+          {adminFeatures
+            .filter(feature => feature.title === 'Quản lý phí ship')
+            .map((feature, index) => {
+              const IconComponent = feature.icon;
+              return (
+                <Card
+                  key={`shipping-${index}`}
+                  className={`bg-gradient-to-r ${feature.color} transform transition-all duration-300 hover:shadow-lg`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="p-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`p-2 ${feature.iconBg} rounded-cute text-white shadow-lg`}>
+                        <IconComponent size={24} />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-base font-bold text-gray-800 mb-0.5">{feature.title}</h3>
+                        <p className="text-gray-600 text-xs">{feature.description}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Đường gạch chia đôi */}
+                    <div className="border-t border-gray-300 pt-2 mb-2"></div>
+                    
+                    {/* Form cập nhật phí ship */}
+                    <form onSubmit={handleUpdateShippingFee} onClick={(e) => e.stopPropagation()} className="w-full">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full min-w-0">
+                        <input
+                          type="number"
+                          value={shippingFeeInput}
+                          onChange={(e) => setShippingFeeInput(e.target.value)}
+                          className="flex-1 min-w-0 px-3 py-2 text-sm border-0 rounded-2xl 
+                                   focus:outline-none focus:ring-2 focus:ring-cyan-300
+                                   transition-all duration-200 bg-white/80"
+                          placeholder="Nhập phí ship"
+                          min="0"
+                          step="1000"
+                          disabled={isUpdatingShippingFee}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <button
+                          type="submit"
+                          disabled={isUpdatingShippingFee || parseFloat(shippingFeeInput) === shippingFee}
+                          className="px-3 sm:px-4 py-2 bg-cyan-500 text-white text-sm font-semibold rounded-lg
+                                   hover:bg-cyan-600 focus:outline-none focus:ring-2 focus:ring-cyan-300
+                                   transition-all duration-200 flex items-center justify-center gap-2
+                                   disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap
+                                   flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Save size={16} />
+                          <span className="hidden sm:inline">{isUpdatingShippingFee ? 'Đang cập nhật...' : 'Cập nhật'}</span>
+                          <span className="sm:hidden">{isUpdatingShippingFee ? '...' : 'OK'}</span>
+                        </button>
+                      </div>
+                    </form>
                   </div>
-                </div>
-              </Card>
-            );
-          })}
+                </Card>
+              );
+            })}
         </div>
       </div>
     </AdminLayout>

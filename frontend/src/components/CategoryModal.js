@@ -93,12 +93,16 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, editingCategory, mode }) => 
           <h2 className="flex items-center gap-2">
             {mode === 'create' ? (
               <>
-                <Plus size={18} />
+                <div className="header-icon-box">
+                  <Plus size={18} />
+                </div>
                 Thêm danh mục mới
               </>
             ) : (
               <>
-                <Edit size={18} />
+                <div className="header-icon-box">
+                  <Edit size={18} />
+                </div>
                 Cập nhật danh mục
               </>
             )}
@@ -123,11 +127,11 @@ const CategoryModal = ({ isOpen, onClose, onSubmit, editingCategory, mode }) => 
                 onChange={handleChange}
                 className={errors.Ten ? 'error' : ''}
                 disabled={isSubmitting}
-                placeholder="Nhập tên danh mục (VD: Đồ chơi xếp hình)"
+                placeholder="Nhập tên"
                 maxLength={100}
+                autoFocus
               />
               {errors.Ten && <span className="error-message">{errors.Ten}</span>}
-              <div className="char-count">{formData.Ten.length}/100 ký tự</div>
             </div>
 
             {mode === 'edit' && editingCategory && (

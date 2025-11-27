@@ -350,21 +350,78 @@ const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, b
 
     try {
       let categoryId = formData.loaiID;
-      let brandId = formData.thuongHieuID;
+      // ✅ Sử dụng brandData.id thay vì formData.thuongHieuID để đảm bảo lấy đúng giá trị hiện tại
+      let brandId = brandData.id || formData.thuongHieuID;
 
+      // ✅ Tạo danh mục mới nếu cần
       if (categoryData.isNew && categoryData.ten) {
-        const catResponse = await adminService.createCategory({ Ten: categoryData.ten });
-        if (catResponse.success) {
-          categoryId = catResponse.data.category.id;
-          if (onRefreshData) onRefreshData();
+        const categoryName = categoryData.ten.trim();
+        
+        // ✅ Validate tên danh mục trước khi gửi
+        if (!categoryName) {
+          setErrors(prev => ({ ...prev, loaiID: 'Tên danh mục không được để trống' }));
+          setIsSubmitting(false);
+          return;
+        }
+        
+        if (categoryName.length < 2) {
+          setErrors(prev => ({ ...prev, loaiID: 'Tên danh mục phải có ít nhất 2 ký tự' }));
+          setIsSubmitting(false);
+          return;
+        }
+        
+        try {
+          const catResponse = await adminService.createCategory({ Ten: categoryName });
+          if (catResponse.success) {
+            categoryId = catResponse.data.category.id;
+            if (onRefreshData) onRefreshData();
+          } else {
+            throw new Error(catResponse.message || 'Tạo danh mục thất bại');
+          }
+        } catch (error) {
+          console.error('❌ Lỗi tạo danh mục:', error);
+          setErrors(prev => ({ 
+            ...prev, 
+            loaiID: error.message || 'Không thể tạo danh mục. Vui lòng thử lại.' 
+          }));
+          setIsSubmitting(false);
+          return;
         }
       }
 
+      // ✅ Tạo thương hiệu mới nếu cần
       if (brandData.isNew && brandData.tenThuongHieu) {
-        const brandResponse = await adminService.createBrand({ TenThuongHieu: brandData.tenThuongHieu });
-        if (brandResponse.success) {
-          brandId = brandResponse.data.brand.id;
-          if (onRefreshData) onRefreshData();
+        const brandName = brandData.tenThuongHieu.trim();
+        
+        // ✅ Validate tên thương hiệu trước khi gửi
+        if (!brandName) {
+          setErrors(prev => ({ ...prev, thuongHieuID: 'Tên thương hiệu không được để trống' }));
+          setIsSubmitting(false);
+          return;
+        }
+        
+        if (brandName.length < 2) {
+          setErrors(prev => ({ ...prev, thuongHieuID: 'Tên thương hiệu phải có ít nhất 2 ký tự' }));
+          setIsSubmitting(false);
+          return;
+        }
+        
+        try {
+          const brandResponse = await adminService.createBrand({ TenThuongHieu: brandName });
+          if (brandResponse.success) {
+            brandId = brandResponse.data.brand.id;
+            if (onRefreshData) onRefreshData();
+          } else {
+            throw new Error(brandResponse.message || 'Tạo thương hiệu thất bại');
+          }
+        } catch (error) {
+          console.error('❌ Lỗi tạo thương hiệu:', error);
+          setErrors(prev => ({ 
+            ...prev, 
+            thuongHieuID: error.message || 'Không thể tạo thương hiệu. Vui lòng thử lại.' 
+          }));
+          setIsSubmitting(false);
+          return;
         }
       }
 
@@ -374,9 +431,24 @@ const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, b
       submitData.append('GiaBan', parseFloat(formData.giaBan));
       submitData.append('Ton', parseInt(formData.soLuongTon));
       submitData.append('LoaiID', parseInt(categoryId));
-      if (brandId) {
-        submitData.append('ThuongHieuID', parseInt(brandId));
+      
+      // ✅ Trong chế độ edit, luôn gửi ThuongHieuID (kể cả null) để backend biết có cần xóa thương hiệu không
+      // ✅ Trong chế độ create, chỉ gửi nếu có giá trị
+      if (mode === 'edit') {
+        // Trong edit mode, luôn gửi để backend biết ý định của user
+        if (brandId && parseInt(brandId) > 0) {
+          submitData.append('ThuongHieuID', parseInt(brandId));
+        } else {
+          // Gửi empty string để backend biết cần xóa thương hiệu
+          submitData.append('ThuongHieuID', '');
+        }
+      } else {
+        // Trong create mode, chỉ gửi nếu có giá trị
+        if (brandId && parseInt(brandId) > 0) {
+          submitData.append('ThuongHieuID', parseInt(brandId));
+        }
       }
+      
       submitData.append('Enable', formData.enable ? 'true' : 'false');
 
       imageFiles.forEach((file, index) => {
