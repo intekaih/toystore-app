@@ -369,6 +369,7 @@ const OrderTable = ({ orders, onUpdateStatus, loading, isStaffView = false }) =>
           <tr>
             <th>Mã đơn</th>
             <th>Khách hàng</th>
+            <th>Mã vận đơn</th>
             <th>Ngày đặt</th>
             <th>Tổng tiền</th>
             <th>Trạng thái</th>
@@ -400,6 +401,16 @@ const OrderTable = ({ orders, onUpdateStatus, loading, isStaffView = false }) =>
                       {order.khachHang?.dienThoai || 'N/A'}
                     </div>
                   </div>
+                </td>
+
+                <td className="tracking-col">
+                  {order.maVanDon ? (
+                    <span className="tracking-code">
+                      {order.maVanDon}
+                    </span>
+                  ) : (
+                    <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>-</span>
+                  )}
                 </td>
 
                 <td className="date-col">
@@ -462,7 +473,7 @@ const OrderTable = ({ orders, onUpdateStatus, loading, isStaffView = false }) =>
               {/* Chi tiết đơn hàng khi expand */}
               {expandedOrderId === order.id && (
                 <tr className="order-detail-row">
-                  <td colSpan="7">
+                  <td colSpan="8">
                     <div className="order-detail">
                       {/* Thông tin khách hàng */}
                       <div className="detail-section">

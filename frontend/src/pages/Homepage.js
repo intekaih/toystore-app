@@ -767,34 +767,6 @@ const Homepage = () => {
         </div>
       </section>
 
-      <section className="py-16 bg-gradient-to-br from-cream-50 via-primary-50 to-rose-50">
-        <div className="container-cute">
-          <div className="text-center mb-12 space-y-3">
-            <h2 className="text-4xl font-display font-bold text-gray-800">Danh mục sản phẩm</h2>
-            <p className="text-lg text-gray-600">Tìm đồ chơi phù hợp với lứa tuổi</p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { icon: '🧠', title: 'Đồ chơi giáo dục', desc: 'Phát triển trí tuệ', category: 'educational' },
-              { icon: '🧱', title: 'Đồ chơi lắp ráp', desc: 'Lego, xếp hình', category: 'building' },
-              { icon: '👸', title: 'Búp bê', desc: 'Búp bê các loại', category: 'dolls' },
-              { icon: '🚗', title: 'Xe mô hình', desc: 'Xe đồ chơi', category: 'vehicles' },
-            ].map((cat, idx) => (
-              <div 
-                key={idx}
-                onClick={() => navigate(`/products?category=${cat.category}`)}
-                className="bg-white p-8 rounded-bubble text-center hover:shadow-bubble hover:-translate-y-2 transition-all cursor-pointer border-2 border-primary-100 group"
-              >
-                <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">{cat.icon}</div>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">{cat.title}</h3>
-                <p className="text-gray-600">{cat.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Trust & Credibility Section */}
       <section className="py-16 bg-gradient-to-br from-primary-50 via-rose-50 to-cream-50">
         <div className="container-cute">

@@ -6,6 +6,8 @@ const DTOMapper = require('../utils/DTOMapper'); // ✅ THÊM DTOMapper
 
 const HoaDon = db.HoaDon;
 const ChiTietHoaDon = db.ChiTietHoaDon;
+const GioHang = db.GioHang;
+const GioHangChiTiet = db.GioHangChiTiet;
 
 /**
  * Sắp xếp object theo key (yêu cầu của VNPay)
@@ -169,6 +171,38 @@ async function processPaymentSuccess(hoaDon, paymentInfo, transaction) {
 
   console.log(`✅ [${source}] Cập nhật trạng thái đơn hàng thành công → Đã xác nhận`);
   console.log(`📦 [${source}] Đơn hàng chờ shop đóng gói và tạo đơn GHN`);
+
+  // ✅ XÓA GIỎ HÀNG SAU KHI THANH TOÁN THÀNH CÔNG
+  try {
+    // Lấy thông tin khách hàng từ đơn hàng
+    const khachHang = await db.KhachHang.findByPk(hoaDon.KhachHangID, { transaction });
+    
+    if (khachHang && khachHang.TaiKhoanID) {
+      // ✅ User đã đăng nhập - Xóa giỏ hàng của user
+      const gioHang = await GioHang.findOne({
+        where: { TaiKhoanID: khachHang.TaiKhoanID },
+        transaction
+      });
+
+      if (gioHang) {
+        // Xóa tất cả chi tiết giỏ hàng
+        await GioHangChiTiet.destroy({
+          where: { GioHangID: gioHang.ID },
+          transaction
+        });
+        console.log(`🗑️ [${source}] Đã xóa giỏ hàng của user (ID: ${khachHang.TaiKhoanID})`);
+      } else {
+        console.log(`ℹ️ [${source}] Không tìm thấy giỏ hàng của user (ID: ${khachHang.TaiKhoanID}) - Có thể đã bị xóa trước đó`);
+      }
+    } else {
+      // ✅ Guest user - Không có giỏ hàng trong DB (dùng session storage)
+      // Giỏ hàng guest sẽ được xóa ở frontend
+      console.log(`ℹ️ [${source}] Đơn hàng của guest - Giỏ hàng sẽ được xóa ở frontend`);
+    }
+  } catch (cartError) {
+    // ⚠️ Không throw error nếu xóa giỏ hàng thất bại - Đơn hàng đã được xử lý thành công
+    console.error(`⚠️ [${source}] Lỗi khi xóa giỏ hàng (không ảnh hưởng đến đơn hàng):`, cartError.message);
+  }
 
   return {
     success: true,

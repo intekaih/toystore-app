@@ -12,6 +12,67 @@ const ConfigService = require('../utils/ConfigService');
 const logger = Logger.getInstance();
 const config = ConfigService.getInstance();
 
+/**
+ * 🔗 Merge đơn hàng guest vào tài khoản mới
+ * Tìm các KhachHang có cùng email/số điện thoại nhưng chưa có TaiKhoanID
+ * và cập nhật TaiKhoanID cho họ
+ * @param {number} taiKhoanId - ID của tài khoản mới
+ * @param {string} email - Email của tài khoản (có thể null)
+ * @param {string} dienThoai - Số điện thoại của tài khoản (có thể null)
+ */
+exports.mergeGuestOrders = async (taiKhoanId, email, dienThoai) => {
+  try {
+    const KhachHang = db.KhachHang;
+    
+    // Tìm các KhachHang có cùng email hoặc số điện thoại nhưng chưa có TaiKhoanID
+    const whereCondition = {
+      TaiKhoanID: null, // Chỉ tìm các guest chưa có tài khoản
+      [Op.or]: []
+    };
+
+    if (email && email.trim()) {
+      whereCondition[Op.or].push({ Email: email.trim().toLowerCase() });
+    }
+
+    if (dienThoai && dienThoai.trim()) {
+      whereCondition[Op.or].push({ DienThoai: dienThoai.trim() });
+    }
+
+    // Nếu không có email hoặc số điện thoại, không merge
+    if (whereCondition[Op.or].length === 0) {
+      logger.info('⚠️ Không có email/số điện thoại để merge đơn hàng guest');
+      return { merged: 0 };
+    }
+
+    const guestCustomers = await KhachHang.findAll({
+      where: whereCondition
+    });
+
+    if (!guestCustomers || guestCustomers.length === 0) {
+      logger.info('ℹ️ Không tìm thấy đơn hàng guest để merge');
+      return { merged: 0 };
+    }
+
+    logger.info(`🔗 Tìm thấy ${guestCustomers.length} khách hàng guest để merge vào tài khoản ${taiKhoanId}`);
+
+    // Cập nhật TaiKhoanID cho tất cả các KhachHang guest
+    let mergedCount = 0;
+    for (const guestCustomer of guestCustomers) {
+      await guestCustomer.update({ TaiKhoanID: taiKhoanId });
+      mergedCount++;
+      logger.info(`✅ Đã merge khách hàng guest ID ${guestCustomer.ID} vào tài khoản ${taiKhoanId}`);
+    }
+
+    logger.success(`✅ Đã merge ${mergedCount} khách hàng guest vào tài khoản ${taiKhoanId}`);
+    return { merged: mergedCount };
+
+  } catch (error) {
+    logger.logError(error, 'Merge guest orders');
+    // Không throw error để không ảnh hưởng đến quá trình đăng ký/đăng nhập
+    return { merged: 0, error: error.message };
+  }
+};
+
 // Đăng ký tài khoản mới
 exports.register = async (req, res) => {
   try {
@@ -96,6 +157,16 @@ exports.register = async (req, res) => {
     });
 
     logger.success(`✅ Đăng ký thành công: ${newUser.TenDangNhap} (ID: ${newUser.ID})`);
+
+    // 🔗 Merge đơn hàng guest vào tài khoản mới (nếu có)
+    const mergeResult = await exports.mergeGuestOrders(
+      newUser.ID,
+      newUser.Email,
+      newUser.DienThoai
+    );
+    if (mergeResult.merged > 0) {
+      logger.info(`📦 Đã merge ${mergeResult.merged} đơn hàng guest vào tài khoản ${newUser.TenDangNhap}`);
+    }
 
     // ✅ SỬ DỤNG DTOMapper
     const userResponse = DTOMapper.toCamelCase({
@@ -231,6 +302,16 @@ exports.login = async (req, res) => {
     );
 
     logger.success(`✅ Đăng nhập thành công: ${user.TenDangNhap} (${user.VaiTro})`);
+
+    // 🔗 Merge đơn hàng guest vào tài khoản (nếu có)
+    const mergeResult = await exports.mergeGuestOrders(
+      user.ID,
+      user.Email,
+      user.DienThoai
+    );
+    if (mergeResult.merged > 0) {
+      logger.info(`📦 Đã merge ${mergeResult.merged} đơn hàng guest vào tài khoản ${user.TenDangNhap}`);
+    }
 
     // ✅ SỬ DỤNG DTOMapper
     const userData = DTOMapper.toCamelCase({
@@ -404,6 +485,16 @@ exports.googleCallback = async (req, res) => {
     );
 
     logger.success(`✅ Google OAuth đăng nhập thành công: ${user.TenDangNhap} (${user.VaiTro})`);
+
+    // 🔗 Merge đơn hàng guest vào tài khoản (nếu có)
+    const mergeResult = await exports.mergeGuestOrders(
+      user.ID,
+      user.Email,
+      user.DienThoai
+    );
+    if (mergeResult.merged > 0) {
+      logger.info(`📦 Đã merge ${mergeResult.merged} đơn hàng guest vào tài khoản ${user.TenDangNhap}`);
+    }
 
     // Redirect về frontend với token
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';

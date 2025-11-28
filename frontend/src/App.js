@@ -1,45 +1,51 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext.js';
 import ErrorBoundary from './components/ErrorBoundary.js';
 import ScrollToTop from './components/ScrollToTop.js';
-import Homepage from './pages/Homepage.js';
-import ProductList from './pages/Products/ProductList.js';
-import ProductDetail from './pages/Products/ProductDetail.js';
-import CartPage from './pages/CartPage.js';
-import CheckoutPage from './pages/CheckoutPage.js';
-import PaymentMethodPage from './pages/PaymentMethodPage.js';
-import OrderHistoryPage from './pages/OrderHistoryPage.js';
-import OrderDetailPage from './pages/OrderDetailPage.js';
-import OrderLookupPage from './pages/OrderLookupPage.js';
-import PaymentReturnPage from './pages/PaymentReturnPage.js';
-import Login from './pages/LoginPage.js';
-import Register from './pages/RegisterPage.js';
-import GoogleCallbackPage from './pages/GoogleCallbackPage.js';
-import Profile from './pages/ProfilePage.js';
-import EditProfilePage from './pages/EditProfilePage.js';
-import AdminLoginPage from './pages/AdminLoginPage.js';
-import AdminDashboard from './pages/AdminDashboard.js';
-import UserManagementPage from './pages/UserManagementPage.js';
-import CategoryManagementPage from './pages/CategoryManagementPage.js';
-import BrandManagementPage from './pages/BrandManagementPage.jsx';
-import ProductManagementPage from './pages/ProductManagementPage.jsx';
-import OrderManagementPage from './pages/OrderManagementPage.jsx';
-import StatisticsPage from './pages/StatisticsPage.jsx';
-import VoucherManagementPage from './pages/VoucherManagementPage.jsx';
-import GHNManagementPage from './pages/GHNManagementPage.jsx';
-import GHNMockTestPage from './pages/GHNMockTestPage.jsx';
-import BannerManagementPage from './pages/BannerManagementPage.jsx';
-// ✅ THÊM: Import các trang đánh giá
-import ReviewableProductsPage from './pages/ReviewableProductsPage.jsx';
-import AdminReviewManagementPage from './pages/AdminReviewManagementPage.jsx';
+import { Loading } from './components/ui';
 import ProtectedRoute from './components/ProtectedRoute.js';
 import AdminRoute from './components/AdminRoute.js';
-// ✅ THÊM: Import StaffRoute và các trang Staff
 import StaffRoute from './components/StaffRoute.js';
-import StaffDashboard from './pages/StaffDashboard.js';
 import './index.css';
 import './App.css';
+
+// ✅ Critical routes - Load ngay (Homepage, Login, Register)
+import Homepage from './pages/Homepage.js';
+import Login from './pages/LoginPage.js';
+import Register from './pages/RegisterPage.js';
+
+// ✅ Lazy load các routes khác để giảm initial bundle size
+const ProductList = React.lazy(() => import('./pages/Products/ProductList.js'));
+const ProductDetail = React.lazy(() => import('./pages/Products/ProductDetail.js'));
+const CartPage = React.lazy(() => import('./pages/CartPage.js'));
+const CheckoutPage = React.lazy(() => import('./pages/CheckoutPage.js'));
+const PaymentMethodPage = React.lazy(() => import('./pages/PaymentMethodPage.js'));
+const OrderHistoryPage = React.lazy(() => import('./pages/OrderHistoryPage.js'));
+const OrderDetailPage = React.lazy(() => import('./pages/OrderDetailPage.js'));
+const OrderLookupPage = React.lazy(() => import('./pages/OrderLookupPage.js'));
+const PaymentReturnPage = React.lazy(() => import('./pages/PaymentReturnPage.js'));
+const GoogleCallbackPage = React.lazy(() => import('./pages/GoogleCallbackPage.js'));
+const Profile = React.lazy(() => import('./pages/ProfilePage.js'));
+const EditProfilePage = React.lazy(() => import('./pages/EditProfilePage.js'));
+const AdminLoginPage = React.lazy(() => import('./pages/AdminLoginPage.js'));
+const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard.js'));
+const UserManagementPage = React.lazy(() => import('./pages/UserManagementPage.js'));
+const CategoryManagementPage = React.lazy(() => import('./pages/CategoryManagementPage.js'));
+const BrandManagementPage = React.lazy(() => import('./pages/BrandManagementPage.jsx'));
+const ProductManagementPage = React.lazy(() => import('./pages/ProductManagementPage.jsx'));
+const OrderManagementPage = React.lazy(() => import('./pages/OrderManagementPage.jsx'));
+const StatisticsPage = React.lazy(() => import('./pages/StatisticsPage.jsx'));
+const VoucherManagementPage = React.lazy(() => import('./pages/VoucherManagementPage.jsx'));
+const GHNManagementPage = React.lazy(() => import('./pages/GHNManagementPage.jsx'));
+const GHNMockTestPage = React.lazy(() => import('./pages/GHNMockTestPage.jsx'));
+const BannerManagementPage = React.lazy(() => import('./pages/BannerManagementPage.jsx'));
+const ReviewableProductsPage = React.lazy(() => import('./pages/ReviewableProductsPage.jsx'));
+const AdminReviewManagementPage = React.lazy(() => import('./pages/AdminReviewManagementPage.jsx'));
+const StaffDashboard = React.lazy(() => import('./pages/StaffDashboard.js'));
+
+// ✅ Loading fallback component cho Suspense
+const PageLoading = () => <Loading fullScreen={true} text="Đang tải trang..." />;
 
 function App() {
   return (
@@ -48,7 +54,8 @@ function App() {
         <Router>
           <ScrollToTop />
           <div className="App">
-            <Routes>
+            <Suspense fallback={<PageLoading />}>
+              <Routes>
               {/* Public routes */}
               <Route path="/" element={<Homepage />} />
               <Route path="/products" element={<ProductList />} />
@@ -257,7 +264,8 @@ function App() {
               
               {/* Catch all route - 404 */}
               <Route path="*" element={<NotFound />} />
-            </Routes>
+              </Routes>
+            </Suspense>
           </div>
         </Router>
       </AuthProvider>

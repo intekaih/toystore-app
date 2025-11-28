@@ -45,6 +45,15 @@ const PaymentReturnPage = () => {
               paymentMethod: stateData.paymentMethod || 'COD'
             }
           });
+
+          // ✅ XÓA GIỎ HÀNG SAU KHI ĐẶT HÀNG COD THÀNH CÔNG
+          try {
+            await cartService.clearCart();
+            console.log('✅ Đã xóa giỏ hàng sau khi đặt hàng COD thành công');
+          } catch (cartError) {
+            // ⚠️ Không throw error nếu xóa giỏ hàng thất bại - Đơn hàng đã được xử lý thành công
+            console.warn('⚠️ Không thể xóa giỏ hàng (không ảnh hưởng đến đơn hàng):', cartError.message);
+          }
         } else {
           setPaymentResult({
             success: false,
@@ -86,6 +95,15 @@ const PaymentReturnPage = () => {
               paymentMethod: 'VNPay'
             }
           });
+
+          // ✅ XÓA GIỎ HÀNG SAU KHI THANH TOÁN THÀNH CÔNG
+          try {
+            await cartService.clearCart();
+            console.log('✅ Đã xóa giỏ hàng sau khi thanh toán thành công');
+          } catch (cartError) {
+            // ⚠️ Không throw error nếu xóa giỏ hàng thất bại - Đơn hàng đã được xử lý thành công
+            console.warn('⚠️ Không thể xóa giỏ hàng (không ảnh hưởng đến đơn hàng):', cartError.message);
+          }
         } else {
           setPaymentResult({
             success: false,

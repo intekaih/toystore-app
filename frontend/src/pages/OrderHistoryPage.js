@@ -71,37 +71,56 @@ const OrderHistoryPage = () => {
     try {
       setLoading(true);
       
-      // ✅ Sử dụng orderService thay vì getOrderHistory API
-      const response = await orderService.getMyOrders({
+      // ✅ SỬA: Sử dụng getOrderHistory thay vì getMyOrders để hỗ trợ filter theo status
+      const response = await orderService.getOrderHistory({
         page: currentPage,
         limit: ordersPerPage,
-        status: statusFilter || undefined
+        trangThai: statusFilter || undefined
       });
 
       if (response.success) {
-        // ✅ Xử lý đúng cấu trúc response: response.data có thể là array hoặc object chứa array
+        // ✅ Xử lý đúng cấu trúc response từ getOrderHistory: response.data là array orders
         let ordersData = Array.isArray(response.data) 
           ? response.data 
-          : (response.data.orders || response.data.hoaDons || []);
+          : (response.data?.orders || response.data?.hoaDons || []);
         
-        // ✅ Normalize dữ liệu chiTiet cho mỗi order
+        // ✅ Normalize dữ liệu cho mỗi order
+        // Backend getOrderHistory trả về sanPhams thay vì chiTiet
         ordersData = ordersData.map(order => {
-          // Đảm bảo chiTiet luôn là array và có cấu trúc đúng
+          // Backend trả về sanPhams (array), cần convert thành chiTiet với cấu trúc đúng
+          const sanPhams = order.sanPhams || order.sanPham || [];
           const chiTiet = order.chiTiet || order.ChiTiet || [];
           
-          // Normalize từng item trong chiTiet
-          const normalizedChiTiet = chiTiet.map(item => ({
-            id: item.id || item.ID,
-            soLuong: item.soLuong || item.SoLuong || 0,
-            donGia: item.donGia || item.DonGia || 0,
-            thanhTien: item.thanhTien || item.ThanhTien || 0,
-            sanPham: {
-              id: item.sanPham?.id || item.sanPham?.ID,
-              ten: item.sanPham?.ten || item.sanPham?.Ten || item.tenSanPham || 'Sản phẩm không xác định',
-              hinhAnhUrl: item.sanPham?.hinhAnhUrl || item.sanPham?.hinhAnhURL || item.sanPham?.hinhAnh || item.sanPham?.HinhAnhURL || item.sanPham?.HinhAnh || '',
-              giaBan: item.sanPham?.giaBan || item.sanPham?.GiaBan || item.donGia || 0
-            }
-          }));
+          // Nếu có sanPhams từ backend, convert thành chiTiet
+          let normalizedChiTiet = [];
+          if (sanPhams.length > 0) {
+            normalizedChiTiet = sanPhams.map(item => ({
+              id: item.id || item.ID,
+              soLuong: item.soLuong || item.SoLuong || 0,
+              donGia: item.donGia || item.DonGia || 0,
+              thanhTien: item.thanhTien || item.ThanhTien || 0,
+              sanPham: {
+                id: item.id || item.ID,
+                ten: item.ten || item.tenSanPham || item.Ten || 'Sản phẩm không xác định',
+                hinhAnhUrl: item.hinhAnh || item.hinhAnhUrl || item.hinhAnhURL || item.HinhAnhURL || '',
+                giaBan: item.donGia || item.giaBan || 0
+              }
+            }));
+          } else if (chiTiet.length > 0) {
+            // Nếu có chiTiet, normalize như cũ
+            normalizedChiTiet = chiTiet.map(item => ({
+              id: item.id || item.ID,
+              soLuong: item.soLuong || item.SoLuong || 0,
+              donGia: item.donGia || item.DonGia || 0,
+              thanhTien: item.thanhTien || item.ThanhTien || 0,
+              sanPham: {
+                id: item.sanPham?.id || item.sanPham?.ID,
+                ten: item.sanPham?.ten || item.sanPham?.Ten || item.tenSanPham || 'Sản phẩm không xác định',
+                hinhAnhUrl: item.sanPham?.hinhAnhUrl || item.sanPham?.hinhAnhURL || item.sanPham?.hinhAnh || item.sanPham?.HinhAnhURL || item.sanPham?.HinhAnh || '',
+                giaBan: item.sanPham?.giaBan || item.sanPham?.GiaBan || item.donGia || 0
+              }
+            }));
+          }
           
           return {
             ...order,
@@ -111,11 +130,12 @@ const OrderHistoryPage = () => {
         
         setOrders(ordersData);
         
+        // ✅ Xử lý pagination từ response
         if (response.pagination) {
-          setTotalPages(response.pagination.totalPages);
+          setTotalPages(response.pagination.totalPages || 1);
           setTotalOrders(response.pagination.total || response.pagination.totalOrders || 0);
-        } else if (response.data.pagination) {
-          setTotalPages(response.data.pagination.totalPages);
+        } else if (response.data?.pagination) {
+          setTotalPages(response.data.pagination.totalPages || 1);
           setTotalOrders(response.data.pagination.total || response.data.pagination.totalOrders || 0);
         }
       }

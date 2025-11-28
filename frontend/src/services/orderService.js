@@ -136,6 +136,43 @@ class OrderService {
   }
 
   /**
+   * Lấy lịch sử đơn hàng với phân trang và filter
+   * @param {Object} filters - Bộ lọc
+   * @param {string} [filters.status] - Trạng thái đơn hàng (sẽ map thành trangThai)
+   * @param {string} [filters.trangThai] - Trạng thái đơn hàng (tên đúng theo backend)
+   * @param {number} [filters.page] - Trang hiện tại
+   * @param {number} [filters.limit] - Số items mỗi trang
+   * @returns {Promise<Object>}
+   */
+  async getOrderHistory(filters = {}) {
+    try {
+      // ✅ Map status thành trangThai để khớp với backend
+      const params = {
+        ...filters,
+        trangThai: filters.trangThai || filters.status || undefined
+      };
+      // Xóa status nếu có để tránh gửi cả 2
+      delete params.status;
+      
+      const response = await this.api.get('/orders/history', { params });
+      
+      if (response.data && response.data.success) {
+        return {
+          success: true,
+          data: response.data.data?.orders || response.data.data || [],
+          pagination: response.data.data?.pagination || response.data.pagination,
+          message: response.data.message
+        };
+      }
+      
+      throw new Error(response.data.message || 'Lấy lịch sử đơn hàng thất bại');
+    } catch (error) {
+      console.error('❌ Lỗi lấy lịch sử đơn hàng:', error);
+      throw this._handleError(error);
+    }
+  }
+
+  /**
    * Lấy chi tiết đơn hàng theo ID
    * @param {number} orderId - ID đơn hàng
    * @returns {Promise<Object>}
@@ -167,7 +204,8 @@ class OrderService {
    */
   async cancelOrder(orderId, reason) {
     try {
-      const response = await this.api.put(`/orders/${orderId}/cancel`, { reason });
+      // ✅ SỬA: Backend dùng POST không phải PUT, và nhận lyDoHuy không phải reason
+      const response = await this.api.post(`/orders/${orderId}/cancel`, { lyDoHuy: reason });
       
       if (response.data && response.data.success) {
         return {

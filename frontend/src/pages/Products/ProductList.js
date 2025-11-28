@@ -448,8 +448,12 @@ const ProductList = () => {
                             <button
                               key={index}
                               onClick={() => {
-                                handleFilterChange('minPrice', range.min);
-                                handleFilterChange('maxPrice', range.max);
+                                setFilters({
+                                  ...filters,
+                                  minPrice: range.min,
+                                  maxPrice: range.max,
+                                  page: 1
+                                });
                               }}
                               className={`w-full text-left p-2 rounded-lg border-2 transition-all text-sm font-medium ${
                                 isActive
