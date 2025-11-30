@@ -165,7 +165,22 @@ const ProductList = () => {
       const response = await productService.getProducts(apiParams);
       
       if (response.success && response.data) {
-        const products = response.data.products || response.data;
+        let products = response.data.products || response.data;
+        
+        // ✨ Sắp xếp: Sản phẩm còn hàng lên trên, hết hàng xuống cuối
+        products = products.sort((a, b) => {
+          const stockA = a.soLuongTon !== undefined ? a.soLuongTon : a.SoLuongTon !== undefined ? a.SoLuongTon : 0;
+          const stockB = b.soLuongTon !== undefined ? b.soLuongTon : b.SoLuongTon !== undefined ? b.SoLuongTon : 0;
+          
+          // Nếu cả 2 đều hết hàng hoặc cả 2 đều còn hàng, giữ nguyên thứ tự
+          if ((stockA === 0 && stockB === 0) || (stockA > 0 && stockB > 0)) {
+            return 0;
+          }
+          
+          // Sản phẩm còn hàng (stock > 0) lên trên, hết hàng (stock === 0) xuống dưới
+          return stockA === 0 ? 1 : -1;
+        });
+        
         setProducts(products);
         
         if (response.data.pagination) {
@@ -225,6 +240,9 @@ const ProductList = () => {
 
       if (response.success) {
         showToast(`Đã thêm ${quantity} ${product.ten} vào giỏ hàng`, 'success', 3000);
+        
+        // ✅ Dispatch event để Navbar cập nhật badge
+        window.dispatchEvent(new CustomEvent('cartUpdated'));
         
         if (!user) {
           setTimeout(() => {
@@ -667,7 +685,7 @@ const ProductList = () => {
                               <div className="col-span-4 flex flex-col justify-center">
                                 <h3 
                                   onClick={() => handleProductClick(productId)}
-                                  className="text-base font-semibold text-gray-800 mb-1 line-clamp-2 cursor-pointer hover:text-primary-600 transition-colors"
+                                  className="text-base font-semibold text-gray-800 mb-1 line-clamp-1 cursor-pointer hover:text-primary-600 transition-colors"
                                 >
                                   {productName}
                                 </h3>

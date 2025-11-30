@@ -10,6 +10,7 @@ import Toast from '../components/Toast';
 import { Button, Card } from '../components/ui';
 import AdminLayout from '../layouts/AdminLayout';
 import authService from '../services/authService';
+import Pagination from '../components/Pagination';
 
 const StatisticsPage = () => {
   const navigate = useNavigate();
@@ -31,6 +32,11 @@ const StatisticsPage = () => {
     message: '',
     type: 'info'
   });
+
+  // State cho phân trang
+  const [slowSellingPage, setSlowSellingPage] = useState(1);
+  const [lowStockPage, setLowStockPage] = useState(1);
+  const itemsPerPage = 10; // Số sản phẩm mỗi trang
 
   // Hiển thị toast
   const showToast = (message, type = 'info') => {
@@ -114,6 +120,9 @@ const StatisticsPage = () => {
   // Load thống kê khi component mount hoặc khi thay đổi filter
   useEffect(() => {
     fetchStatistics(selectedMonth, selectedYear, viewMode);
+    // Reset phân trang về trang 1 khi filter thay đổi
+    setSlowSellingPage(1);
+    setLowStockPage(1);
   }, [selectedMonth, selectedYear, viewMode]);
 
   // Xử lý thay đổi tháng
@@ -947,66 +956,6 @@ const StatisticsPage = () => {
         </Card>
       )}
 
-      {/* BÁO CÁO: Sản phẩm hết hàng */}
-      {statistics?.sanPhamHetHang && statistics.sanPhamHetHang.length > 0 && (
-        <Card id="out-of-stock" className="mb-6" padding="md">
-          <div className="mb-6">
-            <div className="flex items-center gap-3 mb-2">
-              <ShoppingCart size={32} className="text-orange-500" />
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800">
-                  Báo cáo: Sản phẩm hết hàng
-                </h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  Cảnh báo: {statistics.sanPhamHetHang.length} sản phẩm đang hết hàng (tồn kho = 0)
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {statistics.sanPhamHetHang.map((product) => (
-              <div key={product.sanPhamId} className="relative">
-                <Card 
-                  padding="md" 
-                  className="border-2 border-orange-400 bg-gradient-to-br from-orange-50 to-red-50 shadow-md hover:shadow-lg transition-shadow"
-                >
-                  <div className="flex flex-col gap-3">
-                    <div className="relative">
-                      <img 
-                        src={buildImageUrl(product.hinhAnh)} 
-                        alt={product.tenSanPham}
-                        className="w-full h-40 object-cover rounded-lg border-2 border-orange-300"
-                        onError={(e) => {
-                          e.target.src = '/barbie.jpg';
-                        }}
-                      />
-                      <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs font-bold">
-                        HẾT HÀNG
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-gray-800 truncate mb-1">{product.tenSanPham}</h4>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs text-gray-500">Tồn kho</p>
-                          <p className="text-lg font-bold text-red-600">0</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-gray-500">Giá bán</p>
-                          <p className="text-lg font-bold text-gray-800">{formatCurrency(product.giaBan)}</p>
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-2">ID: {product.sanPhamId}</p>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
       {/* BÁO CÁO: Sản phẩm bán không chạy */}
       {statistics?.sanPhamBanKhongChay && statistics.sanPhamBanKhongChay.length > 0 && (
         <Card id="slow-selling" className="mb-6" padding="md">
@@ -1032,17 +981,37 @@ const StatisticsPage = () => {
                   <th className="text-left py-3 px-4 font-semibold text-gray-700">Sản phẩm</th>
                   <th className="text-center py-3 px-4 font-semibold text-gray-700">Số lượng đã bán</th>
                   <th className="text-center py-3 px-4 font-semibold text-gray-700">Số lần mua</th>
-                  <th className="text-right py-3 px-4 font-semibold text-gray-700">Tổng doanh thu</th>
                   <th className="text-center py-3 px-4 font-semibold text-gray-700">Tồn kho</th>
                   <th className="text-right py-3 px-4 font-semibold text-gray-700">Giá bán</th>
                 </tr>
               </thead>
               <tbody>
-                {statistics.sanPhamBanKhongChay.map((product, index) => (
+                {(() => {
+                  // Sắp xếp và phân trang
+                  const sortedProducts = [...statistics.sanPhamBanKhongChay].sort((a, b) => {
+                    const aSoLuongBan = a.tongSoLuongBan || 0;
+                    const bSoLuongBan = b.tongSoLuongBan || 0;
+                    const aSoLanMua = a.soLanMua || 0;
+                    const bSoLanMua = b.soLanMua || 0;
+                    
+                    if (aSoLuongBan === 0 && bSoLuongBan === 0) {
+                      return aSoLanMua - bSoLanMua;
+                    }
+                    if (aSoLuongBan === 0) return -1;
+                    if (bSoLuongBan === 0) return 1;
+                    return aSoLuongBan - bSoLuongBan;
+                  });
+                  
+                  const totalPages = Math.ceil(sortedProducts.length / itemsPerPage);
+                  const startIndex = (slowSellingPage - 1) * itemsPerPage;
+                  const endIndex = startIndex + itemsPerPage;
+                  const paginatedProducts = sortedProducts.slice(startIndex, endIndex);
+                  
+                  return paginatedProducts.map((product, index) => (
                   <tr key={product.sanPhamId} className="border-b border-gray-100 hover:bg-indigo-50 transition-colors">
                     <td className="py-4 px-4">
                       <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold bg-indigo-500">
-                        #{index + 1}
+                        #{startIndex + index + 1}
                       </div>
                     </td>
                     <td className="py-4 px-4">
@@ -1068,9 +1037,6 @@ const StatisticsPage = () => {
                     <td className="py-4 px-4 text-center">
                       <span className="text-gray-700">{product.soLanMua || 0}</span>
                     </td>
-                    <td className="py-4 px-4 text-right">
-                      <span className="font-semibold text-gray-800">{formatCurrency(product.tongDoanhThu)}</span>
-                    </td>
                     <td className="py-4 px-4 text-center">
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${
                         product.tonKho === 0 
@@ -1086,9 +1052,100 @@ const StatisticsPage = () => {
                       <span className="text-gray-700">{formatCurrency(product.giaBan)}</span>
                     </td>
                   </tr>
-                ))}
+                  ));
+                })()}
               </tbody>
             </table>
+          </div>
+          
+          {/* Phân trang cho Sản phẩm bán không chạy */}
+          {(() => {
+            const sortedProducts = [...statistics.sanPhamBanKhongChay].sort((a, b) => {
+              const aSoLuongBan = a.tongSoLuongBan || 0;
+              const bSoLuongBan = b.tongSoLuongBan || 0;
+              const aSoLanMua = a.soLanMua || 0;
+              const bSoLanMua = b.soLanMua || 0;
+              
+              if (aSoLuongBan === 0 && bSoLuongBan === 0) {
+                return aSoLanMua - bSoLanMua;
+              }
+              if (aSoLuongBan === 0) return -1;
+              if (bSoLuongBan === 0) return 1;
+              return aSoLuongBan - bSoLuongBan;
+            });
+            const totalPages = Math.ceil(sortedProducts.length / itemsPerPage);
+            
+            return totalPages > 1 ? (
+              <div className="mt-4 flex justify-center">
+                <Pagination
+                  currentPage={slowSellingPage}
+                  totalPages={totalPages}
+                  onPageChange={setSlowSellingPage}
+                />
+              </div>
+            ) : null;
+          })()}
+        </Card>
+      )}
+
+      {/* BÁO CÁO: Sản phẩm hết hàng */}
+      {statistics?.sanPhamHetHang && statistics.sanPhamHetHang.length > 0 && (
+        <Card id="out-of-stock" className="mb-6" padding="md">
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-2">
+              <ShoppingCart size={32} className="text-orange-500" />
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  Báo cáo: Sản phẩm hết hàng
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Cảnh báo: {statistics.sanPhamHetHang.length} sản phẩm đang hết hàng (tồn kho = 0)
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {statistics.sanPhamHetHang.map((product) => (
+              <div key={product.sanPhamId} className="relative">
+                <Card 
+                  padding="md" 
+                  className="border-2 border-orange-400 bg-gradient-to-br from-orange-50 to-red-50 shadow-md hover:shadow-lg transition-shadow"
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="relative w-46 h-46 aspect-square">
+                      <img 
+                        src={buildImageUrl(product.hinhAnh)} 
+                        alt={product.tenSanPham}
+                        className="w-full h-full object-cover rounded-lg"
+                        onError={(e) => {
+                          e.target.src = '/barbie.jpg';
+                        }}
+                      />
+                      <div className="absolute top-1 left-1 bg-red-500 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">
+                        ID: {product.sanPhamId}
+                      </div>
+                      <div className="absolute top-1 right-1 bg-red-500 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">
+                        HẾT HÀNG
+                      </div>
+                    </div>
+                    <div className="w-full text-left">
+                      <h4 className="font-bold text-gray-800 truncate mb-2 text-sm text-left">{product.tenSanPham}</h4>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-left">
+                          <p className="text-[10px] text-gray-500 text-left">Tồn kho</p>
+                          <p className="text-base font-bold text-red-600 text-left">0</p>
+                        </div>
+                        <div className="flex-1 text-right">
+                          <p className="text-[10px] text-gray-500">Giá bán</p>
+                          <p className="text-base font-bold text-gray-800">{formatCurrency(product.giaBan)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            ))}
           </div>
         </Card>
       )}
@@ -1110,24 +1167,32 @@ const StatisticsPage = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {statistics.hangSapHet.map((product) => (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            {(() => {
+              const startIndex = (lowStockPage - 1) * itemsPerPage;
+              const endIndex = startIndex + itemsPerPage;
+              const paginatedProducts = statistics.hangSapHet.slice(startIndex, endIndex);
+              
+              return paginatedProducts.map((product) => (
               <div key={product.sanPhamId} className="relative">
                 <Card 
                   padding="md" 
                   className="border-2 border-amber-400 bg-gradient-to-br from-amber-50 to-orange-50 shadow-md hover:shadow-lg transition-shadow"
                 >
-                  <div className="flex flex-col gap-3">
-                    <div className="relative">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="relative w-46 h-46 aspect-square">
                       <img 
                         src={buildImageUrl(product.hinhAnh)} 
                         alt={product.tenSanPham}
-                        className="w-full h-40 object-cover rounded-lg border-2 border-amber-300"
+                        className="w-full h-full object-cover rounded-lg"
                         onError={(e) => {
                           e.target.src = '/barbie.jpg';
                         }}
                       />
-                      <div className={`absolute top-2 right-2 text-white px-2 py-1 rounded text-xs font-bold ${
+                      <div className="absolute top-1 left-1 bg-red-500 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">
+                        ID: {product.sanPhamId}
+                      </div>
+                      <div className={`absolute top-1 right-1 text-white px-1.5 py-0.5 rounded text-[10px] font-bold ${
                         product.soLuongTon <= 3 
                           ? 'bg-red-500' 
                           : product.soLuongTon <= 5
@@ -1137,12 +1202,12 @@ const StatisticsPage = () => {
                         {product.soLuongTon <= 3 ? 'CẤP BÁCH' : product.soLuongTon <= 5 ? 'SẮP HẾT' : 'THẤP'}
                       </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-gray-800 truncate mb-1">{product.tenSanPham}</h4>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs text-gray-500">Tồn kho</p>
-                          <p className={`text-lg font-bold ${
+                    <div className="w-full text-left">
+                      <h4 className="font-bold text-gray-800 truncate mb-2 text-sm text-left">{product.tenSanPham}</h4>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-left">
+                          <p className="text-[10px] text-gray-500 text-left">Tồn kho</p>
+                          <p className={`text-base font-bold text-left ${
                             product.soLuongTon <= 3 
                               ? 'text-red-600' 
                               : product.soLuongTon <= 5
@@ -1152,19 +1217,34 @@ const StatisticsPage = () => {
                             {product.soLuongTon}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-xs text-gray-500">Giá bán</p>
-                          <p className="text-lg font-bold text-gray-800">{formatCurrency(product.giaBan)}</p>
+                        <div className="flex-1 text-right">
+                          <p className="text-[10px] text-gray-500">Giá bán</p>
+                          <p className="text-base font-bold text-gray-800">{formatCurrency(product.giaBan)}</p>
                         </div>
 
                       </div>
-                      <p className="text-xs text-gray-500 mt-2">ID: {product.sanPhamId}</p>
                     </div>
                   </div>
                 </Card>
               </div>
-            ))}
+              ));
+            })()}
           </div>
+          
+          {/* Phân trang cho Hàng sắp hết */}
+          {(() => {
+            const totalPages = Math.ceil(statistics.hangSapHet.length / itemsPerPage);
+            
+            return totalPages > 1 ? (
+              <div className="mt-4 flex justify-center">
+                <Pagination
+                  currentPage={lowStockPage}
+                  totalPages={totalPages}
+                  onPageChange={setLowStockPage}
+                />
+              </div>
+            ) : null;
+          })()}
         </Card>
       )}
 

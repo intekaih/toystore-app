@@ -23,6 +23,8 @@ const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, b
   const [imagePreviews, setImagePreviews] = useState([]);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
   const fileInputRef = useRef(null);
 
   const [categoryData, setCategoryData] = useState({ id: null, ten: '' });
@@ -246,6 +248,69 @@ const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, b
   const handleRemoveImage = (index) => {
     setImageFiles(prev => prev.filter((_, i) => i !== index));
     setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // ✅ Drag and Drop handlers để sắp xếp thứ tự ảnh
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+    // Set drag image
+    const img = e.currentTarget.querySelector('img');
+    if (img) {
+      const dragImage = img.cloneNode(true);
+      dragImage.style.width = '100px';
+      dragImage.style.height = '100px';
+      dragImage.style.position = 'absolute';
+      dragImage.style.top = '-1000px';
+      document.body.appendChild(dragImage);
+      e.dataTransfer.setDragImage(dragImage, 50, 50);
+      setTimeout(() => document.body.removeChild(dragImage), 0);
+    }
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = (e) => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (e, dropIndex) => {
+    e.preventDefault();
+    setDragOverIndex(null);
+    
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      return;
+    }
+
+    // Reorder images
+    const newImageFiles = [...imageFiles];
+    const newImagePreviews = [...imagePreviews];
+
+    // Remove dragged item
+    const draggedFile = newImageFiles.splice(draggedIndex, 1)[0];
+    const draggedPreview = newImagePreviews.splice(draggedIndex, 1)[0];
+
+    // Insert at new position
+    newImageFiles.splice(dropIndex, 0, draggedFile);
+    newImagePreviews.splice(dropIndex, 0, draggedPreview);
+
+    setImageFiles(newImageFiles);
+    setImagePreviews(newImagePreviews);
+    setDraggedIndex(null);
   };
 
   const searchCategories = async (query) => {
@@ -653,7 +718,7 @@ const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, b
               <div className="form-group-compact">
                 <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-sm text-blue-700 font-medium flex items-center gap-2">
-                    💡 <span>Ảnh đầu tiên bạn chọn sẽ là <strong>ảnh chính</strong> hiển thị trên danh sách sản phẩm</span>
+                    💡 <span>Ảnh đầu tiên sẽ là <strong>ảnh chính</strong> hiển thị trên danh sách sản phẩm. Bạn có thể <strong>kéo thả</strong> để sắp xếp thứ tự ảnh.</span>
                   </p>
                 </div>
 
@@ -683,21 +748,57 @@ const ProductModal = ({ isOpen, onClose, onSubmit, editingProduct, categories, b
 
               <div className="image-grid-compact">
                 {imagePreviews.map((preview, index) => (
-                  <div key={index} className="image-item-compact relative">
-                    <img src={preview} alt={`Preview ${index + 1}`} />
+                  <div 
+                    key={index} 
+                    className={`image-item-compact relative ${
+                      imagePreviews.length > 1 ? 'cursor-move' : 'cursor-default'
+                    } ${
+                      draggedIndex === index ? 'opacity-50 scale-95' : ''
+                    } ${
+                      dragOverIndex === index ? 'border-blue-500 border-2 scale-105' : ''
+                    } transition-all`}
+                    draggable={imagePreviews.length > 1}
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragLeave={handleDragLeave}
+                    onDragEnd={handleDragEnd}
+                    onDrop={(e) => handleDrop(e, index)}
+                  >
+                    <img 
+                      src={preview} 
+                      alt={`Preview ${index + 1}`} 
+                      draggable={false}
+                      className="select-none pointer-events-none"
+                    />
                     {index === 0 && (
-                      <div className="absolute top-1 left-1 bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                      <div className="absolute top-1 left-1 bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-semibold z-10 shadow-md">
                         Ảnh chính
+                      </div>
+                    )}
+                    {index > 0 && (
+                      <div className="absolute top-1 left-1 bg-gray-600 text-white text-xs px-2 py-1 rounded-full font-semibold z-10 shadow-md">
+                        Ảnh {index + 1}
                       </div>
                     )}
                     <button
                       type="button"
-                      className="btn-remove-compact"
-                      onClick={() => handleRemoveImage(index)}
+                      className="btn-remove-compact z-10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveImage(index);
+                      }}
                       disabled={isSubmitting}
+                      onMouseDown={(e) => e.stopPropagation()}
                     >
                       <X size={14} />
                     </button>
+                    {imagePreviews.length > 1 && draggedIndex === null && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-30 transition-all rounded-lg pointer-events-none">
+                        <div className="text-white text-xs font-semibold bg-black bg-opacity-60 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                          Kéo để sắp xếp
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -79,6 +79,13 @@ exports.getAllProducts = async (req, res) => {
         as: 'loaiSP',
         attributes: ['ID', 'Ten'],
         where: { TrangThai: true }
+      },
+      {
+        model: db.SanPhamHinhAnh,
+        as: 'hinhAnhs',
+        attributes: ['ID', 'DuongDanHinhAnh', 'ThuTu', 'LaMacDinh'],
+        required: false, // LEFT JOIN để lấy cả sản phẩm không có ảnh
+        order: [['ThuTu', 'ASC']]
       }
     ];
 
@@ -164,7 +171,13 @@ exports.getAllProducts = async (req, res) => {
         LoaiSP: product.loaiSP ? {
           ID: product.loaiSP.ID,
           Ten: product.loaiSP.Ten
-        } : null
+        } : null,
+        HinhAnhs: product.hinhAnhs && product.hinhAnhs.length > 0 ? product.hinhAnhs.map(img => ({
+          ID: img.ID,
+          DuongDanHinhAnh: `${baseUrl}${img.DuongDanHinhAnh}`,
+          ThuTu: img.ThuTu,
+          LaMacDinh: img.LaMacDinh
+        })) : []
       };
       
       return DTOMapper.toCamelCase(productData);

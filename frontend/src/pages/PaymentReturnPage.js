@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { cartService } from '../services'; // ✅ Sử dụng cartService
-import './PaymentReturnPage.css';
+import { cartService, orderService } from '../services';
+import config from '../config';
+import { CheckCircle2, XCircle, Loader2, Package, CreditCard, Clock, ArrowRight, Home, ShoppingCart, AlertCircle } from 'lucide-react';
 
 const PaymentReturnPage = () => {
   const [searchParams] = useSearchParams();
@@ -12,6 +13,15 @@ const PaymentReturnPage = () => {
   const [loading, setLoading] = useState(true);
   const [paymentResult, setPaymentResult] = useState(null);
   const [restoring, setRestoring] = useState(false);
+  const [orderDetails, setOrderDetails] = useState(null);
+  const [orderItems, setOrderItems] = useState([]);
+  const [orderSummary, setOrderSummary] = useState({ 
+    subtotal: 0, 
+    vat: { rate: 0, amount: 0 },
+    shipping: 0, 
+    voucher: { discountAmount: 0 },
+    total: 0 
+  });
   
   const hasProcessedRef = useRef(false);
 
@@ -21,6 +31,44 @@ const PaymentReturnPage = () => {
       processPaymentResult();
     }
   }, []);
+
+  // Fetch order details khi có orderCode/orderId
+  useEffect(() => {
+    if (paymentResult?.data?.orderCode || paymentResult?.data?.orderId) {
+      loadOrderDetails();
+    } else {
+      // Nếu không có orderCode, thử parse cartItems từ URL (khi thất bại)
+      const cartItemsJson = searchParams.get('cartItems');
+      if (cartItemsJson && !paymentResult?.success) {
+        try {
+          const items = JSON.parse(cartItemsJson);
+          // Đảm bảo items có đầy đủ thông tin, đặc biệt là image
+          const formattedItems = items.map(item => ({
+            id: item.id || item.ID,
+            name: item.name || item.ten || item.Ten || 'Sản phẩm',
+            price: parseFloat(item.price || item.gia || item.Gia || 0),
+            quantity: parseInt(item.quantity || item.soLuong || item.SoLuong || 1),
+            image: item.image || item.hinhAnh || item.HinhAnh || item.hinhAnhURL || item.HinhAnhURL || '',
+            total: parseFloat(item.price || item.gia || item.Gia || 0) * parseInt(item.quantity || item.soLuong || item.SoLuong || 1)
+          }));
+          setOrderItems(formattedItems);
+          calculateSummary(formattedItems);
+        } catch (e) {
+          console.error('Error parsing cartItems:', e);
+        }
+      } else if (paymentResult?.data?.amount && orderItems.length === 0) {
+        // Fallback: nếu chỉ có amount, tạo summary đơn giản
+        const amount = parseFloat(paymentResult.data.amount);
+        setOrderSummary({ 
+          subtotal: amount, 
+          vat: { rate: 0, amount: 0 },
+          shipping: 0, 
+          voucher: { discountAmount: 0 },
+          total: amount 
+        });
+      }
+    }
+  }, [paymentResult]);
 
   const processPaymentResult = async () => {
     try {
@@ -149,6 +197,142 @@ const PaymentReturnPage = () => {
     }
   };
 
+  // Load order details từ API
+  const loadOrderDetails = async () => {
+    try {
+      const orderCode = paymentResult?.data?.orderCode;
+      if (!orderCode) return;
+
+      const response = await orderService.getOrderByCode(orderCode);
+      if (response.success && response.data?.hoaDon) {
+        const order = response.data.hoaDon;
+        setOrderDetails(order);
+        
+        // Map order items - xử lý cả camelCase và PascalCase
+        const chiTiet = order.chiTiet || order.ChiTiet || [];
+        const items = chiTiet.map(item => {
+          const sanPham = item.sanPham || item.SanPham || {};
+          
+          // Lấy ảnh từ nhiều nguồn khác nhau
+          const imageRaw = sanPham.HinhAnhURL || sanPham.hinhAnhURL || 
+                          sanPham.hinhAnh || sanPham.HinhAnh || 
+                          sanPham.image || item.hinhAnh || item.image || '';
+          
+          const mappedItem = {
+            id: sanPham.ID || sanPham.id || item.sanPhamID || item.SanPhamID,
+            name: sanPham.Ten || sanPham.ten || item.tenSanPham || 'Sản phẩm',
+            price: parseFloat(item.donGia || item.DonGia || 0),
+            quantity: parseInt(item.soLuong || item.SoLuong || 1),
+            image: imageRaw,
+            total: parseFloat(item.donGia || item.DonGia || 0) * parseInt(item.soLuong || item.SoLuong || 1)
+          };
+          
+          console.log('📸 Mapping order item:', {
+            sanPham: sanPham,
+            imageRaw: imageRaw,
+            mappedItem: mappedItem
+          });
+          
+          return mappedItem;
+        });
+        
+        console.log('📦 All mapped items:', items);
+        setOrderItems(items);
+        
+        // Calculate summary với đầy đủ các trường phí
+        const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const priceBreakdown = order.priceBreakdown || order.PriceBreakdown || {};
+        
+        // VAT
+        const vat = {
+          rate: parseFloat(priceBreakdown.vat?.rate || priceBreakdown.VAT?.rate || 0),
+          amount: parseFloat(priceBreakdown.vat?.amount || priceBreakdown.VAT?.amount || 0)
+        };
+        
+        // Shipping
+        const shipping = parseFloat(priceBreakdown.shipping?.fee || priceBreakdown.Shipping?.fee || 0);
+        
+        // Voucher discount
+        const voucher = {
+          discountAmount: parseFloat(priceBreakdown.voucher?.discountAmount || priceBreakdown.Voucher?.discountAmount || 0)
+        };
+        
+        // Total
+        const total = parseFloat(order.tongTien || order.TongTien || order.ThanhTien || (subtotal + vat.amount + shipping - voucher.discountAmount));
+        
+        setOrderSummary({ 
+          subtotal, 
+          vat, 
+          shipping, 
+          voucher, 
+          total 
+        });
+      }
+    } catch (error) {
+      console.error('Error loading order details:', error);
+      // Fallback: sử dụng amount từ paymentResult
+      if (paymentResult?.data?.amount) {
+        const amount = parseFloat(paymentResult.data.amount);
+        setOrderSummary({ 
+          subtotal: amount, 
+          vat: { rate: 0, amount: 0 },
+          shipping: 0, 
+          voucher: { discountAmount: 0 },
+          total: amount 
+        });
+      }
+    }
+  };
+
+  // Calculate summary từ cart items
+  const calculateSummary = (items) => {
+    if (!items || items.length === 0) return;
+    
+    const subtotal = items.reduce((sum, item) => sum + (parseFloat(item.price || 0) * parseInt(item.quantity || 1)), 0);
+    const vat = {
+      rate: 0.1, // 10% default
+      amount: subtotal * 0.1
+    };
+    const shipping = 30000; // Default shipping fee
+    const voucher = {
+      discountAmount: 0
+    };
+    const total = subtotal + vat.amount + shipping - voucher.discountAmount;
+    
+    setOrderSummary({ 
+      subtotal, 
+      vat, 
+      shipping, 
+      voucher, 
+      total 
+    });
+  };
+
+  // Build image URL - giống với ProductCard và các component khác
+  const buildImageUrl = (imagePath) => {
+    if (!imagePath) return '/barbie.jpg';
+    
+    // Nếu đã là full URL (http/https)
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    
+    const API_BASE_URL = config.API_BASE_URL;
+    
+    // Nếu bắt đầu với /uploads/
+    if (imagePath.startsWith('/uploads/')) {
+      return `${API_BASE_URL}${imagePath}`;
+    }
+    
+    // Nếu chỉ là filename (không bắt đầu với /)
+    if (!imagePath.startsWith('/')) {
+      return `${API_BASE_URL}/uploads/${imagePath}`;
+    }
+    
+    // Fallback
+    return '/barbie.jpg';
+  };
+
   /**
    * Khôi phục giỏ hàng guest sau khi thanh toán thất bại
    */
@@ -186,13 +370,11 @@ const PaymentReturnPage = () => {
   // Hiển thị loading
   if (loading) {
     return (
-      <div className="payment-return-page">
-        <div className="payment-return-container">
-          <div className="payment-loading">
-            <div className="loading-spinner-large"></div>
-            <h2>🔍 Đang xử lý kết quả thanh toán...</h2>
-            <p>Vui lòng chờ trong giây lát</p>
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-rose-50 to-cream-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-cute shadow-cute p-8 md:p-12 max-w-2xl w-full text-center">
+          <Loader2 className="w-16 h-16 text-primary-500 animate-spin mx-auto mb-6" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Đang xử lý kết quả thanh toán...</h2>
+          <p className="text-gray-600">Vui lòng chờ trong giây lát</p>
         </div>
       </div>
     );
@@ -201,26 +383,37 @@ const PaymentReturnPage = () => {
   // Hiển thị lỗi nếu không có kết quả
   if (!paymentResult) {
     return (
-      <div className="payment-return-page">
-        <div className="payment-return-container">
-          <div className="payment-result payment-error">
-            <div className="result-icon">❌</div>
-            <h2>Không có thông tin thanh toán</h2>
-            <p className="result-message">Không tìm thấy thông tin giao dịch</p>
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 via-rose-50 to-cream-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-cute shadow-cute p-8 md:p-12 max-w-4xl w-full">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-8">
+            {/* Left: Icon */}
+            <div className="flex-shrink-0">
+              <div className="w-24 h-24 rounded-full bg-red-100 flex items-center justify-center">
+                <XCircle className="w-14 h-14 text-red-500" />
+              </div>
+            </div>
             
-            <div className="result-actions">
-              <button 
-                className="btn btn-primary"
-                onClick={() => navigate('/cart')}
-              >
-                Quay lại giỏ hàng
-              </button>
-              <button 
-                className="btn btn-secondary"
-                onClick={() => navigate('/')}
-              >
-                Về trang chủ
-              </button>
+            {/* Right: Content */}
+            <div className="flex-1 text-center md:text-left">
+              <h2 className="text-3xl font-bold text-gray-800 mb-3">Không có thông tin thanh toán</h2>
+              <p className="text-gray-600 mb-6">Không tìm thấy thông tin giao dịch</p>
+              
+              <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
+                <button 
+                  className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+                  onClick={() => navigate('/cart')}
+                >
+                  <ShoppingCart className="w-5 h-5" />
+                  Quay lại giỏ hàng
+                </button>
+                <button 
+                  className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+                  onClick={() => navigate('/')}
+                >
+                  <Home className="w-5 h-5" />
+                  Về trang chủ
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -233,122 +426,77 @@ const PaymentReturnPage = () => {
   const isCOD = paymentResult?.data?.paymentMethod === 'COD';
 
   return (
-    <div className="payment-return-page">
-      <div className="payment-return-container">
-        <div className={`payment-result ${isSuccess ? 'payment-success' : 'payment-failed'}`}>
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-rose-50 to-cream-100 flex items-center justify-center p-4 py-8">
+      <div className="max-w-7xl w-full grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column: Payment Status */}
+        <div className="bg-white rounded-cute shadow-cute p-6 md:p-8">
           {/* Icon */}
-          <div className="result-icon">
-            {isSuccess ? '✅' : '❌'}
+          <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 mx-auto ${
+            isSuccess ? 'bg-green-100' : 'bg-primary-100'
+          }`}>
+            {isSuccess ? (
+              <CheckCircle2 className="w-14 h-14 text-green-500" />
+            ) : (
+              <AlertCircle className="w-14 h-14 text-primary-600 font-bold" />
+            )}
           </div>
-
+          
           {/* Title */}
-          <h2>
+          <h2 className={`text-3xl font-bold mb-3 text-center lg:text-left ${
+            isSuccess ? 'text-green-600' : 'text-gray-800'
+          }`}>
             {isSuccess ? (isCOD ? 'Đặt hàng thành công!' : 'Thanh toán thành công!') : 'Thanh toán thất bại'}
           </h2>
-
+          
           {/* Message */}
-          <p className="result-message">
-            {paymentResult?.message || 'Không có thông tin'}
+          <p className="text-gray-600 mb-6 text-center lg:text-left">
+            {isSuccess 
+              ? (isCOD ? 'Đơn hàng của bạn đã được đặt thành công.' : 'Giao dịch của bạn đã được thanh toán thành công.')
+              : (paymentResult?.message || 'Rất tiếc, giao dịch của bạn không thể hoàn tất.')
+            }
           </p>
 
-          {/* Payment details - CHỈ HIỂN THỊ NẾU CÓ DỮ LIỆU */}
-          {paymentResult?.data && (paymentResult.data.orderCode || paymentResult.data.orderId || paymentResult.data.amount) && (
-            <div className="payment-details">
-              <h3>📋 Thông tin giao dịch</h3>
-              {(paymentResult.data.orderCode || paymentResult.data.orderId) && (
-                <div className="detail-row">
-                  <span className="detail-label">Mã đơn hàng:</span>
-                  <span className="detail-value">
-                    {paymentResult.data.orderCode || paymentResult.data.orderId || 'Không xác định'}
-                  </span>
-                </div>
-              )}
-              {paymentResult.data.paymentMethod && (
-                <div className="detail-row">
-                  <span className="detail-label">Phương thức:</span>
-                  <span className="detail-value">{paymentResult.data.paymentMethod}</span>
-                </div>
-              )}
-              {paymentResult.data.transactionNo && (
-                <div className="detail-row">
-                  <span className="detail-label">Mã giao dịch VNPay:</span>
-                  <span className="detail-value">{paymentResult.data.transactionNo}</span>
-                </div>
-              )}
-              {paymentResult.data.amount && (
-                <div className="detail-row">
-                  <span className="detail-label">Số tiền:</span>
-                  <span className="detail-value amount">
-                    {formatPrice(paymentResult.data.amount)}
-                  </span>
-                </div>
-              )}
-              {paymentResult.data.bankCode && (
-                <div className="detail-row">
-                  <span className="detail-label">Ngân hàng:</span>
-                  <span className="detail-value">{paymentResult.data.bankCode}</span>
-              </div>
-              )}
-              {paymentResult.data.payDate && (
-                <div className="detail-row">
-                  <span className="detail-label">Thời gian:</span>
-                  <span className="detail-value">
-                    {formatPayDate(paymentResult.data.payDate)}
-                  </span>
-                </div>
-              )}
+          {/* Reason box (chỉ hiển thị khi thất bại) */}
+          {!isSuccess && paymentResult?.message && (
+            <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6">
+              <p className="text-sm font-semibold text-gray-800 mb-2">Lý do:</p>
+              <p className="text-sm text-gray-700">{paymentResult.message}</p>
             </div>
           )}
 
-          {/* Success info */}
+          {/* Success info (chỉ hiển thị khi thành công) */}
           {isSuccess && (
-            <div className="success-info">
-              <div className="info-item">
-                <span className="info-icon">✅</span>
-                <span>
-                  {isCOD 
-                    ? 'Đơn hàng đã được đặt thành công với hình thức thanh toán COD' 
-                    : 'Đơn hàng đã được thanh toán thành công qua VNPay'
-                  }
-                </span>
-              </div>
-              <div className="info-item">
-                <span className="info-icon">📦</span>
-                <span>Đơn hàng sẽ được xử lý và giao đến bạn sớm nhất</span>
-              </div>
-              {isCOD && (
-                <div className="info-item">
-                  <span className="info-icon">💵</span>
-                  <span>Bạn sẽ thanh toán khi nhận hàng</span>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span className="text-green-800">
+                    {isCOD 
+                      ? 'Đơn hàng đã được đặt thành công với hình thức thanh toán COD' 
+                      : 'Đơn hàng đã được thanh toán thành công qua VNPay'
+                    }
+                  </span>
                 </div>
-              )}
-              <div className="info-item">
-                <span className="info-icon">📱</span>
-                <span>Bạn có thể theo dõi đơn hàng trong mục "Đơn hàng của tôi"</span>
-              </div>
-            </div>
-          )}
-
-          {/* ✨ Thông báo khôi phục giỏ hàng khi thất bại */}
-          {!isSuccess && (
-            <div className="success-info" style={{ backgroundColor: '#fef3c7', borderColor: '#f59e0b' }}>
-              <div className="info-item">
-                <span className="info-icon">🛒</span>
-                <span>Sản phẩm đã được khôi phục vào giỏ hàng của bạn</span>
-              </div>
-              <div className="info-item">
-                <span className="info-icon">💡</span>
-                <span>Bạn có thể thử thanh toán lại hoặc chọn phương thức khác</span>
+                <div className="flex items-start gap-2">
+                  <Package className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <span className="text-green-800">Đơn hàng sẽ được xử lý và giao đến bạn sớm nhất</span>
+                </div>
+                {isCOD && (
+                  <div className="flex items-start gap-2">
+                    <CreditCard className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    <span className="text-green-800">Bạn sẽ thanh toán khi nhận hàng</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {/* Actions */}
-          <div className="result-actions">
+          <div className="flex flex-col gap-3">
             {isSuccess ? (
               <>
                 <button 
-                  className="btn btn-primary"
+                  className="w-full px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2 shadow-soft hover:shadow-cute"
                   onClick={() => {
                     if (!user && paymentResult.data.orderCode) {
                       navigate(`/order/${paymentResult.data.orderCode}`);
@@ -357,32 +505,163 @@ const PaymentReturnPage = () => {
                     }
                   }}
                 >
-                  📋 Xem đơn hàng
+                  <Package className="w-5 h-5" />
+                  Xem đơn hàng
+                  <ArrowRight className="w-4 h-4" />
                 </button>
                 <button 
-                  className="btn btn-secondary"
+                  className="w-full px-6 py-3 bg-white border-2 border-primary-300 hover:border-primary-400 text-primary-700 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
                   onClick={() => navigate('/')}
                 >
-                  🏠 Tiếp tục mua sắm
+                  <Home className="w-5 h-5" />
+                  Tiếp tục mua sắm
                 </button>
               </>
             ) : (
               <>
                 <button 
-                  className="btn btn-primary"
+                  className="w-full px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-2 shadow-soft hover:shadow-cute"
                   onClick={() => navigate('/cart')}
                 >
-                  ← Quay lại giỏ hàng
+                  <ShoppingCart className="w-5 h-5" />
+                  Thử lại thanh toán
                 </button>
                 <button 
-                  className="btn btn-secondary"
-                  onClick={() => navigate('/')}
+                  className="w-full px-6 py-3 bg-white border-2 border-primary-300 hover:border-primary-400 text-primary-700 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
+                  onClick={() => navigate('/cart')}
                 >
-                  🏠 Về trang chủ
+                  Chọn phương thức khác
                 </button>
               </>
             )}
           </div>
+
+          {/* Help link */}
+          <p className="text-sm text-gray-500 text-center lg:text-left mt-6">
+            Cần trợ giúp? <a href="/contact" className="text-primary-600 hover:underline">Liên hệ với chúng tôi</a>
+          </p>
+        </div>
+
+        {/* Right Column: Order Summary */}
+        <div className="bg-white rounded-cute shadow-cute p-6 md:p-8 flex flex-col">
+          <h3 className="text-xl font-bold text-gray-800 mb-6 text-center">Tóm tắt đơn hàng</h3>
+          
+          {/* Order Items */}
+          {orderItems.length > 0 ? (
+            <div className="space-y-4 mb-6">
+              {orderItems.map((item, index) => {
+                const imageUrl = buildImageUrl(item.image);
+                console.log('🖼️ Rendering item:', { item, imageUrl, originalImage: item.image });
+                return (
+                  <div key={index} className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                      <img 
+                        src={imageUrl} 
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => { 
+                          console.error('❌ Image load error:', {
+                            imageUrl,
+                            originalImage: item.image,
+                            item: item,
+                            error: e
+                          });
+                          e.target.src = '/barbie.jpg'; 
+                        }}
+                        onLoad={() => {
+                          console.log('✅ Image loaded successfully:', imageUrl);
+                        }}
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-800 truncate">{item.name}</p>
+                      <p className="text-sm text-gray-600">Số lượng: {item.quantity}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="font-semibold text-gray-800">{formatPrice(item.price * item.quantity)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <Package className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+              <p>Không có thông tin sản phẩm</p>
+            </div>
+          )}
+
+          {/* Divider */}
+          <div className="border-t border-gray-200 my-6"></div>
+
+          {/* Summary */}
+          <div className="space-y-3 flex-1">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">Tạm tính</span>
+              <span className="text-gray-800 font-semibold">{formatPrice(orderSummary.subtotal)}</span>
+            </div>
+            
+            {/* VAT */}
+            {orderSummary.vat && orderSummary.vat.amount > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 flex items-center gap-2">
+                  Thuế VAT
+                  {orderSummary.vat.rate > 0 && (
+                    <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">
+                      {(orderSummary.vat.rate * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </span>
+                <span className="text-gray-800 font-semibold text-blue-600">
+                  +{formatPrice(orderSummary.vat.amount)}
+                </span>
+              </div>
+            )}
+            
+            {/* Shipping */}
+            {orderSummary.shipping > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Phí vận chuyển</span>
+                <span className="text-gray-800 font-semibold">{formatPrice(orderSummary.shipping)}</span>
+              </div>
+            )}
+            
+            {/* Voucher Discount */}
+            {orderSummary.voucher && orderSummary.voucher.discountAmount > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Giảm giá</span>
+                <span className="text-gray-800 font-semibold text-red-600">
+                  -{formatPrice(orderSummary.voucher.discountAmount)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-300 my-4"></div>
+
+          {/* Total */}
+          <div className="flex justify-between items-center">
+            <span className="text-lg font-bold text-gray-800">Tổng cộng</span>
+            <span className="text-xl font-bold text-primary-600">{formatPrice(orderSummary.total)}</span>
+          </div>
+
+          {/* Payment Method Info */}
+          {paymentResult?.data?.paymentMethod && (
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <CreditCard className="w-4 h-4" />
+                <span>Phương thức: <span className="font-semibold text-gray-800">{paymentResult.data.paymentMethod}</span></span>
+              </div>
+              {paymentResult.data.orderCode && (
+                <div className="flex items-center gap-2 text-sm text-gray-600 mt-2">
+                  <Package className="w-4 h-4" />
+                  <span>Mã đơn: <span className="font-semibold text-gray-800">{paymentResult.data.orderCode}</span></span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

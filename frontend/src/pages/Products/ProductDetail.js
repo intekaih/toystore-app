@@ -131,6 +131,10 @@ const ProductDetail = () => {
           'success',
           3000
         );
+        
+        // ✅ Dispatch event để Navbar cập nhật badge
+        window.dispatchEvent(new CustomEvent('cartUpdated'));
+        
         setQuantity(1);
         
         if (!user) {

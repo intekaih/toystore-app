@@ -32,7 +32,7 @@ const AdminLayout = ({ children, isStaffView = false }) => {
   // Menu items - Ẩn các menu không cần thiết cho Staff
   const allMenuItems = [
     {
-      name: 'Dashboard',
+      name: 'Trang chủ',
       path: isStaffView ? '/staff/dashboard' : '/admin/dashboard',
       icon: <Home size={18} />,
       show: true // Cả Admin và Staff đều có
@@ -56,7 +56,7 @@ const AdminLayout = ({ children, isStaffView = false }) => {
       show: !isStaffView // Chỉ Admin
     },
     {
-      name: 'Thống kê',
+      name: 'Báo cáo',
       path: '/admin/statistics',
       icon: <TrendingUp size={18} />,
       show: !isStaffView // Chỉ Admin

@@ -301,15 +301,44 @@ const BrandManagementPage = () => {
                       <span className="text-sm font-medium text-gray-900">{brand.tenThuongHieu || brand.TenThuongHieu}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {brand.logo || brand.Logo ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          Có
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                          Không
-                        </span>
-                      )}
+                      {(() => {
+                        const logoPath = brand.logo || brand.Logo;
+                        if (logoPath) {
+                          // Build full URL
+                          let logoUrl = logoPath;
+                          if (!logoPath.startsWith('http')) {
+                            // Nếu là đường dẫn tương đối
+                            if (logoPath.startsWith('/uploads/')) {
+                              logoUrl = `${config.API_BASE_URL}${logoPath}`;
+                            } else if (!logoPath.startsWith('/')) {
+                              logoUrl = `${config.API_BASE_URL}/uploads/${logoPath}`;
+                            } else {
+                              logoUrl = `${config.API_BASE_URL}${logoPath}`;
+                            }
+                          }
+                          
+                          return (
+                            <div className="flex items-center">
+                              <img 
+                                src={logoUrl} 
+                                alt={brand.tenThuongHieu || brand.TenThuongHieu || 'Logo'} 
+                                className="w-16 h-16 object-contain rounded-lg border border-gray-200 bg-white p-1"
+                                onError={(e) => {
+                                  // Fallback nếu ảnh không load được - thay bằng placeholder
+                                  e.target.onerror = null; // Prevent infinite loop
+                                  e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="%23999" stroke-width="2"%3E%3Crect x="3" y="3" width="18" height="18" rx="2"/%3E%3Cpath d="M9 9h6v6H9z"/%3E%3C/svg%3E';
+                                }}
+                              />
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div className="flex items-center justify-center w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
+                              <ImageIcon size={20} className="text-gray-400" />
+                            </div>
+                          );
+                        }
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${

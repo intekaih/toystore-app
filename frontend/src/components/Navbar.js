@@ -227,6 +227,41 @@ const Navbar = () => {
     loadCartItems();
   }, []);
 
+  // ✅ Reload cart items khi window focus (khi user quay lại tab) hoặc location thay đổi
+  useEffect(() => {
+    const handleFocus = () => {
+      loadCartItems();
+    };
+
+    const handleStorageChange = (e) => {
+      // Reload cart khi có thay đổi trong localStorage (nếu có)
+      if (e.key === 'cart_updated' || e.key === 'cart') {
+        loadCartItems();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleStorageChange);
+    
+    // ✅ Custom event để các component khác có thể trigger reload cart
+    const handleCartUpdate = () => {
+      loadCartItems();
+    };
+    
+    window.addEventListener('cartUpdated', handleCartUpdate);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('cartUpdated', handleCartUpdate);
+    };
+  }, []);
+
+  // ✅ Reload cart items khi location thay đổi (khi user navigate)
+  useEffect(() => {
+    loadCartItems();
+  }, [location.pathname]);
+
   // ✅ Sync search query với URL search params khi ở trang /products
   useEffect(() => {
     if (!isHomepage && location.pathname.startsWith('/products')) {

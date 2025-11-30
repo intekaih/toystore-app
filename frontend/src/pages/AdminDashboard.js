@@ -28,9 +28,10 @@ const AdminDashboard = () => {
   // State cho dữ liệu thống kê
   const [stats, setStats] = useState({
     tongSanPham: 0,
-    donHangMoi: 0,
+    tongDonHang: 0,
     nguoiDung: 0,
     tongDanhMuc: 0, // ✅ Thêm tongDanhMuc
+    tongVoucher: 0,
     doanhThu: 0
   });
   const [loading, setLoading] = useState(true);
@@ -148,7 +149,7 @@ const AdminDashboard = () => {
       route: '/admin/orders',
       color: 'from-green-50 to-green-100 border-green-200',
       iconBg: 'bg-green-500',
-      stats: `Đang xử lý: ${stats.donHangMoi} đơn`
+      stats: `Tổng: ${stats.tongDonHang} đơn`
     },
     {
       title: 'Quản lý người dùng',
@@ -157,7 +158,7 @@ const AdminDashboard = () => {
       route: '/admin/users',
       color: 'from-purple-50 to-purple-100 border-purple-200',
       iconBg: 'bg-purple-500',
-      stats: `Tổng: ${stats.nguoiDung} users`
+      stats: `Tổng: ${stats.nguoiDung} người dùng`
     },
     {
       title: 'Quản lý voucher',
@@ -166,7 +167,7 @@ const AdminDashboard = () => {
       route: '/admin/vouchers',
       color: 'from-pink-50 to-pink-100 border-pink-200',
       iconBg: 'bg-pink-500',
-      stats: 'Mã giảm giá'
+      stats: `Tổng: ${stats.tongVoucher} voucher`
     },
     {
       title: 'Quản lý phí ship',
@@ -248,8 +249,8 @@ const AdminDashboard = () => {
           <div className="flex items-center gap-2 p-3">
             <ShoppingCart className="text-green-600" size={32} />
             <div>
-              <p className="text-xs text-green-600">Đơn hàng mới</p>
-              <p className="text-xl font-bold text-green-700">{stats.donHangMoi}</p>
+              <p className="text-xs text-green-600">Tổng đơn hàng</p>
+              <p className="text-xl font-bold text-green-700">{stats.tongDonHang}</p>
             </div>
           </div>
         </Card>

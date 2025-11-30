@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import config from '../config';
-import { X, ShoppingCart, Heart, Package, Tag, Star, Minus, Plus } from 'lucide-react';
+import { X, ShoppingCart, Package, Tag, Star, Minus, Plus } from 'lucide-react';
 import { Modal, Badge, Button } from './ui';
 import reviewService from '../services/reviewService';
 
@@ -11,11 +11,9 @@ const ProductQuickViewModal = ({
   isOpen, 
   onClose, 
   product, 
-  onAddToCart,
-  onFavorite 
+  onAddToCart
 }) => {
   const [quantity, setQuantity] = useState(1);
-  const [isFavorited, setIsFavorited] = useState(false);
   const [reviewStats, setReviewStats] = useState(null);
 
   // ✅ MỚI: Load thống kê đánh giá từ database
@@ -89,12 +87,6 @@ const ProductQuickViewModal = ({
   const handleQuantityChange = (value) => {
     const newQty = Math.max(1, Math.min(value, productStock));
     setQuantity(newQty);
-  };
-
-  // Handle favorite toggle
-  const handleFavoriteClick = () => {
-    setIsFavorited(!isFavorited);
-    onFavorite && onFavorite(product);
   };
 
   // Handle add to cart with quantity
@@ -265,23 +257,11 @@ const ProductQuickViewModal = ({
               <Button
                 onClick={handleAddToCartClick}
                 disabled={productStock === 0}
-                className="flex-1 py-2.5 text-sm font-semibold shadow-lg hover:shadow-xl"
+                className="w-full py-2.5 text-sm font-semibold shadow-lg hover:shadow-xl"
               >
                 <ShoppingCart size={18} className="mr-2" />
                 {productStock === 0 ? 'Hết hàng' : 'Thêm vào giỏ'}
               </Button>
-              
-              <button
-                onClick={handleFavoriteClick}
-                className={`px-4 py-2.5 border-2 font-semibold rounded-cute shadow-soft hover:shadow-cute transition-all duration-300 ${
-                  isFavorited 
-                    ? 'bg-rose-500 border-rose-500 text-white' 
-                    : 'bg-white border-rose-300 text-rose-500 hover:bg-rose-50 hover:border-rose-400'
-                }`}
-                title={isFavorited ? 'Đã thích' : 'Thêm vào yêu thích'}
-              >
-                <Heart size={18} className={isFavorited ? 'fill-white' : ''} />
-              </button>
             </div>
           </div>
         </div>

@@ -223,6 +223,9 @@ const Homepage = () => {
           3000
         );
         
+        // ✅ Dispatch event để Navbar cập nhật badge
+        window.dispatchEvent(new CustomEvent('cartUpdated'));
+        
         if (!user) {
           setTimeout(() => {
             showToast('💡 Bạn có thể thanh toán mà không cần đăng nhập!', 'info', 3000);
@@ -250,6 +253,10 @@ const Homepage = () => {
           'success',
           2000
         );
+        
+        // ✅ Dispatch event để Navbar cập nhật badge
+        window.dispatchEvent(new CustomEvent('cartUpdated'));
+        
         // Navigate to cart
         navigate('/cart');
       }

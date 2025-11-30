@@ -1,9 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ShoppingCart, Heart, Eye } from 'lucide-react';
 import Badge from './Badge';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import config from '../../config';
-import OptimizedImage from './OptimizedImage';
 
 /**
  * 🧸 ProductCard Component - Card sản phẩm dễ thương
@@ -49,6 +48,59 @@ const ProductCard = ({
   // ✅ SỬA: Hỗ trợ nhiều tên field để tương thích
   const productImageRaw = product.hinhAnhUrl || product.hinhAnhURL || product.HinhAnhURL || product.hinhAnh || product.HinhAnh || product.image;
   const productImage = buildImageUrl(productImageRaw);
+  
+  // ✨ Lấy danh sách ảnh sản phẩm (hỗ trợ nhiều format)
+  const productImages = product.hinhAnhs || product.HinhAnhs || product.images || [];
+  const sortedImages = Array.isArray(productImages) && productImages.length > 0
+    ? productImages
+        .sort((a, b) => (a.thuTu || a.ThuTu || 0) - (b.thuTu || b.ThuTu || 0))
+        .map(img => {
+          const url = img.duongDanHinhAnh || img.DuongDanHinhAnh || img.url || img;
+          return typeof url === 'string' ? buildImageUrl(url) : buildImageUrl(url?.duongDanHinhAnh || url?.DuongDanHinhAnh || '');
+        })
+    : [];
+  
+  // Ảnh chính (ảnh 1)
+  const imgDefault = sortedImages.length > 0 ? sortedImages[0] : productImage;
+  // Ảnh thứ 2 (nếu có) - dùng khi hover
+  const imgHover = sortedImages.length > 1 ? sortedImages[1] : null;
+  
+  // Debug: Log để kiểm tra (comment để tắt khi không cần)
+  // if (process.env.NODE_ENV === 'development') {
+  //   console.log('🖼️ Product images debug:', {
+  //     productName,
+  //     productImages: productImages.length,
+  //     sortedImages: sortedImages.length,
+  //     hasHoverImage: !!imgHover,
+  //     imgDefault: imgDefault?.substring(0, 50) + '...',
+  //     imgHover: imgHover?.substring(0, 50) + '...',
+  //     productData: {
+  //       hinhAnhs: product.hinhAnhs?.length || 0,
+  //       HinhAnhs: product.HinhAnhs?.length || 0,
+  //       images: product.images?.length || 0
+  //     }
+  //   });
+  // }
+  
+  // State để quản lý hover
+  const [isHover, setIsHover] = useState(false);
+  
+  // Handlers cho hover
+  const handleMouseEnter = () => {
+    setIsHover(true);
+  };
+  
+  const handleMouseLeave = () => {
+    setIsHover(false);
+  };
+  
+  // ✨ Handle click nút xem nhanh
+  const handleQuickViewClick = (e) => {
+    e.stopPropagation(); // Ngăn trigger click vào card
+    if (onQuickView) {
+      onQuickView(product);
+    }
+  };
   
   const productStock = product.soLuongTon !== undefined ? product.soLuongTon : 
                        product.SoLuongTon !== undefined ? product.SoLuongTon :
@@ -104,33 +156,56 @@ const ProductCard = ({
   };
 
   const stockStatus = getStockStatus();
+  const navigate = useNavigate();
+
+  // ✅ Handle click vào toàn bộ card để điều hướng
+  const handleCardClick = (e) => {
+    // Nếu click vào button hoặc link, không điều hướng
+    if (e.target.closest('button') || e.target.closest('a')) {
+      return;
+    }
+    navigate(`/products/${productId}`);
+  };
 
   return (
-    <div className={`bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-all group ${className}`}>
+    <div 
+      className={`bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-all group cursor-pointer ${className}`}
+      onClick={handleCardClick}
+    >
       {/* Product Image - với padding để lộ viền nền */}
       <div className="p-3">
-        <div className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden">
-          <OptimizedImage
-            src={productImage}
+        <div 
+          className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden group/image"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          <img
+            src={isHover && imgHover ? imgHover : imgDefault}
             alt={productName}
-            aspectRatio="1"
-            objectFit="cover"
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            priority={false}
-            className="rounded-lg"
-            fallback="/barbie.jpg"
+            className="w-full h-full object-cover rounded-lg transition-opacity duration-300"
             onError={handleImageError}
+            loading="lazy"
           />
+          
+          {/* Nút xem nhanh - hiển thị khi hover */}
+          {onQuickView && (
+            <button
+              onClick={handleQuickViewClick}
+              className={`absolute top-2 right-2 w-10 h-10 bg-white/90 hover:bg-white text-primary-600 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-110 z-10 ${
+                isHover ? 'opacity-100' : 'opacity-0'
+              }`}
+              title="Xem nhanh"
+            >
+              <Eye size={18} />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Product Info */}
       <div className="px-3 pb-3 relative">
         {/* Product Name */}
-        <h3 
-          onClick={() => window.location.href = `/products/${productId}`}
-          className="font-semibold text-gray-800 mb-1 line-clamp-2 cursor-pointer hover:text-primary-600 transition-colors"
-        >
+        <h3 className="font-semibold text-gray-800 mb-1 line-clamp-1 hover:text-primary-600 transition-colors">
           {productName}
         </h3>
 
@@ -157,7 +232,7 @@ const ProductCard = ({
               }
             }}
             disabled={productStock === 0}
-            className="w-10 h-10 bg-primary-200 hover:bg-primary-300 text-white rounded-full flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            className="w-10 h-10 bg-primary-400 hover:bg-primary-500 text-white rounded-full flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             title="Thêm vào giỏ"
           >
             <ShoppingCart size={18} />

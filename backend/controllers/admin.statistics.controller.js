@@ -6,6 +6,7 @@ const SanPham = db.SanPham;
 const TaiKhoan = db.TaiKhoan;
 const LoaiSP = db.LoaiSP;
 const DanhGiaSanPham = db.DanhGiaSanPham;
+const Voucher = db.Voucher;
 const { Op } = require('sequelize');
 const DTOMapper = require('../utils/DTOMapper');
 
@@ -22,10 +23,10 @@ exports.getDashboardStats = async (req, res) => {
       where: { TrangThai: true }
     });
 
-    // 2. Đơn hàng mới (đơn có trạng thái "Chờ xử lý") - ✅ BỎ: Enable
-    const donHangMoi = await HoaDon.count({
+    // 2. Tổng số đơn hàng (trừ đơn đã hủy)
+    const tongDonHang = await HoaDon.count({
       where: { 
-        TrangThai: 'Chờ xử lý'
+        TrangThai: { [Op.ne]: 'Đã hủy' }
       }
     });
 
@@ -39,7 +40,10 @@ exports.getDashboardStats = async (req, res) => {
       where: { TrangThai: true }
     });
 
-    // ✨ 5. Tổng doanh thu tháng hiện tại - BỎ Enable, TÍNH TẤT CẢ ĐƠN (TRỪ ĐÃ HỦY)
+    // ✅ 5. Tổng số voucher
+    const tongVoucher = await Voucher.count();
+
+    // ✨ 6. Tổng doanh thu tháng hiện tại - BỎ Enable, TÍNH TẤT CẢ ĐƠN (TRỪ ĐÃ HỦY)
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
     const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01 00:00:00`;
@@ -60,18 +64,20 @@ exports.getDashboardStats = async (req, res) => {
 
     console.log('✅ Dashboard stats:', {
       tongSanPham,
-      donHangMoi,
+      tongDonHang,
       nguoiDung,
       tongDanhMuc,
+      tongVoucher,
       doanhThu
     });
 
     // ✅ SỬ DỤNG DTOMapper - dù data đơn giản nhưng vẫn consistent
     const statsDTO = DTOMapper.toCamelCase({
       TongSanPham: parseInt(tongSanPham),
-      DonHangMoi: parseInt(donHangMoi),
+      TongDonHang: parseInt(tongDonHang),
       NguoiDung: parseInt(nguoiDung),
       TongDanhMuc: parseInt(tongDanhMuc),
+      TongVoucher: parseInt(tongVoucher),
       DoanhThu: parseFloat(doanhThu)
     });
 
@@ -608,34 +614,36 @@ exports.getStatistics = async (req, res) => {
     let slowSellingProducts = [];
     try {
       const params = {};
-      let whereClause = "WHERE hd.TrangThai != N'Đã hủy'";
+      let dateCondition = '';
       
       if (startDate && endDate) {
-        whereClause += ' AND CAST(hd.NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)';
+        dateCondition = 'AND CAST(hd.NgayLap AS DATE) BETWEEN CAST(:startDate AS DATE) AND CAST(:endDate AS DATE)';
         params.startDate = startDate;
         params.endDate = endDate;
       } else if (year && !startDate) {
-        whereClause += ' AND YEAR(hd.NgayLap) = :year';
+        dateCondition = 'AND YEAR(hd.NgayLap) = :year';
         params.year = parseInt(year);
       }
 
       const slowProductsResult = await db.sequelize.query(`
         SELECT 
-          cthd.SanPhamID as SanPhamID,
+          sp.ID as SanPhamID,
           sp.ID as SanPham_ID,
           sp.Ten as TenSanPham,
           sp.HinhAnhURL as HinhAnh,
           sp.GiaBan as GiaBan,
           sp.SoLuongTon as SoLuongTon,
-          SUM(cthd.SoLuong) as tongSoLuongBan,
+          ISNULL(SUM(cthd.SoLuong), 0) as tongSoLuongBan,
           ISNULL(SUM(cthd.ThanhTien), 0) as tongDoanhThu,
-          COUNT(DISTINCT cthd.HoaDonID) as soLanMua
-        FROM ChiTietHoaDon cthd
-        INNER JOIN HoaDon hd ON cthd.HoaDonID = hd.ID
-        INNER JOIN SanPham sp ON cthd.SanPhamID = sp.ID
-        ${whereClause}
-        GROUP BY cthd.SanPhamID, sp.ID, sp.Ten, sp.HinhAnhURL, sp.GiaBan, sp.SoLuongTon
-        HAVING SUM(cthd.SoLuong) < 10
+          ISNULL(COUNT(DISTINCT cthd.HoaDonID), 0) as soLanMua
+        FROM SanPham sp
+        LEFT JOIN ChiTietHoaDon cthd ON sp.ID = cthd.SanPhamID
+        LEFT JOIN HoaDon hd ON cthd.HoaDonID = hd.ID 
+          AND hd.TrangThai != N'Đã hủy'
+          ${dateCondition}
+        WHERE sp.TrangThai = 1
+        GROUP BY sp.ID, sp.Ten, sp.HinhAnhURL, sp.GiaBan, sp.SoLuongTon
+        HAVING ISNULL(SUM(cthd.SoLuong), 0) < 10
         ORDER BY tongSoLuongBan ASC
       `, {
         replacements: params,
