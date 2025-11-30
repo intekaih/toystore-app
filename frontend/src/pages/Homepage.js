@@ -40,10 +40,50 @@ const Homepage = () => {
   const [banners, setBanners] = useState([]);
   const [isBannerHovered, setIsBannerHovered] = useState(false);
   const [bannerImagesLoaded, setBannerImagesLoaded] = useState({});
+  const [hoveredProducts, setHoveredProducts] = useState({}); // Track hover state cho mỗi product
 
   const navigate = useNavigate();
   const { user } = useAuth();
   const swiperRef = useRef(null);
+
+  // ✅ Helper function để build image URL
+  const buildImageUrl = (imagePath) => {
+    if (!imagePath) return '/barbie.jpg';
+    if (imagePath.startsWith('http')) return imagePath;
+    if (imagePath.startsWith('/uploads/')) return `${config.API_BASE_URL}${imagePath}`;
+    if (!imagePath.startsWith('/')) return `${config.API_BASE_URL}/uploads/${imagePath}`;
+    return '/barbie.jpg';
+  };
+
+  // ✅ Helper function để lấy ảnh chính và ảnh hover từ product
+  const getProductImages = (product) => {
+    const productImages = product.hinhAnhs || product.HinhAnhs || product.images || [];
+    const sortedImages = Array.isArray(productImages) && productImages.length > 0
+      ? productImages
+          .sort((a, b) => (a.thuTu || a.ThuTu || 0) - (b.thuTu || b.ThuTu || 0))
+          .map(img => {
+            const url = img.duongDanHinhAnh || img.DuongDanHinhAnh || img.url || img;
+            return typeof url === 'string' ? buildImageUrl(url) : buildImageUrl(url?.duongDanHinhAnh || url?.DuongDanHinhAnh || '');
+          })
+      : [];
+    
+    const imgDefault = sortedImages.length > 0 
+      ? sortedImages[0] 
+      : buildImageUrl(product.hinhAnhUrl || product.hinhAnhURL || product.HinhAnhURL || product.hinhAnh || product.HinhAnh || product.image);
+    
+    const imgHover = sortedImages.length > 1 ? sortedImages[1] : null;
+    
+    return { imgDefault, imgHover };
+  };
+
+  // ✅ Handlers cho hover
+  const handleProductMouseEnter = (productId) => {
+    setHoveredProducts(prev => ({ ...prev, [productId]: true }));
+  };
+
+  const handleProductMouseLeave = (productId) => {
+    setHoveredProducts(prev => ({ ...prev, [productId]: false }));
+  };
 
   useEffect(() => {
     loadAllProducts();
@@ -474,14 +514,25 @@ const Homepage = () => {
                     <div className="absolute top-2 right-2 bg-gradient-to-r from-red-500 to-rose-500 text-white px-3 py-1 rounded-full text-xs font-bold z-10">
                       -{product.discount}%
                     </div>
-                    <div className="aspect-square bg-gradient-to-br from-primary-50 to-rose-50 rounded-cute overflow-hidden">
-                      <img
-                        src={product.hinhAnhUrl || product.hinhAnhURL || '/barbie.jpg'}
-                        alt={product.ten || product.Ten}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                        loading="lazy"
-                        decoding="async"
-                      />
+                    <div 
+                      className="aspect-square bg-gradient-to-br from-primary-50 to-rose-50 rounded-cute overflow-hidden relative"
+                      onMouseEnter={() => handleProductMouseEnter(product.id)}
+                      onMouseLeave={() => handleProductMouseLeave(product.id)}
+                    >
+                      {(() => {
+                        const { imgDefault, imgHover } = getProductImages(product);
+                        const isHover = hoveredProducts[product.id];
+                        return (
+                          <img
+                            src={isHover && imgHover ? imgHover : imgDefault}
+                            alt={product.ten || product.Ten}
+                            className="w-full h-full object-cover transition-opacity duration-300"
+                            loading="lazy"
+                            decoding="async"
+                            onError={(e) => { e.target.src = '/barbie.jpg'; }}
+                          />
+                        );
+                      })()}
                     </div>
                   </div>
                   <h3 className="font-bold text-gray-800 text-sm mb-2 line-clamp-2">{product.ten || product.Ten}</h3>
@@ -571,15 +622,25 @@ const Homepage = () => {
                   className="flex flex-col gap-3 rounded-xl bg-white p-3 group border border-transparent hover:border-primary-200 hover:shadow-lg transition-all cursor-pointer"
                   onClick={() => navigate(`/products/${product.id}`)}
                 >
-                  <OptimizedImage
-                    src={product.hinhAnhUrl || product.hinhAnhURL || '/barbie.jpg'}
-                    alt={product.ten || product.Ten}
-                    aspectRatio="1"
-                    objectFit="cover"
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                    className="rounded-lg"
-                    fallback="/barbie.jpg"
-                  />
+                  <div 
+                    className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden"
+                    onMouseEnter={() => handleProductMouseEnter(product.id)}
+                    onMouseLeave={() => handleProductMouseLeave(product.id)}
+                  >
+                    {(() => {
+                      const { imgDefault, imgHover } = getProductImages(product);
+                      const isHover = hoveredProducts[product.id];
+                      return (
+                        <img
+                          src={isHover && imgHover ? imgHover : imgDefault}
+                          alt={product.ten || product.Ten}
+                          className="w-full h-full object-cover rounded-lg transition-opacity duration-300"
+                          loading="lazy"
+                          onError={(e) => { e.target.src = '/barbie.jpg'; }}
+                        />
+                      );
+                    })()}
+                  </div>
                   <p className="text-gray-800 text-base font-medium truncate group-hover:text-primary-600 transition-colors">
                     {product.ten || product.Ten}
                   </p>
@@ -648,15 +709,25 @@ const Homepage = () => {
                   className="flex flex-col gap-3 rounded-xl bg-white p-3 group border border-transparent hover:border-primary-200 hover:shadow-lg transition-all cursor-pointer"
                   onClick={() => navigate(`/products/${product.id}`)}
                 >
-                  <OptimizedImage
-                    src={product.hinhAnhUrl || product.hinhAnhURL || '/barbie.jpg'}
-                    alt={product.ten || product.Ten}
-                    aspectRatio="1"
-                    objectFit="cover"
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                    className="rounded-lg"
-                    fallback="/barbie.jpg"
-                  />
+                  <div 
+                    className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden"
+                    onMouseEnter={() => handleProductMouseEnter(product.id)}
+                    onMouseLeave={() => handleProductMouseLeave(product.id)}
+                  >
+                    {(() => {
+                      const { imgDefault, imgHover } = getProductImages(product);
+                      const isHover = hoveredProducts[product.id];
+                      return (
+                        <img
+                          src={isHover && imgHover ? imgHover : imgDefault}
+                          alt={product.ten || product.Ten}
+                          className="w-full h-full object-cover rounded-lg transition-opacity duration-300"
+                          loading="lazy"
+                          onError={(e) => { e.target.src = '/barbie.jpg'; }}
+                        />
+                      );
+                    })()}
+                  </div>
                   <p className="text-gray-800 text-base font-medium truncate group-hover:text-primary-600 transition-colors">
                     {product.ten || product.Ten}
                   </p>
@@ -725,15 +796,25 @@ const Homepage = () => {
                   className="flex flex-col gap-3 rounded-xl bg-white p-3 group border border-transparent hover:border-primary-200 hover:shadow-lg transition-all cursor-pointer"
                   onClick={() => navigate(`/products/${product.id}`)}
                 >
-                  <OptimizedImage
-                    src={product.hinhAnhUrl || product.hinhAnhURL || '/barbie.jpg'}
-                    alt={product.ten || product.Ten}
-                    aspectRatio="1"
-                    objectFit="cover"
-                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                    className="rounded-lg"
-                    fallback="/barbie.jpg"
-                  />
+                  <div 
+                    className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden"
+                    onMouseEnter={() => handleProductMouseEnter(product.id)}
+                    onMouseLeave={() => handleProductMouseLeave(product.id)}
+                  >
+                    {(() => {
+                      const { imgDefault, imgHover } = getProductImages(product);
+                      const isHover = hoveredProducts[product.id];
+                      return (
+                        <img
+                          src={isHover && imgHover ? imgHover : imgDefault}
+                          alt={product.ten || product.Ten}
+                          className="w-full h-full object-cover rounded-lg transition-opacity duration-300"
+                          loading="lazy"
+                          onError={(e) => { e.target.src = '/barbie.jpg'; }}
+                        />
+                      );
+                    })()}
+                  </div>
                   <p className="text-gray-800 text-base font-medium truncate group-hover:text-primary-600 transition-colors">
                     {product.ten || product.Ten}
                   </p>
