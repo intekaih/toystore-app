@@ -1,8 +1,8 @@
 // src/pages/StatisticsPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { BarChart3, DollarSign, Package, TrendingUp, Award, Users as UsersIcon, RotateCcw, TrendingDown, Star, AlertTriangle, XCircle, ShoppingCart, ShoppingBag } from 'lucide-react';
+import { BarChart3, DollarSign, Package, TrendingUp, Award, Users as UsersIcon, RotateCcw, TrendingDown, Star, AlertTriangle, XCircle, ShoppingCart, ShoppingBag, Menu, X, ChevronRight } from 'lucide-react';
 import StarRating from '../components/StarRating';
 import { statisticsService } from '../services'; // ✅ Sử dụng statisticsService
 import RevenueChart from '../components/RevenueChart';
@@ -15,6 +15,10 @@ import Pagination from '../components/Pagination';
 const StatisticsPage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  
+  // Ref để lưu vị trí chart section
+  const chartSectionRef = useRef(null);
+  const scrollPositionRef = useRef(0);
 
   // State cho dữ liệu thống kê
   const [statistics, setStatistics] = useState(null);
@@ -38,6 +42,9 @@ const StatisticsPage = () => {
   const [lowStockPage, setLowStockPage] = useState(1);
   const itemsPerPage = 10; // Số sản phẩm mỗi trang
 
+  // State cho menu điều hướng
+  const [isNavMenuOpen, setIsNavMenuOpen] = useState(false); // Mặc định thu gọn (chỉ icon)
+
   // Hiển thị toast
   const showToast = (message, type = 'info') => {
     setToast({ show: true, message, type });
@@ -56,6 +63,9 @@ const StatisticsPage = () => {
   // Fetch thống kê
   const fetchStatistics = async (month, year, mode) => {
     try {
+      // Lưu vị trí scroll hiện tại trước khi fetch
+      scrollPositionRef.current = window.pageYOffset || document.documentElement.scrollTop;
+      
       setLoading(true);
 
       // Tính startDate và endDate dựa vào viewMode
@@ -114,6 +124,16 @@ const StatisticsPage = () => {
       }
     } finally {
       setLoading(false);
+      
+      // Khôi phục vị trí scroll sau khi load xong
+      // Sử dụng setTimeout để đảm bảo DOM đã render xong
+      setTimeout(() => {
+        // Khôi phục scroll position cũ để giữ nguyên vị trí user đang xem
+        window.scrollTo({
+          top: scrollPositionRef.current,
+          behavior: 'auto' // Dùng 'auto' thay vì 'smooth' để không có animation, giữ nguyên vị trí ngay lập tức
+        });
+      }, 50);
     }
   };
 
@@ -124,6 +144,19 @@ const StatisticsPage = () => {
     setSlowSellingPage(1);
     setLowStockPage(1);
   }, [selectedMonth, selectedYear, viewMode]);
+
+  // Khôi phục scroll position khi statistics thay đổi (sau khi load xong)
+  useEffect(() => {
+    if (statistics && !loading && scrollPositionRef.current > 0) {
+      // Sử dụng requestAnimationFrame để đảm bảo DOM đã render xong
+      requestAnimationFrame(() => {
+        window.scrollTo({
+          top: scrollPositionRef.current,
+          behavior: 'auto'
+        });
+      });
+    }
+  }, [statistics, loading]);
 
   // Xử lý thay đổi tháng
   const handleMonthChange = (e) => {
@@ -194,8 +227,9 @@ const StatisticsPage = () => {
 
   return (
     <AdminLayout>
-      {/* Page Title */}
-      <div className="mb-6">
+      <div className="lg:pl-10">
+        {/* Page Title */}
+        <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
           <BarChart3 size={32} />
           Thống kê báo cáo
@@ -203,73 +237,382 @@ const StatisticsPage = () => {
         <p className="text-gray-600 mt-1">Xem báo cáo doanh thu và thống kê</p>
       </div>
 
-      {/* Quick Navigation Menu */}
+      {/* Floating Vertical Navigation Menu - Sidebar Style */}
       {statistics && (
-        <Card className="mb-6" padding="md">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Điều hướng nhanh:</h3>
-          <div className="flex flex-wrap gap-2">
-            <a 
-              href="#top-products" 
-              className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-sm font-medium hover:bg-green-200 transition-colors"
-            >
-              📊 Top sản phẩm bán chạy
-            </a>
-            <a 
-              href="#top-customers" 
-              className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-200 transition-colors"
-            >
-              👥 Top khách hàng
-            </a>
-            {statistics.sanPhamBanE && statistics.sanPhamBanE.length > 0 && (
-              <a 
-                href="#worst-products" 
-                className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-lg text-sm font-medium hover:bg-orange-200 transition-colors"
+        <div className="fixed left-2 top-1/2 -translate-y-1/2 z-50 hidden lg:block">
+          <div 
+            className="bg-white/95 backdrop-blur-md rounded-cute shadow-cute border border-primary-100/50 overflow-hidden"
+            style={{ 
+              width: isNavMenuOpen ? '256px' : '56px',
+              transition: 'width 0.3s ease-in-out'
+            }}
+          >
+            {/* Header với nút toggle */}
+            <div className="relative flex items-center p-3 border-b border-primary-100/50">
+              <button
+                onClick={() => setIsNavMenuOpen(!isNavMenuOpen)}
+                className="p-1.5 hover:bg-primary-100/50 rounded-lg transition-all duration-300 flex-shrink-0 relative w-8 h-8 flex items-center justify-center z-10"
+                title={isNavMenuOpen ? 'Thu gọn' : 'Mở rộng'}
               >
-                ⚠️ Sản phẩm bán ế
-              </a>
-            )}
-            {statistics.sanPhamDanhGiaXau && statistics.sanPhamDanhGiaXau.length > 0 && (
-              <a 
-                href="#bad-reviews" 
-                className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
+                {/* Icon Menu - 3 gạch */}
+                <Menu 
+                  size={18} 
+                  className={`text-gray-600 absolute transition-all duration-300 ${
+                    isNavMenuOpen 
+                      ? 'opacity-0 rotate-90 scale-0' 
+                      : 'opacity-100 rotate-0 scale-100'
+                  }`}
+                />
+                {/* Icon X */}
+                <X 
+                  size={18} 
+                  className={`text-gray-600 absolute transition-all duration-300 ${
+                    isNavMenuOpen 
+                      ? 'opacity-100 rotate-0 scale-100' 
+                      : 'opacity-0 -rotate-90 scale-0'
+                  }`}
+                />
+              </button>
+              <h3 
+                className="absolute left-0 right-0 text-sm font-semibold text-gray-700 transition-all duration-300 overflow-hidden whitespace-nowrap text-center"
+                style={{
+                  width: isNavMenuOpen ? 'auto' : '0',
+                  opacity: isNavMenuOpen ? 1 : 0
+                }}
               >
-                ⭐ Sản phẩm đánh giá xấu
-              </a>
-            )}
-            {statistics.sanPhamHetHang && statistics.sanPhamHetHang.length > 0 && (
+                
+              </h3>
+            </div>
+
+            {/* Menu Items - Sắp xếp theo thứ tự trên trang */}
+            <div className="p-2 space-y-1">
+              {/* 1. Top sản phẩm bán chạy */}
               <a 
-                href="#out-of-stock" 
-                className="px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-lg text-sm font-medium hover:bg-yellow-200 transition-colors"
+                href="#top-products"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('top-products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="relative flex items-center rounded-lg text-sm font-medium transition-all duration-300 group overflow-hidden"
+                title="Top sản phẩm bán chạy"
+                style={{
+                  padding: isNavMenuOpen ? '10px 12px' : '10px',
+                  justifyContent: isNavMenuOpen ? 'flex-start' : 'center'
+                }}
               >
-                🛒 Sản phẩm hết hàng
+                {/* Background - cố định vị trí icon */}
+                <div 
+                  className="absolute left-0 top-0 bottom-0 rounded-lg transition-all duration-300 bg-green-50/80 group-hover:bg-green-100/80"
+                  style={{
+                    width: isNavMenuOpen ? '100%' : '100%',
+                    minWidth: '100%'
+                  }}
+                />
+                {/* Content */}
+                <div className="relative z-10 flex items-center w-full" style={{ gap: isNavMenuOpen ? '12px' : '0' }}>
+                  <Award size={18} className="flex-shrink-0 text-green-700" style={{ minWidth: '18px' }} />
+                  <span 
+                    className="text-green-700 transition-all duration-300 overflow-hidden whitespace-nowrap"
+                    style={{
+                      width: isNavMenuOpen ? 'auto' : '0',
+                      opacity: isNavMenuOpen ? 1 : 0,
+                      marginLeft: isNavMenuOpen ? '0' : '0'
+                    }}
+                  >
+                    Top sản phẩm bán chạy
+                  </span>
+                  {isNavMenuOpen && (
+                    <ChevronRight 
+                      size={16} 
+                      className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-auto text-green-700"
+                    />
+                  )}
+                </div>
               </a>
-            )}
-            {statistics.sanPhamBanKhongChay && statistics.sanPhamBanKhongChay.length > 0 && (
+
+              {/* 2. Top khách hàng */}
               <a 
-                href="#slow-selling" 
-                className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-200 transition-colors"
+                href="#top-customers"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('top-customers')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="relative flex items-center rounded-lg text-sm font-medium transition-all duration-300 group overflow-hidden"
+                title="Top khách hàng"
+                style={{
+                  padding: isNavMenuOpen ? '10px 12px' : '10px',
+                  justifyContent: isNavMenuOpen ? 'flex-start' : 'center'
+                }}
               >
-                📉 Sản phẩm bán không chạy
+                <div 
+                  className="absolute left-0 top-0 bottom-0 rounded-lg transition-all duration-300 bg-blue-50/80 group-hover:bg-blue-100/80"
+                  style={{ width: '100%', minWidth: '100%' }}
+                />
+                <div className="relative z-10 flex items-center w-full" style={{ gap: isNavMenuOpen ? '12px' : '0' }}>
+                  <UsersIcon size={18} className="flex-shrink-0 text-blue-700" style={{ minWidth: '18px' }} />
+                  <span 
+                    className="text-blue-700 transition-all duration-300 overflow-hidden whitespace-nowrap"
+                    style={{
+                      width: isNavMenuOpen ? 'auto' : '0',
+                      opacity: isNavMenuOpen ? 1 : 0
+                    }}
+                  >
+                    Top khách hàng
+                  </span>
+                  {isNavMenuOpen && (
+                    <ChevronRight 
+                      size={16} 
+                      className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-auto text-blue-700"
+                    />
+                  )}
+                </div>
               </a>
-            )}
-            {statistics.hangSapHet && statistics.hangSapHet.length > 0 && (
-              <a 
-                href="#low-stock" 
-                className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-200 transition-colors"
-              >
-                ⚡ Hàng sắp hết
-              </a>
-            )}
-            {statistics.thongKeDanhGia && statistics.thongKeDanhGia.tongSoDanhGia > 0 && (
-              <a 
-                href="#review-stats" 
-                className="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-200 transition-colors"
-              >
-                📈 Phân bố đánh giá
-              </a>
-            )}
+
+              {/* 3. Sản phẩm bán ế */}
+              {statistics.sanPhamBanE && statistics.sanPhamBanE.length > 0 && (
+                <a 
+                  href="#worst-products"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById('worst-products')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  className="relative flex items-center rounded-lg text-sm font-medium transition-all duration-300 group overflow-hidden"
+                  title="Sản phẩm bán ế"
+                  style={{
+                    padding: isNavMenuOpen ? '10px 12px' : '10px',
+                    justifyContent: isNavMenuOpen ? 'flex-start' : 'center'
+                  }}
+                >
+                  <div 
+                    className="absolute left-0 top-0 bottom-0 rounded-lg transition-all duration-300 bg-orange-50/80 group-hover:bg-orange-100/80"
+                    style={{ width: '100%', minWidth: '100%' }}
+                  />
+                  <div className="relative z-10 flex items-center w-full" style={{ gap: isNavMenuOpen ? '12px' : '0' }}>
+                    <TrendingDown size={18} className="flex-shrink-0 text-orange-700" style={{ minWidth: '18px' }} />
+                    <span 
+                      className="text-orange-700 transition-all duration-300 overflow-hidden whitespace-nowrap"
+                      style={{
+                        width: isNavMenuOpen ? 'auto' : '0',
+                        opacity: isNavMenuOpen ? 1 : 0
+                      }}
+                    >
+                      Sản phẩm bán ế
+                    </span>
+                    {isNavMenuOpen && (
+                      <ChevronRight 
+                        size={16} 
+                        className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-auto text-orange-700"
+                      />
+                    )}
+                  </div>
+                </a>
+              )}
+
+              {/* 4. Sản phẩm đánh giá xấu */}
+              {statistics.sanPhamDanhGiaXau && statistics.sanPhamDanhGiaXau.length > 0 && (
+                <a 
+                  href="#bad-reviews"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById('bad-reviews')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  className="relative flex items-center rounded-lg text-sm font-medium transition-all duration-300 group overflow-hidden"
+                  title="Sản phẩm đánh giá xấu"
+                  style={{
+                    padding: isNavMenuOpen ? '10px 12px' : '10px',
+                    justifyContent: isNavMenuOpen ? 'flex-start' : 'center'
+                  }}
+                >
+                  <div 
+                    className="absolute left-0 top-0 bottom-0 rounded-lg transition-all duration-300 bg-red-50/80 group-hover:bg-red-100/80"
+                    style={{ width: '100%', minWidth: '100%' }}
+                  />
+                  <div className="relative z-10 flex items-center w-full" style={{ gap: isNavMenuOpen ? '12px' : '0' }}>
+                    <Star size={18} className="flex-shrink-0 text-red-700" style={{ minWidth: '18px' }} />
+                    <span 
+                      className="text-red-700 transition-all duration-300 overflow-hidden whitespace-nowrap"
+                      style={{
+                        width: isNavMenuOpen ? 'auto' : '0',
+                        opacity: isNavMenuOpen ? 1 : 0
+                      }}
+                    >
+                      Sản phẩm đánh giá xấu
+                    </span>
+                    {isNavMenuOpen && (
+                      <ChevronRight 
+                        size={16} 
+                        className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-auto text-red-700"
+                      />
+                    )}
+                  </div>
+                </a>
+              )}
+
+              {/* 5. Sản phẩm bán không chạy */}
+              {statistics.sanPhamBanKhongChay && statistics.sanPhamBanKhongChay.length > 0 && (
+                <a 
+                  href="#slow-selling"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById('slow-selling')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  className="relative flex items-center rounded-lg text-sm font-medium transition-all duration-300 group overflow-hidden"
+                  title="Sản phẩm bán không chạy"
+                  style={{
+                    padding: isNavMenuOpen ? '10px 12px' : '10px',
+                    justifyContent: isNavMenuOpen ? 'flex-start' : 'center'
+                  }}
+                >
+                  <div 
+                    className="absolute left-0 top-0 bottom-0 rounded-lg transition-all duration-300 bg-indigo-50/80 group-hover:bg-indigo-100/80"
+                    style={{ width: '100%', minWidth: '100%' }}
+                  />
+                  <div className="relative z-10 flex items-center w-full" style={{ gap: isNavMenuOpen ? '12px' : '0' }}>
+                    <TrendingDown size={18} className="flex-shrink-0 text-indigo-700" style={{ minWidth: '18px' }} />
+                    <span 
+                      className="text-indigo-700 transition-all duration-300 overflow-hidden whitespace-nowrap"
+                      style={{
+                        width: isNavMenuOpen ? 'auto' : '0',
+                        opacity: isNavMenuOpen ? 1 : 0
+                      }}
+                    >
+                      Sản phẩm bán không chạy
+                    </span>
+                    {isNavMenuOpen && (
+                      <ChevronRight 
+                        size={16} 
+                        className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-auto text-indigo-700"
+                      />
+                    )}
+                  </div>
+                </a>
+              )}
+
+              {/* 6. Sản phẩm hết hàng */}
+              {statistics.sanPhamHetHang && statistics.sanPhamHetHang.length > 0 && (
+                <a 
+                  href="#out-of-stock"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById('out-of-stock')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  className="relative flex items-center rounded-lg text-sm font-medium transition-all duration-300 group overflow-hidden"
+                  title="Sản phẩm hết hàng"
+                  style={{
+                    padding: isNavMenuOpen ? '10px 12px' : '10px',
+                    justifyContent: isNavMenuOpen ? 'flex-start' : 'center'
+                  }}
+                >
+                  <div 
+                    className="absolute left-0 top-0 bottom-0 rounded-lg transition-all duration-300 bg-yellow-50/80 group-hover:bg-yellow-100/80"
+                    style={{ width: '100%', minWidth: '100%' }}
+                  />
+                  <div className="relative z-10 flex items-center w-full" style={{ gap: isNavMenuOpen ? '12px' : '0' }}>
+                    <XCircle size={18} className="flex-shrink-0 text-yellow-700" style={{ minWidth: '18px' }} />
+                    <span 
+                      className="text-yellow-700 transition-all duration-300 overflow-hidden whitespace-nowrap"
+                      style={{
+                        width: isNavMenuOpen ? 'auto' : '0',
+                        opacity: isNavMenuOpen ? 1 : 0
+                      }}
+                    >
+                      Sản phẩm hết hàng
+                    </span>
+                    {isNavMenuOpen && (
+                      <ChevronRight 
+                        size={16} 
+                        className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-auto text-yellow-700"
+                      />
+                    )}
+                  </div>
+                </a>
+              )}
+
+              {/* 7. Hàng sắp hết */}
+              {statistics.hangSapHet && statistics.hangSapHet.length > 0 && (
+                <a 
+                  href="#low-stock"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById('low-stock')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  className="relative flex items-center rounded-lg text-sm font-medium transition-all duration-300 group overflow-hidden"
+                  title="Hàng sắp hết"
+                  style={{
+                    padding: isNavMenuOpen ? '10px 12px' : '10px',
+                    justifyContent: isNavMenuOpen ? 'flex-start' : 'center'
+                  }}
+                >
+                  <div 
+                    className="absolute left-0 top-0 bottom-0 rounded-lg transition-all duration-300 bg-amber-50/80 group-hover:bg-amber-100/80"
+                    style={{ width: '100%', minWidth: '100%' }}
+                  />
+                  <div className="relative z-10 flex items-center w-full" style={{ gap: isNavMenuOpen ? '12px' : '0' }}>
+                    <AlertTriangle size={18} className="flex-shrink-0 text-amber-700" style={{ minWidth: '18px' }} />
+                    <span 
+                      className="text-amber-700 transition-all duration-300 overflow-hidden whitespace-nowrap"
+                      style={{
+                        width: isNavMenuOpen ? 'auto' : '0',
+                        opacity: isNavMenuOpen ? 1 : 0
+                      }}
+                    >
+                      Hàng sắp hết
+                    </span>
+                    {isNavMenuOpen && (
+                      <ChevronRight 
+                        size={16} 
+                        className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-auto text-amber-700"
+                      />
+                    )}
+                  </div>
+                </a>
+              )}
+
+              {/* 8. Phân bố đánh giá */}
+              {statistics.thongKeDanhGia && statistics.thongKeDanhGia.tongSoDanhGia > 0 && (
+                <a 
+                  href="#review-stats"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const element = document.getElementById('review-stats');
+                    if (element) {
+                      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }}
+                  className="relative flex items-center rounded-lg text-sm font-medium transition-all duration-300 group overflow-hidden"
+                  title="Phân bố đánh giá"
+                  style={{
+                    padding: isNavMenuOpen ? '10px 12px' : '10px',
+                    justifyContent: isNavMenuOpen ? 'flex-start' : 'center'
+                  }}
+                >
+                  <div 
+                    className="absolute left-0 top-0 bottom-0 rounded-lg transition-all duration-300 bg-purple-50/80 group-hover:bg-purple-100/80"
+                    style={{ width: '100%', minWidth: '100%' }}
+                  />
+                  <div className="relative z-10 flex items-center w-full" style={{ gap: isNavMenuOpen ? '12px' : '0' }}>
+                    <BarChart3 size={18} className="flex-shrink-0 text-purple-700" style={{ minWidth: '18px' }} />
+                    <span 
+                      className="text-purple-700 transition-all duration-300 overflow-hidden whitespace-nowrap"
+                      style={{
+                        width: isNavMenuOpen ? 'auto' : '0',
+                        opacity: isNavMenuOpen ? 1 : 0
+                      }}
+                    >
+                      Phân bố đánh giá
+                    </span>
+                    {isNavMenuOpen && (
+                      <ChevronRight 
+                        size={16} 
+                        className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 ml-auto text-purple-700"
+                      />
+                    )}
+                  </div>
+                </a>
+              )}
+            </div>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Filter Bar */}
@@ -443,72 +786,66 @@ const StatisticsPage = () => {
       </div>
 
       {/* Chart với Tab Day/Month/Year */}
-      <Card className="mb-6" padding="md">
-        {/* Tab Buttons */}
-        <div className="flex justify-center gap-2 mb-6">
-          <button
-            onClick={() => setViewMode('day')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-              viewMode === 'day'
-                ? 'bg-purple-500 text-white shadow-md'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Day
-          </button>
-          <button
-            onClick={() => setViewMode('month')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-              viewMode === 'month'
-                ? 'bg-purple-500 text-white shadow-md'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Month
-          </button>
-          <button
-            onClick={() => setViewMode('year')}
-            className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-              viewMode === 'year'
-                ? 'bg-purple-500 text-white shadow-md'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Year
-          </button>
-        </div>
+      <div ref={chartSectionRef} id="chart-section">
+        <Card className="mb-6" padding="md">
+          {/* Tab Buttons */}
+          <div className="flex justify-center gap-2 mb-6">
+            <button
+              onClick={() => {
+                // Lưu scroll position trước khi thay đổi
+                scrollPositionRef.current = window.pageYOffset || document.documentElement.scrollTop;
+                setViewMode('day');
+              }}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                viewMode === 'day'
+                  ? 'bg-purple-500 text-white shadow-md'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Ngày
+            </button>
+            <button
+              onClick={() => {
+                // Lưu scroll position trước khi thay đổi
+                scrollPositionRef.current = window.pageYOffset || document.documentElement.scrollTop;
+                setViewMode('month');
+              }}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                viewMode === 'month'
+                  ? 'bg-purple-500 text-white shadow-md'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Tháng
+            </button>
+            <button
+              onClick={() => {
+                // Lưu scroll position trước khi thay đổi
+                scrollPositionRef.current = window.pageYOffset || document.documentElement.scrollTop;
+                setViewMode('year');
+              }}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                viewMode === 'year'
+                  ? 'bg-purple-500 text-white shadow-md'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              Năm
+            </button>
+          </div>
 
-        {/* Chart */}
-        <RevenueChart 
-          data={chartData} 
-          title={
-            viewMode === 'day' ? 'Doanh thu theo giờ (Hôm nay)' :
-            viewMode === 'month' ? `Doanh thu theo ngày (Tháng ${selectedMonth}/${selectedYear})` :
-            `Doanh thu theo tháng (Năm ${selectedYear})`
-          }
-        />
-      </Card>
-
-      {/* Debug Info - Chỉ hiển thị trong development */}
-      {process.env.NODE_ENV === 'development' && statistics && (
-        <Card className="mb-6" padding="md" style={{ backgroundColor: '#f9fafb', border: '1px dashed #d1d5db' }}>
-          <details className="text-xs">
-            <summary className="cursor-pointer text-gray-600 font-semibold mb-2">
-              🔍 Debug Info (Development only)
-            </summary>
-            <div className="mt-2 space-y-1 text-gray-600">
-              <p>Top Products: {statistics.topSanPham?.length || 0}</p>
-              <p>Top Customers: {statistics.topKhachHang?.length || 0}</p>
-              <p>Worst Products: {statistics.sanPhamBanE?.length || 0}</p>
-              <p>Bad Rated: {statistics.sanPhamDanhGiaXau?.length || 0}</p>
-              <p>Out of Stock: {statistics.sanPhamHetHang?.length || 0}</p>
-              <pre className="mt-2 p-2 bg-white rounded text-xs overflow-auto max-h-40">
-                {JSON.stringify(statistics, null, 2)}
-              </pre>
-            </div>
-          </details>
+          {/* Chart */}
+          <RevenueChart 
+            data={chartData} 
+            title={
+              viewMode === 'day' ? 'Doanh thu theo giờ (Hôm nay)' :
+              viewMode === 'month' ? `Doanh thu theo ngày (Tháng ${selectedMonth}/${selectedYear})` :
+              `Doanh thu theo tháng (Năm ${selectedYear})`
+            }
+          />
         </Card>
-      )}
+      </div>
+
 
       {/* Thông báo khi không có dữ liệu */}
       {statistics && !statistics.topSanPham?.length && !statistics.topKhachHang?.length && 
@@ -1312,9 +1649,10 @@ const StatisticsPage = () => {
           duration={3000}
           onClose={() => setToast({ ...toast, show: false })}
         />
-      )}
+        )}
+      </div>
     </AdminLayout>
-  );
+    );
 };
 
 export default StatisticsPage;

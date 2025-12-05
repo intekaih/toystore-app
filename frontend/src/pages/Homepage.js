@@ -76,13 +76,21 @@ const Homepage = () => {
     return { imgDefault, imgHover };
   };
 
-  // ✅ Handlers cho hover
-  const handleProductMouseEnter = (productId) => {
-    setHoveredProducts(prev => ({ ...prev, [productId]: true }));
+  // ✅ Handlers cho hover - dùng unique key kết hợp section và product id
+  const handleProductMouseEnter = (productId, sectionName, index) => {
+    const uniqueKey = `${sectionName}-${productId}-${index}`;
+    setHoveredProducts(prev => ({ ...prev, [uniqueKey]: true }));
   };
 
-  const handleProductMouseLeave = (productId) => {
-    setHoveredProducts(prev => ({ ...prev, [productId]: false }));
+  const handleProductMouseLeave = (productId, sectionName, index) => {
+    const uniqueKey = `${sectionName}-${productId}-${index}`;
+    setHoveredProducts(prev => ({ ...prev, [uniqueKey]: false }));
+  };
+
+  // ✅ Helper để get hover state với unique key
+  const getHoverState = (productId, sectionName, index) => {
+    const uniqueKey = `${sectionName}-${productId}-${index}`;
+    return hoveredProducts[uniqueKey] || false;
   };
 
   useEffect(() => {
@@ -516,12 +524,12 @@ const Homepage = () => {
                     </div>
                     <div 
                       className="aspect-square bg-gradient-to-br from-primary-50 to-rose-50 rounded-cute overflow-hidden relative"
-                      onMouseEnter={() => handleProductMouseEnter(product.id)}
-                      onMouseLeave={() => handleProductMouseLeave(product.id)}
+                      onMouseEnter={() => handleProductMouseEnter(product.id, 'flashSale', flashSaleProducts.indexOf(product))}
+                      onMouseLeave={() => handleProductMouseLeave(product.id, 'flashSale', flashSaleProducts.indexOf(product))}
                     >
                       {(() => {
                         const { imgDefault, imgHover } = getProductImages(product);
-                        const isHover = hoveredProducts[product.id];
+                        const isHover = getHoverState(product.id, 'flashSale', flashSaleProducts.indexOf(product));
                         return (
                           <img
                             src={isHover && imgHover ? imgHover : imgDefault}
@@ -624,12 +632,12 @@ const Homepage = () => {
                 >
                   <div 
                     className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden"
-                    onMouseEnter={() => handleProductMouseEnter(product.id)}
-                    onMouseLeave={() => handleProductMouseLeave(product.id)}
+                    onMouseEnter={() => handleProductMouseEnter(product.id, 'bestSellers', bestSellers.indexOf(product))}
+                    onMouseLeave={() => handleProductMouseLeave(product.id, 'bestSellers', bestSellers.indexOf(product))}
                   >
                     {(() => {
                       const { imgDefault, imgHover } = getProductImages(product);
-                      const isHover = hoveredProducts[product.id];
+                      const isHover = getHoverState(product.id, 'bestSellers', bestSellers.indexOf(product));
                       return (
                         <img
                           src={isHover && imgHover ? imgHover : imgDefault}
@@ -711,12 +719,12 @@ const Homepage = () => {
                 >
                   <div 
                     className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden"
-                    onMouseEnter={() => handleProductMouseEnter(product.id)}
-                    onMouseLeave={() => handleProductMouseLeave(product.id)}
+                    onMouseEnter={() => handleProductMouseEnter(product.id, 'newArrivals', newArrivals.indexOf(product))}
+                    onMouseLeave={() => handleProductMouseLeave(product.id, 'newArrivals', newArrivals.indexOf(product))}
                   >
                     {(() => {
                       const { imgDefault, imgHover } = getProductImages(product);
-                      const isHover = hoveredProducts[product.id];
+                      const isHover = getHoverState(product.id, 'newArrivals', newArrivals.indexOf(product));
                       return (
                         <img
                           src={isHover && imgHover ? imgHover : imgDefault}
@@ -798,12 +806,12 @@ const Homepage = () => {
                 >
                   <div 
                     className="relative w-full aspect-square bg-gray-100 rounded-lg overflow-hidden"
-                    onMouseEnter={() => handleProductMouseEnter(product.id)}
-                    onMouseLeave={() => handleProductMouseLeave(product.id)}
+                    onMouseEnter={() => handleProductMouseEnter(product.id, 'trendingProducts', trendingProducts.indexOf(product))}
+                    onMouseLeave={() => handleProductMouseLeave(product.id, 'trendingProducts', trendingProducts.indexOf(product))}
                   >
                     {(() => {
                       const { imgDefault, imgHover } = getProductImages(product);
-                      const isHover = hoveredProducts[product.id];
+                      const isHover = getHoverState(product.id, 'trendingProducts', trendingProducts.indexOf(product));
                       return (
                         <img
                           src={isHover && imgHover ? imgHover : imgDefault}

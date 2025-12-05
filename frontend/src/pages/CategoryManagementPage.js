@@ -103,9 +103,13 @@ const CategoryManagementPage = () => {
 
   const handleUpdateCategory = async (categoryData) => {
     try {
-      const categoryId = modalState.editingCategory.ID;
+      // ✅ Hỗ trợ cả hai format: ID (chữ hoa) và id (chữ thường)
+      const categoryId = modalState.editingCategory?.ID || 
+                         modalState.editingCategory?.id ||
+                         modalState.editingCategory?.Id;
 
       if (!categoryId) {
+        console.error('❌ Category object:', modalState.editingCategory);
         showToast('Không tìm thấy ID danh mục', 'error');
         throw new Error('Category ID not found');
       }

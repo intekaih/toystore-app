@@ -75,7 +75,7 @@ async function processPaymentSuccess(hoaDon, paymentInfo, transaction) {
   const chiTietHoaDon = await ChiTietHoaDon.findAll({
     where: {
       HoaDonID: hoaDon.ID
-      // ✅ XÓA Enable: true vì bảng ChiTietHoaDon KHÔNG có cột Enable
+      
     },
     include: [{
       model: db.SanPham,
