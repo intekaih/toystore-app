@@ -272,22 +272,49 @@ exports.getPrintLabel = async (req, res) => {
  */
 exports.getProvinces = async (req, res) => {
   try {
+    console.log('📡 [Backend] Nhận request lấy danh sách tỉnh/thành...');
     const result = await ghnService.getProvinces();
     
     if (result.success) {
+      console.log(`✅ [Backend] Trả về ${result.data?.length || 0} tỉnh/thành`);
       return res.status(200).json({
         success: true,
+        message: 'Lấy danh sách tỉnh/thành thành công',
         data: result.data
       });
     }
 
-    return res.status(400).json(result);
+    // ✅ CẢI THIỆN: Phân biệt lỗi network (500) và lỗi validation (400)
+    const isNetworkError = result.error === 'ECONNRESET' || 
+                          result.error === 'ETIMEDOUT' || 
+                          result.error === 'ECONNREFUSED' ||
+                          result.message?.includes('ECONNRESET') ||
+                          result.message?.includes('timeout') ||
+                          result.message?.includes('kết nối');
+
+    if (isNetworkError) {
+      console.error('❌ [Backend] Lỗi network khi gọi GHN API:', result.message);
+      return res.status(503).json({
+        success: false,
+        message: 'Không thể kết nối đến GHN API. Vui lòng thử lại sau.',
+        error: result.error || 'NETWORK_ERROR',
+        retryable: true
+      });
+    }
+
+    // Lỗi validation hoặc lỗi từ GHN API
+    console.error('❌ [Backend] Lỗi từ GHN API:', result.message);
+    return res.status(400).json({
+      success: false,
+      message: result.message || 'Không thể lấy danh sách tỉnh/thành',
+      error: result.error
+    });
   } catch (error) {
-    console.error('❌ Lỗi lấy tỉnh/thành:', error);
+    console.error('❌ [Backend] Lỗi server khi lấy tỉnh/thành:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server',
-      error: error.message
+      message: 'Lỗi server nội bộ',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
     });
   }
 };

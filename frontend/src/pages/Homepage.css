@@ -596,3 +596,390 @@
     align-items: center;
   }
 }
+
+/* ==================== BANNER EFFECTS ==================== */
+
+.banner-swiper {
+  position: relative;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  animation: bannerFadeIn 0.8s ease-out;
+}
+
+@keyframes bannerFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.banner-image-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.banner-image-wrapper > div {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.banner-image {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: kenBurns 20s ease-in-out infinite;
+  transform-origin: center center;
+  display: block;
+}
+
+.banner-image-wrapper picture,
+.banner-image-wrapper img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+
+@keyframes kenBurns {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  50% {
+    transform: scale(1.1) translate(-2%, -2%);
+  }
+  100% {
+    transform: scale(1) translate(0, 0);
+  }
+}
+
+.banner-swiper .swiper-slide-active .banner-image,
+.banner-swiper .swiper-slide-active .banner-image-wrapper img {
+  animation: kenBurns 20s ease-in-out infinite;
+  animation-play-state: running;
+}
+
+.banner-swiper .group:hover .banner-image,
+.banner-swiper .group:hover .banner-image-wrapper img {
+  transform: scale(1.15) !important;
+  animation-play-state: paused;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Swiper Pagination Bullets - Enhanced */
+.swiper-pagination-bullet-custom {
+  width: 12px !important;
+  height: 12px !important;
+  background: rgba(255, 255, 255, 0.5) !important;
+  opacity: 1 !important;
+  transition: all 0.3s ease !important;
+  margin: 0 6px !important;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+}
+
+.swiper-pagination-bullet-custom-active {
+  background: white !important;
+  width: 32px !important;
+  border-radius: 6px !important;
+  border-color: white !important;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
+}
+
+/* Navigation Buttons - Enhanced */
+.swiper-button-prev-custom,
+.swiper-button-next-custom {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.swiper-button-prev-custom:hover,
+.swiper-button-next-custom:hover {
+  transform: translateY(-50%) scale(1.1) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  background: white !important;
+}
+
+.swiper-button-prev-custom:active,
+.swiper-button-next-custom:active {
+  transform: translateY(-50%) scale(0.95) !important;
+}
+
+/* Banner Container Glow Effect */
+.banner-swiper::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(45deg, 
+    rgba(236, 72, 153, 0.3), 
+    rgba(251, 113, 133, 0.3), 
+    rgba(236, 72, 153, 0.3));
+  border-radius: 24px;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  z-index: -1;
+  filter: blur(20px);
+}
+
+.banner-swiper:hover::before {
+  opacity: 1;
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Slide Transition Enhancement */
+.banner-swiper .swiper-slide {
+  transition: opacity 0.8s ease-in-out !important;
+}
+
+/* Responsive Banner Effects */
+@media (max-width: 768px) {
+  .banner-image {
+    animation-duration: 15s;
+  }
+  
+  .banner-swiper {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  }
+  
+  .swiper-pagination-bullet-custom {
+    width: 8px !important;
+    height: 8px !important;
+    margin: 0 4px !important;
+  }
+  
+  .swiper-pagination-bullet-custom-active {
+    width: 24px !important;
+  }
+}
+
+/* ==================== SCROLL REVEAL ANIMATIONS ==================== */
+
+.scroll-reveal {
+  opacity: 0;
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Base - Fade in từ dưới lên */
+.scroll-reveal {
+  transform: translateY(50px);
+}
+
+.scroll-reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Slide từ trái */
+.scroll-reveal-slide-left {
+  transform: translateX(-50px);
+}
+
+.scroll-reveal-slide-left.revealed {
+  transform: translateX(0);
+}
+
+/* Scale in */
+.scroll-reveal-scale {
+  transform: translateY(50px) scale(0.95);
+}
+
+.scroll-reveal-scale.revealed {
+  transform: translateY(0) scale(1);
+}
+
+/* Slide từ phải */
+.scroll-reveal-slide-right {
+  transform: translateX(50px);
+}
+
+.scroll-reveal-slide-right.revealed {
+  transform: translateX(0);
+}
+
+/* Rotate và fade in */
+.scroll-reveal-rotate {
+  transform: translateY(50px) rotateY(15deg);
+}
+
+.scroll-reveal-rotate.revealed {
+  transform: translateY(0) rotateY(0deg);
+}
+
+/* Bounce in */
+.scroll-reveal-bounce {
+  transform: scale(0.9);
+}
+
+.scroll-reveal-bounce.revealed {
+  animation: bounceIn 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* Features Section - Stagger animation cho các items */
+section.scroll-reveal.revealed .grid > div {
+  animation: fadeInUp 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+section.scroll-reveal.revealed .grid > div:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+section.scroll-reveal.revealed .grid > div:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+section.scroll-reveal.revealed .grid > div:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+section.scroll-reveal.revealed .grid > div:nth-child(4) {
+  animation-delay: 0.4s;
+}
+
+section.scroll-reveal.revealed .grid > div:nth-child(5) {
+  animation-delay: 0.5s;
+}
+
+section.scroll-reveal.revealed .grid > div:nth-child(6) {
+  animation-delay: 0.6s;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Product Cards - Stagger animation */
+.scroll-reveal.revealed .grid > div,
+.scroll-reveal.revealed section .grid > div {
+  animation: slideUpFade 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+.scroll-reveal.revealed .grid > div:nth-child(1),
+.scroll-reveal.revealed section .grid > div:nth-child(1) {
+  animation-delay: 0.05s;
+}
+
+.scroll-reveal.revealed .grid > div:nth-child(2),
+.scroll-reveal.revealed section .grid > div:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.scroll-reveal.revealed .grid > div:nth-child(3),
+.scroll-reveal.revealed section .grid > div:nth-child(3) {
+  animation-delay: 0.15s;
+}
+
+.scroll-reveal.revealed .grid > div:nth-child(4),
+.scroll-reveal.revealed section .grid > div:nth-child(4) {
+  animation-delay: 0.2s;
+}
+
+.scroll-reveal.revealed .grid > div:nth-child(5),
+.scroll-reveal.revealed section .grid > div:nth-child(5) {
+  animation-delay: 0.25s;
+}
+
+.scroll-reveal.revealed .grid > div:nth-child(6),
+.scroll-reveal.revealed section .grid > div:nth-child(6) {
+  animation-delay: 0.3s;
+}
+
+.scroll-reveal.revealed .grid > div:nth-child(7),
+.scroll-reveal.revealed section .grid > div:nth-child(7) {
+  animation-delay: 0.35s;
+}
+
+.scroll-reveal.revealed .grid > div:nth-child(8),
+.scroll-reveal.revealed section .grid > div:nth-child(8) {
+  animation-delay: 0.4s;
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Newsletter Section - Bounce in */
+section.scroll-reveal:has(.text-yellow-300[aria-label*="🎁"]) {
+  transform: scale(0.9);
+}
+
+section.scroll-reveal:has(.text-yellow-300[aria-label*="🎁"]).revealed {
+  animation: bounceIn 0.8s ease-out;
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Header trong sections - Slide từ trên */
+.scroll-reveal.revealed h2,
+.scroll-reveal.revealed .flex.items-center.justify-between {
+  animation: slideDown 0.6s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .scroll-reveal {
+    transform: translateY(30px);
+  }
+  
+  .scroll-reveal.revealed {
+    transform: translateY(0);
+  }
+  
+  section.scroll-reveal:has(.text-yellow-300),
+  div.scroll-reveal:has(.text-5xl[aria-label*="🆕"]) {
+    transform: translateX(0);
+  }
+}

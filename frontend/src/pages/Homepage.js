@@ -17,6 +17,7 @@ import 'swiper/css/pagination';
 import 'swiper/css/effect-fade';
 import './Homepage.css';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import useScrollReveal from '../hooks/useScrollReveal';
 
 const Homepage = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
@@ -45,6 +46,14 @@ const Homepage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const swiperRef = useRef(null);
+
+  // Scroll Reveal Hooks cho các sections
+  const [flashSaleRef, isFlashSaleVisible] = useScrollReveal({ threshold: 0.1, rootMargin: '-50px' });
+  const [bestSellersRef, isBestSellersVisible] = useScrollReveal({ threshold: 0.1, rootMargin: '-50px' });
+  const [newArrivalsRef, isNewArrivalsVisible] = useScrollReveal({ threshold: 0.1, rootMargin: '-50px' });
+  const [trendingRef, isTrendingVisible] = useScrollReveal({ threshold: 0.1, rootMargin: '-50px' });
+  const [featuresRef, isFeaturesVisible] = useScrollReveal({ threshold: 0.1, rootMargin: '-50px' });
+  const [newsletterRef, isNewsletterVisible] = useScrollReveal({ threshold: 0.1, rootMargin: '-50px' });
 
   // ✅ Helper function để build image URL
   const buildImageUrl = (imagePath) => {
@@ -448,18 +457,26 @@ const Homepage = () => {
                         {banner.type === 'leaderboard' ? (
                           <LeaderboardBanner />
                         ) : (
-                          <div className="relative w-full h-full bg-gradient-to-br from-primary-100 to-rose-100">
-                            <OptimizedImage
-                              src={banner.imageUrl}
-                              alt={`Banner ${banner.order}`}
-                              aspectRatio="16/9"
-                              objectFit="cover"
-                              sizes="100vw"
-                              priority={index === 0}
-                              className="cursor-pointer"
-                              onClick={() => navigate(banner.link || '/products')}
-                              fallback="/barbie.jpg"
-                            />
+                          <div className="relative w-full h-full bg-gradient-to-br from-primary-100 to-rose-100 overflow-hidden group cursor-pointer" onClick={() => navigate(banner.link || '/products')}>
+                            {/* Gradient Overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                            {/* Shine Effect */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 z-20"></div>
+                            {/* Image with Ken Burns Effect */}
+                            <div className="banner-image-wrapper w-full h-full">
+                              <OptimizedImage
+                                src={banner.imageUrl}
+                                alt={`Banner ${banner.order}`}
+                                aspectRatio="16/9"
+                                objectFit="cover"
+                                sizes="100vw"
+                                priority={index === 0}
+                                className="banner-image"
+                                fallback="/barbie.jpg"
+                              />
+                            </div>
+                            {/* Glow Effect */}
+                            <div className="absolute inset-0 bg-primary-400/0 group-hover:bg-primary-400/20 transition-all duration-500 blur-2xl -z-10"></div>
                           </div>
                         )}
                       </SwiperSlide>
@@ -487,7 +504,7 @@ const Homepage = () => {
       </section>
 
       {/* Flash Sale Section */}
-      <section className="py-8 bg-gradient-to-r from-rose-400 via-primary-500 to-rose-400 text-white relative overflow-hidden">
+      <section ref={flashSaleRef} className={`py-8 bg-gradient-to-r from-rose-400 via-primary-500 to-rose-400 text-white relative overflow-hidden scroll-reveal scroll-reveal-slide-left ${isFlashSaleVisible ? 'revealed' : ''}`}>
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-64 h-64 bg-white rounded-full blur-3xl"></div>
           <div className="absolute bottom-0 right-0 w-64 h-64 bg-white rounded-full blur-3xl"></div>
@@ -602,7 +619,7 @@ const Homepage = () => {
       {/* Featured Collections */}
       <section className="mb-6 md:mb-8 container-cute">
         {/* Best Sellers */}
-        <div className="mb-6 md:mb-8 bg-gradient-to-br from-primary-50 via-rose-50 to-cream-50 rounded-cute p-6 md:p-8 relative overflow-hidden">
+        <div ref={bestSellersRef} className={`mb-6 md:mb-8 bg-gradient-to-br from-primary-50 via-rose-50 to-cream-50 rounded-cute p-6 md:p-8 relative overflow-hidden scroll-reveal scroll-reveal-scale ${isBestSellersVisible ? 'revealed' : ''}`}>
           <div className="absolute top-5 left-5 text-5xl opacity-20 animate-float">🏆</div>
           <div className="absolute top-10 right-10 text-4xl opacity-20 animate-float" style={{ animationDelay: '0.5s' }}>🎯</div>
           <div className="absolute bottom-10 left-1/4 text-4xl opacity-20 animate-float" style={{ animationDelay: '1s' }}>🎁</div>
@@ -689,7 +706,7 @@ const Homepage = () => {
         </div>
 
         {/* New Arrivals */}
-        <div className="mb-6 md:mb-8 bg-gradient-to-br from-cream-50 via-primary-50 to-rose-50 rounded-cute p-6 md:p-8 relative overflow-hidden">
+        <div ref={newArrivalsRef} className={`mb-6 md:mb-8 bg-gradient-to-br from-cream-50 via-primary-50 to-rose-50 rounded-cute p-6 md:p-8 relative overflow-hidden scroll-reveal scroll-reveal-slide-right ${isNewArrivalsVisible ? 'revealed' : ''}`}>
           <div className="absolute top-5 left-5 text-5xl opacity-20 animate-float">🆕</div>
           <div className="absolute top-10 right-10 text-4xl opacity-20 animate-float" style={{ animationDelay: '0.5s' }}>🎈</div>
           <div className="absolute bottom-10 left-1/4 text-4xl opacity-20 animate-float" style={{ animationDelay: '1s' }}>🎨</div>
@@ -776,7 +793,7 @@ const Homepage = () => {
         </div>
 
         {/* Trending Now */}
-        <div className="bg-gradient-to-br from-rose-50 via-cream-50 to-primary-50 rounded-cute p-6 md:p-8 relative overflow-hidden">
+        <div ref={trendingRef} className={`bg-gradient-to-br from-rose-50 via-cream-50 to-primary-50 rounded-cute p-6 md:p-8 relative overflow-hidden scroll-reveal scroll-reveal-rotate ${isTrendingVisible ? 'revealed' : ''}`}>
           <div className="absolute top-5 left-5 text-5xl opacity-20 animate-float">🔥</div>
           <div className="absolute top-10 right-10 text-4xl opacity-20 animate-float" style={{ animationDelay: '0.5s' }}>🚀</div>
           <div className="absolute bottom-10 left-1/4 text-4xl opacity-20 animate-float" style={{ animationDelay: '1s' }}>💫</div>
@@ -864,7 +881,7 @@ const Homepage = () => {
       </section>
 
       {/* Trust & Credibility Section */}
-      <section className="py-16 bg-gradient-to-br from-primary-50 via-rose-50 to-cream-50">
+      <section ref={featuresRef} className={`py-16 bg-gradient-to-br from-primary-50 via-rose-50 to-cream-50 scroll-reveal ${isFeaturesVisible ? 'revealed' : ''}`}>
         <div className="container-cute">
           <h2 className="text-3xl font-display font-bold text-gray-800 text-center mb-12">
             🛡️ TẠI SAO CHỌN TOYSTORE?
@@ -905,7 +922,7 @@ const Homepage = () => {
       </section>
 
       {/* Newsletter Banner */}
-      <section className="py-16 bg-gradient-to-r from-primary-400 via-primary-500 to-rose-400 text-white relative overflow-hidden">
+      <section ref={newsletterRef} className={`py-16 bg-gradient-to-r from-primary-400 via-primary-500 to-rose-400 text-white relative overflow-hidden scroll-reveal scroll-reveal-bounce ${isNewsletterVisible ? 'revealed' : ''}`}>
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl"></div>
           <div className="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl"></div>

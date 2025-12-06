@@ -5,10 +5,8 @@ import {
   ShoppingCart, 
   Users, 
   DollarSign, 
-  FolderOpen, 
   Ticket, 
   Truck, 
-  TrendingUp,
   Zap,
   MapPin,
   TestTube,
@@ -125,42 +123,6 @@ const AdminDashboard = () => {
 
   const adminFeatures = [
     {
-      title: 'Quản lý danh mục',
-      description: 'Thêm, sửa, xóa danh mục sản phẩm',
-      icon: FolderOpen,
-      route: '/admin/categories',
-      color: 'from-orange-50 to-orange-100 border-orange-200',
-      iconBg: 'bg-orange-500',
-      stats: `Tổng: ${stats.tongDanhMuc} danh mục`
-    },
-    {
-      title: 'Quản lý sản phẩm',
-      description: 'Thêm, sửa, xóa sản phẩm',
-      icon: Package,
-      route: '/admin/products',
-      color: 'from-blue-50 to-blue-100 border-blue-200',
-      iconBg: 'bg-blue-500',
-      stats: `Tổng: ${stats.tongSanPham} sản phẩm`
-    },
-    {
-      title: 'Quản lý đơn hàng',
-      description: 'Xem và cập nhật đơn hàng',
-      icon: ShoppingCart,
-      route: '/admin/orders',
-      color: 'from-green-50 to-green-100 border-green-200',
-      iconBg: 'bg-green-500',
-      stats: `Tổng: ${stats.tongDonHang} đơn`
-    },
-    {
-      title: 'Quản lý người dùng',
-      description: 'Quản lý tài khoản khách hàng',
-      icon: Users,
-      route: '/admin/users',
-      color: 'from-purple-50 to-purple-100 border-purple-200',
-      iconBg: 'bg-purple-500',
-      stats: `Tổng: ${stats.nguoiDung} người dùng`
-    },
-    {
       title: 'Quản lý voucher',
       description: 'Quản lý mã giảm giá',
       icon: Ticket,
@@ -179,15 +141,6 @@ const AdminDashboard = () => {
       color: 'from-cyan-50 to-cyan-100 border-cyan-200',
       iconBg: 'bg-cyan-500',
       stats: 'Phí giao hàng'
-    },
-    {
-      title: 'Thống kê báo cáo',
-      description: 'Xem báo cáo doanh thu',
-      icon: TrendingUp,
-      route: '/admin/statistics',
-      color: 'from-indigo-50 to-indigo-100 border-indigo-200',
-      iconBg: 'bg-indigo-500',
-      stats: 'Doanh thu tháng'
     },
     {
       title: 'Quản lý GHN',

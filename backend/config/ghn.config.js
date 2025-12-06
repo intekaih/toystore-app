@@ -90,13 +90,13 @@ module.exports = {
     height: 10 // Chiều cao (cm)
   },
   
-  // Timeout cho API calls (ms)
-  TIMEOUT: 30000,
+  // Timeout cho API calls (ms) - ✅ Tăng lên 60s để xử lý IP mới chậm hơn
+  TIMEOUT: 60000,
   
   // Retry configuration
   RETRY: {
     maxRetries: 3,
-    retryDelay: 1000 // ms
+    retryDelay: 2000 // ✅ Tăng delay lên 2s để tránh spam request
   },
   
   // Webhook URL (GHN sẽ gọi khi có cập nhật trạng thái)

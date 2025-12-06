@@ -805,42 +805,69 @@ const Navbar = () => {
               onMouseEnter={handleCartMouseEnter}
               onMouseLeave={handleCartMouseLeave}
             >
-              <Link
-                to="/cart"
-                className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-gray-800 transition-all relative"
-              >
-                <ShoppingCart size={20} />
-                {cartItems.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                    {cartItems.length}
-                  </span>
-                )}
-              </Link>
+              {(() => {
+                const isCartActive = location.pathname === '/cart';
+                return (
+                  <Link
+                    to="/cart"
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all relative ${
+                      isCartActive 
+                        ? 'bg-primary-400 text-white hover:bg-primary-500' 
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800'
+                    }`}
+                  >
+                    <ShoppingCart size={20} />
+                    {cartItems.length > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                        {cartItems.length}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })()}
             </div>
 
             {/* Orders Icon */}
-            <button
-              onClick={() => {
-                if (user) {
-                  navigate('/orders');
-                } else {
-                  navigate('/order-lookup');
-                }
-              }}
-              className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-gray-800 transition-all relative"
-            >
-              <Package size={20} />
-            </button>
+            {(() => {
+              const isOrdersActive = location.pathname === '/orders' || location.pathname === '/order-lookup';
+              return (
+                <button
+                  onClick={() => {
+                    if (user) {
+                      navigate('/orders');
+                    } else {
+                      navigate('/order-lookup');
+                    }
+                  }}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all relative ${
+                    isOrdersActive 
+                      ? 'bg-primary-400 text-white hover:bg-primary-500' 
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  <Package size={20} />
+                </button>
+              );
+            })()}
 
             {/* User Profile Icon */}
             {user ? (
               <div className="relative">
-                <button
-                  onClick={toggleUserMenu}
-                  className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-gray-800 transition-all"
-                >
-                  <User size={20} />
-                </button>
+                {(() => {
+                  const isProfileActive = location.pathname === '/profile' || location.pathname === '/profile/edit';
+                  return (
+                    <button
+                      onClick={toggleUserMenu}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                        isProfileActive 
+                          ? 'bg-primary-400 text-white hover:bg-primary-500' 
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800'
+                      }`}
+                    >
+                      <User size={20} />
+                    </button>
+                  );
+                })()}
 
                 {/* User Dropdown Menu */}
                 {showUserMenu && (
@@ -947,7 +974,11 @@ const Navbar = () => {
             ) : (
               <Link
                 to="/login"
-                className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 hover:text-gray-800 transition-all"
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                  location.pathname === '/login' 
+                    ? 'bg-primary-400 text-white hover:bg-primary-500' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800'
+                }`}
               >
                 <User size={20} />
               </Link>

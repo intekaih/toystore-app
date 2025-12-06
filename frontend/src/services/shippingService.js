@@ -12,7 +12,7 @@ class ShippingService {
   constructor() {
     this.api = axios.create({
       baseURL: API_URL,
-      timeout: 15000,
+      timeout: 45000, // ✅ Tăng timeout lên 45s để xử lý IP mới chậm hơn
       headers: {
         'Content-Type': 'application/json',
       },
@@ -29,6 +29,51 @@ class ShippingService {
       },
       (error) => Promise.reject(error)
     );
+
+    // ✅ THÊM: Response interceptor để retry khi gặp lỗi network
+    this.api.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const config = error.config;
+        
+        // Nếu đã retry quá số lần cho phép, bỏ qua
+        if (!config || config.__retryCount >= 3) {
+          return Promise.reject(error);
+        }
+
+        // Chỉ retry với các lỗi network/timeout
+        const isNetworkError = 
+          error.code === 'ECONNRESET' ||
+          error.code === 'ETIMEDOUT' ||
+          error.code === 'ECONNABORTED' ||
+          error.code === 'ECONNREFUSED' ||
+          error.code === 'ENOTFOUND' ||
+          error.message?.includes('timeout') ||
+          error.message?.includes('ECONNRESET') ||
+          (error.response?.status >= 500 && error.response?.status < 600);
+
+        if (isNetworkError) {
+          config.__retryCount = config.__retryCount || 0;
+          config.__retryCount += 1;
+
+          // Exponential backoff: delay tăng dần (1s, 2s, 4s)
+          const delay = 1000 * Math.pow(2, config.__retryCount - 1);
+          
+          console.log(`🔄 [Frontend] Retry request (${config.__retryCount}/3) sau ${delay}ms...`, error.code || error.message);
+
+          // Đợi trước khi retry
+          await new Promise(resolve => setTimeout(resolve, delay));
+
+          // Tăng timeout cho lần retry
+          config.timeout = 45000;
+
+          // Retry request
+          return this.api(config);
+        }
+
+        return Promise.reject(error);
+      }
+    );
   }
 
   /**
@@ -37,9 +82,13 @@ class ShippingService {
    */
   async getProvinces() {
     try {
-      const response = await this.api.get('/shipping/provinces');
+      console.log('📡 [Frontend] Đang gọi API lấy danh sách tỉnh/thành...');
+      const response = await this.api.get('/shipping/provinces', {
+        timeout: 45000 // ✅ Tăng timeout riêng cho request này
+      });
       
       if (response.data && response.data.success) {
+        console.log(`✅ [Frontend] Lấy thành công ${response.data.data?.length || 0} tỉnh/thành`);
         return {
           success: true,
           data: response.data.data || [],
@@ -49,7 +98,15 @@ class ShippingService {
       
       throw new Error(response.data.message || 'Lấy danh sách tỉnh/thành thất bại');
     } catch (error) {
-      console.error('❌ Lỗi lấy danh sách tỉnh/thành:', error);
+      console.error('❌ [Frontend] Lỗi lấy danh sách tỉnh/thành:', error);
+      
+      // ✅ CẢI THIỆN: Log chi tiết hơn
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        console.error('   ⚠️ Timeout - Có thể do IP mới chậm hơn, đã thử retry tự động');
+      } else if (error.code === 'ECONNRESET') {
+        console.error('   ⚠️ Connection reset - Đã thử retry tự động');
+      }
+      
       throw this._handleError(error);
     }
   }
@@ -504,11 +561,21 @@ class ShippingService {
           return new Error(data.message || 'Không tìm thấy thông tin');
         case 500:
           return new Error('Lỗi máy chủ, vui lòng thử lại sau');
+        case 503:
+          return new Error('Dịch vụ tạm thời không khả dụng, vui lòng thử lại sau');
         default:
           return new Error(data.message || `Lỗi ${status}`);
       }
     } else if (error.request) {
-      return new Error('Không thể kết nối đến máy chủ');
+      // ✅ CẢI THIỆN: Thông báo lỗi chi tiết hơn
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        return new Error('Kết nối quá lâu. Vui lòng kiểm tra kết nối internet và thử lại.');
+      } else if (error.code === 'ECONNRESET') {
+        return new Error('Kết nối bị ngắt. Vui lòng thử lại sau vài giây.');
+      } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+        return new Error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối internet.');
+      }
+      return new Error('Không thể kết nối đến máy chủ. Vui lòng thử lại sau.');
     } else {
       return error;
     }

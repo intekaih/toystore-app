@@ -384,30 +384,54 @@ exports.calculateShippingFee = async (req, res) => {
 
 /**
  * 🗺️ LẤY DANH SÁCH TỈNH/THÀNH PHỐ
- * GET /api/shipping/provinces
+ * GET /api/webhooks/shipping/provinces
+ * ⚠️ Route này có thể không được sử dụng, chính route là /api/shipping/provinces
  */
 exports.getProvinces = async (req, res) => {
   try {
+    console.log('📡 [Webhook Controller] Nhận request lấy danh sách tỉnh/thành...');
     const result = await ghnService.getProvinces();
 
-    if (!result.success) {
-      return res.status(400).json({
-        success: false,
-        message: result.message
+    if (result.success) {
+      console.log(`✅ [Webhook Controller] Trả về ${result.data?.length || 0} tỉnh/thành`);
+      return res.status(200).json({
+        success: true,
+        message: 'Lấy danh sách tỉnh/thành thành công',
+        data: result.data
       });
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'Lấy danh sách tỉnh/thành thành công',
-      data: result.data
+    // ✅ CẢI THIỆN: Phân biệt lỗi network (503) và lỗi validation (400)
+    const isNetworkError = result.error === 'ECONNRESET' || 
+                          result.error === 'ETIMEDOUT' || 
+                          result.error === 'ECONNREFUSED' ||
+                          result.message?.includes('ECONNRESET') ||
+                          result.message?.includes('timeout') ||
+                          result.message?.includes('kết nối');
+
+    if (isNetworkError) {
+      console.error('❌ [Webhook Controller] Lỗi network khi gọi GHN API:', result.message);
+      return res.status(503).json({
+        success: false,
+        message: 'Không thể kết nối đến GHN API. Vui lòng thử lại sau.',
+        error: result.error || 'NETWORK_ERROR',
+        retryable: true
+      });
+    }
+
+    console.error('❌ [Webhook Controller] Lỗi từ GHN API:', result.message);
+    return res.status(400).json({
+      success: false,
+      message: result.message || 'Không thể lấy danh sách tỉnh/thành',
+      error: result.error
     });
 
   } catch (error) {
-    console.error('❌ Lỗi lấy tỉnh/thành:', error);
+    console.error('❌ [Webhook Controller] Lỗi server khi lấy tỉnh/thành:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server nội bộ'
+      message: 'Lỗi server nội bộ',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error'
     });
   }
 };
