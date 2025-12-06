@@ -75,10 +75,6 @@ npm start
 - Username: `admin`
 - Password: `admin123`
 
-**User:**
-- Username: `user1`
-- Password: `user123`
-
 ---
 
 ## 📝 Lưu ý
