@@ -1029,15 +1029,84 @@ exports.createShippingOrder = async (req, res) => {
         });
       }
 
-      if (!diaChiGH.MaQuanID || !diaChiGH.MaPhuongXa) {
-        await safeRollback(transaction, 'missing district/ward code');
+      // ✅ TỰ ĐỘNG LẤY MÃ QUẬN/PHƯỜNG NẾU THIẾU
+      let maQuanID = diaChiGH.MaQuanID;
+      let maPhuongXa = diaChiGH.MaPhuongXa;
+
+      // Nếu thiếu mã quận nhưng có tên quận và mã tỉnh
+      if (!maQuanID && diaChiGH.TenQuan && diaChiGH.MaTinhID) {
+        console.log('🔍 Tự động tìm mã quận từ tên:', diaChiGH.TenQuan);
+        try {
+          const districtsResult = await ghnService.getDistricts(diaChiGH.MaTinhID);
+          if (districtsResult.success && districtsResult.data) {
+            // Tìm quận theo tên (không phân biệt hoa thường, bỏ dấu)
+            const normalizeName = (name) => name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+            const targetName = normalizeName(diaChiGH.TenQuan);
+            const foundDistrict = districtsResult.data.find(d => 
+              normalizeName(d.districtName) === targetName ||
+              normalizeName(d.districtName).includes(targetName) ||
+              targetName.includes(normalizeName(d.districtName))
+            );
+            
+            if (foundDistrict) {
+              maQuanID = foundDistrict.districtId;
+              console.log('✅ Tìm thấy mã quận:', maQuanID, 'cho', diaChiGH.TenQuan);
+              
+              // Cập nhật vào database
+              await diaChiGH.update({ MaQuanID: maQuanID }, { transaction });
+            } else {
+              console.warn('⚠️ Không tìm thấy mã quận cho:', diaChiGH.TenQuan);
+            }
+          }
+        } catch (error) {
+          console.error('❌ Lỗi khi tìm mã quận:', error);
+        }
+      }
+
+      // Nếu thiếu mã phường nhưng có tên phường và mã quận
+      if (!maPhuongXa && diaChiGH.TenPhuong && maQuanID) {
+        console.log('🔍 Tự động tìm mã phường từ tên:', diaChiGH.TenPhuong);
+        try {
+          const wardsResult = await ghnService.getWards(maQuanID);
+          if (wardsResult.success && wardsResult.data) {
+            // Tìm phường theo tên (không phân biệt hoa thường, bỏ dấu)
+            const normalizeName = (name) => name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+            const targetName = normalizeName(diaChiGH.TenPhuong);
+            const foundWard = wardsResult.data.find(w => 
+              normalizeName(w.wardName) === targetName ||
+              normalizeName(w.wardName).includes(targetName) ||
+              targetName.includes(normalizeName(w.wardName))
+            );
+            
+            if (foundWard) {
+              maPhuongXa = foundWard.wardCode;
+              console.log('✅ Tìm thấy mã phường:', maPhuongXa, 'cho', diaChiGH.TenPhuong);
+              
+              // Cập nhật vào database
+              await diaChiGH.update({ MaPhuongXa: maPhuongXa }, { transaction });
+            } else {
+              console.warn('⚠️ Không tìm thấy mã phường cho:', diaChiGH.TenPhuong);
+            }
+          }
+        } catch (error) {
+          console.error('❌ Lỗi khi tìm mã phường:', error);
+        }
+      }
+
+      // Kiểm tra lại sau khi đã cố gắng tự động lấy mã
+      if (!maQuanID || !maPhuongXa) {
+        await safeRollback(transaction, 'missing district/ward code after auto-fetch');
         return res.status(400).json({
           success: false,
           message: 'Thiếu thông tin mã quận/phường. Không thể tạo đơn GHN.',
           detail: {
             maTinhID: diaChiGH.MaTinhID,
-            maQuanID: diaChiGH.MaQuanID,
-            maPhuongXa: diaChiGH.MaPhuongXa
+            maQuanID: maQuanID,
+            maPhuongXa: maPhuongXa,
+            tenTinh: diaChiGH.TenTinh,
+            tenQuan: diaChiGH.TenQuan,
+            tenPhuong: diaChiGH.TenPhuong,
+            hint: 'Vui lòng cập nhật địa chỉ giao hàng với mã quận/phường hợp lệ từ GHN API.'
           }
         });
       }
@@ -1051,8 +1120,8 @@ exports.createShippingOrder = async (req, res) => {
           name: diaChiGH.TenNguoiNhan || hoaDon.khachHang.HoTen,
           phone: diaChiGH.SoDienThoai || hoaDon.khachHang.DienThoai,
           address: diaChiGH.DiaChiChiTiet,
-          districtId: parseInt(diaChiGH.MaQuanID),
-          wardCode: diaChiGH.MaPhuongXa
+          districtId: parseInt(maQuanID),
+          wardCode: maPhuongXa
         },
         items: hoaDon.chiTiet.map(item => ({
           name: item.sanPham.Ten,
@@ -1098,7 +1167,6 @@ exports.createShippingOrder = async (req, res) => {
     const ThongTinVanChuyen = db.ThongTinVanChuyen;
 
     // ✅ FIX: Format date for SQL Server DATETIME type (YYYY-MM-DD HH:mm:ss WITHOUT timezone)
-    // SQL Server DATETIME không chấp nhận timezone (+00:00), chỉ cần format: 2025-11-27 07:25:10
     const formatDateForSQLServer = (date) => {
       if (!date) return null;
 
@@ -1110,7 +1178,6 @@ exports.createShippingOrder = async (req, res) => {
       }
 
       // ✅ QUAN TRỌNG: Dùng local time, KHÔNG dùng UTC
-      // getFullYear(), getMonth() etc. sẽ trả về local time
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
@@ -1124,17 +1191,13 @@ exports.createShippingOrder = async (req, res) => {
       return formatted;
     };
 
-
-    // ✅ FIX CRITICAL: Set NULL cho NgayGiaoDuKien để tránh lỗi conversion
-    // Vấn đề: Sequelize + tedious driver tự động thêm timezone vào Date object
-    // SQL Server DATETIME không hỗ trợ timezone
-    // Giải pháp tạm thời: Set NULL, sau đó update bằng raw query
-    const ngayGiaoDuKienValue = null; // TEMPORARY FIX
+    // ✅ FIX: Format ngày giao dự kiến đúng cách
+    const ngayGiaoDuKienFormatted = expectedDeliveryTime ? formatDateForSQLServer(expectedDeliveryTime) : null;
 
     console.log(`🔍 [createShippingOrder] expectedDeliveryTime:`, expectedDeliveryTime);
-    console.log(`⚠️ [createShippingOrder] Tạm thời set NgayGiaoDuKien = NULL để tránh lỗi conversion`);
+    console.log(`🔍 [createShippingOrder] ngayGiaoDuKienFormatted:`, ngayGiaoDuKienFormatted);
 
-    // ✅ FIX: Sử dụng Sequelize model thay vì raw query để đảm bảo consistency
+    // ✅ FIX: Kiểm tra ThongTinVanChuyen đã tồn tại chưa
     let vanChuyen = await ThongTinVanChuyen.findOne({
       where: { HoaDonID: hoaDon.ID },
       transaction
@@ -1144,48 +1207,57 @@ exports.createShippingOrder = async (req, res) => {
 
     if (vanChuyen) {
       console.log(`🔍 [createShippingOrder] Updating existing ThongTinVanChuyen ID: ${vanChuyen.ID}`);
-      await vanChuyen.update({
-        MaVanDon: finalMaVanDon,
-        DonViVanChuyen: finalDonViVanChuyen,
-        PhiVanChuyen: phiVanChuyen,
-        NgayGiaoDuKien: ngayGiaoDuKienValue, // ✅ FIX: Dùng string thay vì Sequelize.literal()
-        TrangThaiGHN: 'ready_to_pick'
-      }, { transaction });
-      console.log('✅ Đã update ThongTinVanChuyen');
+      
+      // ✅ FIX: Update bằng raw SQL để tránh lỗi timezone
+      await db.sequelize.query(
+        `UPDATE ThongTinVanChuyen 
+         SET MaVanDon = :maVanDon,
+             DonViVanChuyen = :donViVanChuyen,
+             PhiVanChuyen = :phiVanChuyen,
+             NgayGiaoDuKien = ${ngayGiaoDuKienFormatted ? ':ngayGiaoDuKien' : 'NULL'},
+             TrangThaiGHN = :trangThaiGHN
+         WHERE HoaDonID = :hoaDonID`,
+        {
+          replacements: {
+            maVanDon: finalMaVanDon,
+            donViVanChuyen: finalDonViVanChuyen,
+            phiVanChuyen: phiVanChuyen,
+            ngayGiaoDuKien: ngayGiaoDuKienFormatted,
+            trangThaiGHN: 'ready_to_pick',
+            hoaDonID: hoaDon.ID
+          },
+          transaction,
+          type: db.sequelize.QueryTypes.UPDATE
+        }
+      );
+      console.log('✅ Đã update ThongTinVanChuyen bằng raw SQL');
     } else {
       console.log(`🔍 [createShippingOrder] Creating new ThongTinVanChuyen`);
 
-      // ✅ FIX: Dùng findOrCreate thay vì create để tránh lỗi duplicate key
-      // Trường hợp: record đã tồn tại từ lần thử trước nhưng transaction bị rollback
-      const [createdVanChuyen, created] = await ThongTinVanChuyen.findOrCreate({
+      // ✅ FIX: Tạo mới bằng raw SQL để tránh lỗi timezone
+      await db.sequelize.query(
+        `INSERT INTO ThongTinVanChuyen (HoaDonID, MaVanDon, DonViVanChuyen, PhiVanChuyen, NgayGiaoDuKien, TrangThaiGHN, SoLanGiaoThatBai)
+         VALUES (:hoaDonID, :maVanDon, :donViVanChuyen, :phiVanChuyen, ${ngayGiaoDuKienFormatted ? ':ngayGiaoDuKien' : 'NULL'}, :trangThaiGHN, 0)`,
+        {
+          replacements: {
+            hoaDonID: hoaDon.ID,
+            maVanDon: finalMaVanDon,
+            donViVanChuyen: finalDonViVanChuyen,
+            phiVanChuyen: phiVanChuyen,
+            ngayGiaoDuKien: ngayGiaoDuKienFormatted,
+            trangThaiGHN: 'ready_to_pick'
+          },
+          transaction,
+          type: db.sequelize.QueryTypes.INSERT
+        }
+      );
+      console.log('✅ Đã insert ThongTinVanChuyen mới bằng raw SQL');
+
+      // Reload để lấy instance
+      vanChuyen = await ThongTinVanChuyen.findOne({
         where: { HoaDonID: hoaDon.ID },
-        defaults: {
-          MaVanDon: finalMaVanDon,
-          DonViVanChuyen: finalDonViVanChuyen,
-          PhiVanChuyen: phiVanChuyen,
-          NgayGiaoDuKien: ngayGiaoDuKienValue, // ✅ FIX: Dùng Date object thay vì string
-          TrangThaiGHN: 'ready_to_pick',
-          SoLanGiaoThatBai: 0
-        },
         transaction
       });
-
-      vanChuyen = createdVanChuyen;
-
-      if (created) {
-        console.log('✅ Đã insert ThongTinVanChuyen mới');
-      } else {
-        console.log('⚠️ ThongTinVanChuyen đã tồn tại, đang update...');
-        // Nếu record đã tồn tại, update nó
-        await vanChuyen.update({
-          MaVanDon: finalMaVanDon,
-          DonViVanChuyen: finalDonViVanChuyen,
-          PhiVanChuyen: phiVanChuyen,
-          NgayGiaoDuKien: ngayGiaoDuKienValue,
-          TrangThaiGHN: 'ready_to_pick'
-        }, { transaction });
-        console.log('✅ Đã update ThongTinVanChuyen hiện có');
-      }
     }
 
     // ✅ FIX: Verify ThongTinVanChuyen đã được tạo
@@ -1193,32 +1265,6 @@ exports.createShippingOrder = async (req, res) => {
       throw new Error('Không thể tạo hoặc cập nhật ThongTinVanChuyen');
     }
     console.log(`✅ [createShippingOrder] ThongTinVanChuyen verified: MaVanDon=${vanChuyen.MaVanDon}`);
-
-    // ✅ FIX: Update NgayGiaoDuKien bằng raw SQL để tránh lỗi timezone của Sequelize
-    if (expectedDeliveryTime) {
-      const ngayGiaoDuKienFormatted = formatDateForSQLServer(expectedDeliveryTime);
-      console.log(`🔍 [createShippingOrder] Updating NgayGiaoDuKien with raw SQL: ${ngayGiaoDuKienFormatted}`);
-
-      try {
-        await db.sequelize.query(
-          `UPDATE ThongTinVanChuyen 
-           SET NgayGiaoDuKien = :ngayGiaoDuKien
-           WHERE HoaDonID = :hoaDonID`,
-          {
-            replacements: {
-              ngayGiaoDuKien: ngayGiaoDuKienFormatted,
-              hoaDonID: hoaDon.ID
-            },
-            transaction,
-            type: db.sequelize.QueryTypes.UPDATE
-          }
-        );
-        console.log(`✅ [createShippingOrder] Đã update NgayGiaoDuKien thành công`);
-      } catch (dateUpdateError) {
-        console.warn(`⚠️ [createShippingOrder] Lỗi khi update NgayGiaoDuKien:`, dateUpdateError.message);
-        // Không throw để không làm gián đoạn flow chính
-      }
-    }
 
     // ✅ FIX: Reload order với ThongTinVanChuyen để đảm bảo có MaVanDon
     await hoaDon.reload({
@@ -1359,7 +1405,7 @@ exports.createShippingOrder = async (req, res) => {
               // Sequelize.create() tự động thêm timezone vào DATE field → SQL Server lỗi conversion
               await db.sequelize.query(
                 `INSERT INTO ThongTinVanChuyen (HoaDonID, MaVanDon, DonViVanChuyen, PhiVanChuyen, NgayGiaoDuKien, TrangThaiGHN, SoLanGiaoThatBai)
-                 VALUES (:hoaDonID, :maVanDon, :donViVanChuyen, :phiVanChuyen, :ngayGiaoDuKien, :trangThaiGHN, :soLanGiaoThatBai)`,
+                 VALUES (:hoaDonID, :maVanDon, :donViVanChuyen, :phiVanChuyen, :ngayGiaoDuKien, :trangThaiGHN, 0)`,
                 {
                   replacements: {
                     hoaDonID: hoaDon.ID,

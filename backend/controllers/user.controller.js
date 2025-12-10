@@ -1,5 +1,6 @@
 const db = require('../models');
 const TaiKhoan = db.TaiKhoan;
+const KhachHang = db.KhachHang;
 const addressService = require('../services/address.service');
 const bcrypt = require('bcrypt');
 const DTOMapper = require('../utils/DTOMapper');
@@ -8,7 +9,7 @@ const DTOMapper = require('../utils/DTOMapper');
 exports.getProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    
+
     const user = await TaiKhoan.findByPk(userId, {
       attributes: ['ID', 'TenDangNhap', 'HoTen', 'Email', 'DienThoai', 'VaiTro', 'NgayTao', 'TrangThai', 'GoogleID', 'LoginMethod']
     });
@@ -132,15 +133,15 @@ exports.updateProfile = async (req, res) => {
 
     // Tạo object dữ liệu cần cập nhật (chỉ cập nhật các field được gửi)
     const updateData = {};
-    
+
     if (HoTen !== undefined) {
       updateData.HoTen = HoTen ? HoTen.trim() : null;
     }
-    
+
     if (Email !== undefined) {
       updateData.Email = Email ? Email.trim().toLowerCase() : null;
     }
-    
+
     if (DienThoai !== undefined) {
       updateData.DienThoai = DienThoai ? DienThoai.trim() : null;
     }
@@ -153,8 +154,58 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    // Cập nhật thông tin user
-    await user.update(updateData);
+    // ✅ SỬ DỤNG TRANSACTION để đảm bảo tính nhất quán dữ liệu
+    const transaction = await db.sequelize.transaction();
+
+    try {
+      // Cập nhật thông tin user trong bảng TaiKhoan
+      await user.update(updateData, { transaction });
+
+      // ✅ ĐỒNG BỘ: Cập nhật bảng KhachHang nếu tồn tại
+      const khachHang = await KhachHang.findOne({
+        where: { TaiKhoanID: userId },
+        transaction
+      });
+
+      if (khachHang) {
+        const khachHangUpdateData = {};
+
+        // Đồng bộ HoTen (chỉ khi có giá trị hợp lệ)
+        if (updateData.HoTen !== undefined && updateData.HoTen !== null && updateData.HoTen !== '') {
+          khachHangUpdateData.HoTen = updateData.HoTen;
+        }
+        
+        // Đồng bộ Email
+        if (updateData.Email !== undefined) {
+          khachHangUpdateData.Email = updateData.Email;
+        }
+        
+        // Đồng bộ DienThoai
+        if (updateData.DienThoai !== undefined) {
+          khachHangUpdateData.DienThoai = updateData.DienThoai;
+        }
+
+        if (Object.keys(khachHangUpdateData).length > 0) {
+          await khachHang.update(khachHangUpdateData, { transaction });
+          console.log('✅ Đồng bộ KhachHang thành công - ID:', khachHang.ID);
+          console.log('📝 Dữ liệu đã đồng bộ:', khachHangUpdateData);
+        } else {
+          console.log('⚠️ Không có dữ liệu để đồng bộ với KhachHang');
+        }
+      } else {
+        console.log('⚠️ Không tìm thấy bản ghi KhachHang với TaiKhoanID:', userId);
+      }
+
+      // Commit transaction nếu tất cả đều thành công
+      await transaction.commit();
+      console.log('✅ Transaction đã được commit thành công');
+
+    } catch (error) {
+      // Rollback transaction nếu có lỗi
+      await transaction.rollback();
+      console.error('❌ Lỗi trong transaction, đã rollback:', error);
+      throw error;
+    }
 
     // Lấy lại thông tin user đã cập nhật
     const updatedUser = await TaiKhoan.findByPk(userId, {
@@ -199,7 +250,7 @@ exports.updateProfile = async (req, res) => {
     if (error.name === 'SequelizeUniqueConstraintError') {
       const field = error.errors[0].path;
       let message = 'Dữ liệu đã tồn tại';
-      
+
       if (field === 'Email') {
         message = 'Email đã được sử dụng bởi tài khoản khác';
       }
@@ -225,7 +276,7 @@ exports.getAddresses = async (req, res) => {
   try {
     const userId = req.userId;
     const addresses = await addressService.getAddressesByUserId(userId);
-    
+
     res.json({
       success: true,
       data: addresses
@@ -277,9 +328,9 @@ exports.createAddress = async (req, res) => {
       ...req.body,
       MaKH: userId
     };
-    
+
     const newAddress = await addressService.createAddress(addressData);
-    
+
     res.status(201).json({
       success: true,
       message: 'Thêm địa chỉ thành công',
@@ -301,16 +352,16 @@ exports.updateAddress = async (req, res) => {
     const userId = req.userId;
     const addressId = req.params.id;
     const addressData = req.body;
-    
+
     const updatedAddress = await addressService.updateAddress(addressId, userId, addressData);
-    
+
     if (!updatedAddress) {
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy địa chỉ'
       });
     }
-    
+
     res.json({
       success: true,
       message: 'Cập nhật địa chỉ thành công',
@@ -331,16 +382,16 @@ exports.deleteAddress = async (req, res) => {
   try {
     const userId = req.userId;
     const addressId = req.params.id;
-    
+
     const deleted = await addressService.deleteAddress(addressId, userId);
-    
+
     if (!deleted) {
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy địa chỉ'
       });
     }
-    
+
     res.json({
       success: true,
       message: 'Xóa địa chỉ thành công'
@@ -360,16 +411,16 @@ exports.setDefaultAddress = async (req, res) => {
   try {
     const userId = req.userId;
     const addressId = req.params.id;
-    
+
     const updatedAddress = await addressService.setDefaultAddress(addressId, userId);
-    
+
     if (!updatedAddress) {
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy địa chỉ'
       });
     }
-    
+
     res.json({
       success: true,
       message: 'Đặt địa chỉ mặc định thành công',
@@ -390,14 +441,14 @@ exports.getDefaultAddress = async (req, res) => {
   try {
     const userId = req.userId;
     const address = await addressService.getDefaultAddress(userId);
-    
+
     if (!address) {
       return res.status(404).json({
         success: false,
         message: 'Chưa có địa chỉ mặc định'
       });
     }
-    
+
     res.json({
       success: true,
       data: address

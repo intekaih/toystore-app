@@ -133,12 +133,20 @@ const OrderTable = ({ orders, onUpdateStatus, loading, isStaffView = false }) =>
 
               if (response.success) {
                 const { maVanDon, printUrl, instructions } = response.data;
+                
+                // ✅ CẬP NHẬT NGAY: Cập nhật cả maVanDon và trạng thái
+                const updatedStatus = response.data.trangThai || 'Đang đóng gói';
+                onUpdateStatus(order.id, updatedStatus, { maVanDon: maVanDon });
+                
                 alert(
                   `✅ Đã tạo đơn GHN thành công!\n\n` +
                   `🏷️ Mã vận đơn: ${maVanDon}\n\n` +
                   `📋 Hướng dẫn:\n${instructions.join('\n')}\n\n` +
                   `🔗 Tracking: ${printUrl || 'Không có'}`
                 );
+                
+                // ✅ Đánh dấu đã xử lý để không cập nhật lại ở dưới
+                response.alreadyUpdated = true;
               }
               break;
             case 'Đang đóng gói':
@@ -175,11 +183,26 @@ const OrderTable = ({ orders, onUpdateStatus, loading, isStaffView = false }) =>
         }
 
         if (response.success) {
+          // ✅ Nếu đã cập nhật ở trên (như trường hợp tạo đơn GHN), bỏ qua
+          if (response.alreadyUpdated) {
+            // Đã cập nhật và hiển thị alert ở trên rồi, không làm gì thêm
+            return;
+          }
+          
           // ✅ SỬA: Lấy trạng thái mới từ response (nếu có) hoặc dùng nextStatus
           const updatedStatus = response.data?.trangThai || response.data?.order?.trangThai || nextStatus;
+          
+          // ✅ THÊM: Lấy các field khác từ response (như maVanDon)
+          const additionalData = {};
+          if (response.data?.maVanDon) {
+            additionalData.maVanDon = response.data.maVanDon;
+          }
+          if (response.data?.order?.maVanDon) {
+            additionalData.maVanDon = response.data.order.maVanDon;
+          }
 
-          // ✅ CHỈ cập nhật state local khi API call thành công
-          onUpdateStatus(order.id, updatedStatus);
+          // ✅ CẬP NHẬT: Cập nhật state local khi API call thành công
+          onUpdateStatus(order.id, updatedStatus, additionalData);
 
           // Hiển thị thông báo sau khi đã cập nhật state
           setTimeout(() => {

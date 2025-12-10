@@ -469,9 +469,9 @@ const OrderManagementPage = ({ isStaffView = false }) => {
     fetchOrders(page, selectedStatus, searchTerm);
   };
 
-  const handleUpdateStatus = async (orderId, newStatus) => {
+  const handleUpdateStatus = async (orderId, newStatus, additionalData = {}) => {
     try {
-      console.log(`🔄 [handleUpdateStatus] Bắt đầu cập nhật order ${orderId} → ${newStatus}`);
+      console.log(`🔄 [handleUpdateStatus] Bắt đầu cập nhật order ${orderId} → ${newStatus}`, additionalData);
       
       // ✅ SỬA: Đánh dấu đang cập nhật để tắt auto-refresh
       setIsUpdatingOrder(true);
@@ -479,14 +479,14 @@ const OrderManagementPage = ({ isStaffView = false }) => {
       // ✅ THÊM: Đánh dấu order đã được cập nhật local
       setLocalUpdatedOrders(prev => new Set([...prev, orderId]));
       
-      // ✅ CẬP NHẬT NGAY: Cập nhật trạng thái trong state ngay lập tức
+      // ✅ CẬP NHẬT NGAY: Cập nhật trạng thái và các field khác trong state ngay lập tức
       setOrders(prevOrders => {
         const updated = prevOrders.map(order => 
           order.id === orderId 
-            ? { ...order, trangThai: newStatus }
+            ? { ...order, trangThai: newStatus, ...additionalData }
             : order
         );
-        console.log(`✅ [handleUpdateStatus] Đã cập nhật state local cho order ${orderId}: ${newStatus}`);
+        console.log(`✅ [handleUpdateStatus] Đã cập nhật state local cho order ${orderId}:`, { trangThai: newStatus, ...additionalData });
         return updated;
       });
       

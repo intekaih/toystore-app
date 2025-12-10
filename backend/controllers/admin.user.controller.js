@@ -1,6 +1,7 @@
 const db = require('../models');
 const bcrypt = require('bcryptjs');
 const TaiKhoan = db.TaiKhoan;
+const KhachHang = db.KhachHang;
 const { Op } = require('sequelize');
 const DTOMapper = require('../utils/DTOMapper');
 
@@ -482,8 +483,58 @@ exports.updateUser = async (req, res) => {
       });
     }
 
-    // Cập nhật thông tin user
-    await user.update(updateData);
+    // ✅ SỬ DỤNG TRANSACTION để đảm bảo tính nhất quán dữ liệu
+    const transaction = await db.sequelize.transaction();
+
+    try {
+      // Cập nhật thông tin user trong bảng TaiKhoan
+      await user.update(updateData, { transaction });
+
+      // ✅ ĐỒNG BỘ: Cập nhật bảng KhachHang nếu tồn tại
+      const khachHang = await KhachHang.findOne({
+        where: { TaiKhoanID: userId },
+        transaction
+      });
+
+      if (khachHang) {
+        const khachHangUpdateData = {};
+
+        // Đồng bộ HoTen (chỉ khi có giá trị hợp lệ)
+        if (updateData.HoTen !== undefined && updateData.HoTen !== null && updateData.HoTen !== '') {
+          khachHangUpdateData.HoTen = updateData.HoTen;
+        }
+        
+        // Đồng bộ Email
+        if (updateData.Email !== undefined) {
+          khachHangUpdateData.Email = updateData.Email;
+        }
+        
+        // Đồng bộ DienThoai
+        if (updateData.DienThoai !== undefined) {
+          khachHangUpdateData.DienThoai = updateData.DienThoai;
+        }
+
+        if (Object.keys(khachHangUpdateData).length > 0) {
+          await khachHang.update(khachHangUpdateData, { transaction });
+          console.log('✅ Đồng bộ KhachHang thành công - ID:', khachHang.ID);
+          console.log('📝 Dữ liệu đã đồng bộ:', khachHangUpdateData);
+        } else {
+          console.log('⚠️ Không có dữ liệu để đồng bộ với KhachHang');
+        }
+      } else {
+        console.log('⚠️ Không tìm thấy bản ghi KhachHang với TaiKhoanID:', userId);
+      }
+
+      // Commit transaction nếu tất cả đều thành công
+      await transaction.commit();
+      console.log('✅ Transaction đã được commit thành công');
+
+    } catch (error) {
+      // Rollback transaction nếu có lỗi
+      await transaction.rollback();
+      console.error('❌ Lỗi trong transaction, đã rollback:', error);
+      throw error;
+    }
 
     // Lấy lại thông tin user đã cập nhật
     const updatedUser = await TaiKhoan.findByPk(userId, {

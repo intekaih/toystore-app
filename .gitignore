@@ -5,40 +5,125 @@ frontend/node_modules/
 
 # Environment variables (IMPORTANT: Never commit these files!)
 .env
-backend/.env
-frontend/.env
+.env.*
 .env.local
-.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
 
 # Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 backend/logs/
+frontend/logs/
+logs/
 
 # OS files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
 
 # Build
 build/
 dist/
 frontend/build/
 backend/dist/
+.next/
+out/
+.vercel/
+.turbo/
+.swc/
 
 # Uploads
 backend/uploads/*
 !backend/uploads/.gitkeep
+!backend/uploads/.gitignore
 
-# Token files
+# Cache
+.cache/
+.parcel-cache/
+.npm/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+.sass-cache/
+*.css.map
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+.jest/
+
+# SSL Certificates & Keys
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+
+# Token files & Secrets
 token.txt
+*.secret
+secrets/
+
+# Database
+*.sql.gz
+*.sql.bak
+*.db
+*.sqlite
+*.sqlite3
+# Uncomment if database dumps contain sensitive data:
+# db/*.sql
+# db/dumps/
+
+# Docker
+docker-compose.override.yml
+.dockerignore.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+.tmp/
+.temp/
 
 # Package lock (optional - uncomment if needed)
 # package-lock.json
 # backend/package-lock.json
 # frontend/package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Misc
+*.pid
+*.seed
+*.pid.lock
+.npmrc.local
